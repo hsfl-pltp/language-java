@@ -156,8 +156,8 @@ recordClassDecl = do
     tok KW_Record
     i <- ident
     tps <- lopt typeParams
-    imp <- lopt implements
     fields <- parens (seplist recordField comma)
+    imp <- lopt implements
     bod <- classBody
     return $ \ms -> RecordDecl ms i tps fields imp bod
     where
