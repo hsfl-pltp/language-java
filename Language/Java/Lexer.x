@@ -9,10 +9,12 @@ import Data.Char
 
 %wrapper "posn"
 
-$digit      = [0-9]
-$nonzero    = [1-9]
-$octdig     = [0-7]
-$hexdig     = [0-9A-Fa-f]
+$digit       = [0-9]
+$digitUnder  = [0-9_]
+$nonzero     = [1-9]
+$octdig      = [0-7]
+$hexdig      = [0-9A-Fa-f]
+$hexdigUnder = [0-9A-Fa-f_]
 
 @lineterm = [\n\r] | \r\n
 
@@ -22,7 +24,6 @@ $hexdig     = [0-9A-Fa-f]
 @comm = @tradcomm | @linecomm
 
 $javaLetter = [a-zA-Z\_\$]
-$javaDigit = $digit
 $javaLetterOrDigit = [a-zA-Z0-9\_\$]
 
 @octEscape = [0123]? $octdig{1,2}
@@ -93,22 +94,22 @@ tokens  :-
 
     0               { \p _ -> L (pos p) $ IntTok 0        }
     0 [lL]          { \p _ -> L (pos p) $ LongTok 0       }
-    0 $digit+       { \p s -> L (pos p) $ IntTok (pickyReadOct s) }
-    0 $digit+ [lL]  { \p s -> L (pos p) $ LongTok (pickyReadOct (init s)) }
-    $nonzero $digit*        { \p s -> L (pos p) $ IntTok (read s) }
-    $nonzero $digit* [lL]   { \p s -> L (pos p) $ LongTok (read (init s)) }
-    0 [xX] $hexdig+         { \p s -> L (pos p) $ IntTok (fst . head $ readHex (drop 2 s)) }
-    0 [xX] $hexdig+ [lL]    { \p s -> L (pos p) $ LongTok (fst . head $ readHex (init (drop 2 s))) }
+    0 $digitUnder+               { \p s -> parseNum readOct s `force` \i -> L (pos p) $ IntTok i }
+    0 $digitUnder+ [lL]          { \p s -> parseNum readOct (init s) `force` \i -> L (pos p) $ LongTok i }
+    $nonzero $digitUnder*        { \p s -> read (removeUnder s) `force` \i -> L (pos p) $ IntTok i }
+    $nonzero $digitUnder* [lL]   { \p s -> read (removeUnder (init s)) `force` \i -> L (pos p) $ LongTok i }
+    0 [xX] $hexdig $hexdigUnder*         { \p s -> parseNum readHex (drop 2 s) `force` \i -> L (pos p) $ IntTok i }
+    0 [xX] $hexdig $hexdigUnder* [lL]    { \p s -> parseNum readHex (init (drop 2 s)) `force` \i -> L (pos p) $ LongTok i }
 
-    $digit+ \. $digit* @exponent? [dD]?           { \p s -> L (pos p) $ DoubleTok (fst . head $ readFloat $ '0':s) }
-            \. $digit+ @exponent? [dD]?           { \p s -> L (pos p) $ DoubleTok (fst . head $ readFloat $ '0':s) }
-    $digit+ \. $digit* @exponent? [fF]            { \p s -> L (pos p) $ FloatTok  (fst . head $ readFloat $ '0':s) }
-            \. $digit+ @exponent? [fF]            { \p s -> L (pos p) $ FloatTok  (fst . head $ readFloat $ '0':s) }
-    $digit+ @exponent                             { \p s -> L (pos p) $ DoubleTok (fst . head $ readFloat s) }
-    $digit+ @exponent? [dD]                       { \p s -> L (pos p) $ DoubleTok (fst . head $ readFloat s) }
-    $digit+ @exponent? [fF]                       { \p s -> L (pos p) $ FloatTok  (fst . head $ readFloat s) }
-    0 [xX] $hexdig* \.? $hexdig* @pexponent [dD]? { \p s -> L (pos p) $ DoubleTok (readHexExp (drop 2 s)) }
-    0 [xX] $hexdig* \.? $hexdig* @pexponent [fF]  { \p s -> L (pos p) $ FloatTok  (readHexExp (drop 2 s)) }
+    $digit $digitUnder* \. $digit? $digitUnder* @exponent? [dD]?    { \p s -> parseNum readFloat (dropDoubleSuffix s) `force` \d -> L (pos p) $ DoubleTok d }
+            \. $digit $digitUnder* @exponent? [dD]?                 { \p s -> parseNum readFloat ('0':(dropDoubleSuffix s)) `force` \d -> L (pos p) $ DoubleTok d }
+    $digit $digitUnder* \. $digit? $digitUnder* @exponent? [fF]     { \p s -> parseNum readFloat (init s) `force` \d -> L (pos p) $ FloatTok  d }
+            \. $digit $digitUnder* @exponent? [fF]                  { \p s -> parseNum readFloat ('0':(init s)) `force` \d -> L (pos p) $ FloatTok  d }
+    $digit $digitUnder* @exponent                                   { \p s -> parseNum readFloat s `force` \d -> L (pos p) $ DoubleTok d }
+    $digit $digitUnder* @exponent? [dD]                             { \p s -> parseNum readFloat (init s) `force` \d -> L (pos p) $ DoubleTok d }
+    $digit $digitUnder* @exponent? [fF]                             { \p s -> parseNum readFloat (init s) `force` \d -> L (pos p) $ FloatTok d }
+    0 [xX] $hexdig? $hexdigUnder* \.? $hexdig? $hexdigUnder* @pexponent [dD]?     { \p s -> readHexExp (drop 2 (dropDoubleSuffix s)) `force` \d -> L (pos p) $ DoubleTok d }
+    0 [xX] $hexdig? $hexdigUnder* \.? $hexdig? $hexdigUnder* @pexponent [fF]      { \p s -> readHexExp (drop 2 (init s)) `force` \d -> L (pos p) $ FloatTok d }
 
     true            { \p _ -> L (pos p) $ BoolTok True    }
     false           { \p _ -> L (pos p) $ BoolTok False   }
@@ -173,20 +174,33 @@ tokens  :-
 
 {
 
-pickyReadOct :: String -> Integer
-pickyReadOct s =
-  if not $ null remStr
-  then lexicalError $ "Non-octal digit '" ++ take 1 remStr ++ "' in \"" ++ s ++ "\"."
-  else n
-    where (n,remStr) = head $ readOct s
+force :: a -> (a -> b) -> b
+force x f = x `seq` (f x)
+
+dropDoubleSuffix :: String -> String
+dropDoubleSuffix s =
+  case reverse s of
+    'd':rest -> reverse rest
+    'D':rest -> reverse rest
+    _ -> s
+
+removeUnder :: String -> String
+removeUnder = filter (/= '_')
+
+parseNum :: (Eq a, Num a) => (String -> [(a, String)]) -> String -> a
+parseNum f s =
+  case f (removeUnder s) of
+    [(x, "")] -> x
+    _ -> lexicalError $ "invalid numeric literal: " ++ s
 
 readHexExp :: (Floating a, Eq a) => String -> a
 readHexExp initial =
-    let (m, suf) = head $ readHex initial
-        (e, _) = case suf of
-                      p:s | toLower p == 'p' -> head $ readHex s
-                      _                      -> (0, "")
-     in m ** e
+    case readHex (removeUnder initial) of
+      [(m, suf)] ->
+          case suf of
+            p:s | toLower p == 'p' -> m ** parseNum readHex s
+            _  -> lexicalError $ "invalid numeric literal: " ++ initial
+      _ -> lexicalError $ "invalid numeric literal: " ++ initial
 
 readCharTok :: String -> Char
 readCharTok s = head . convChar . dropQuotes $ s
@@ -240,7 +254,7 @@ convChar (x:s) = x:convChar s
 convChar "" = ""
 
 lexicalError :: String -> a
-lexicalError = error . ("lexical error: " ++)
+lexicalError s = error ("lexical error: " ++ s)
 
 data L a = L Pos a
   deriving (Show, Eq)
