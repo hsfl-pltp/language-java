@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+
+
 module Language.Java.Parser (
     parser,
 
@@ -43,7 +45,7 @@ import Text.Parsec.Pos
 
 import Prelude hiding ( exp, catch, (>>), (>>=) )
 import qualified Prelude as P ( (>>), (>>=) )
-import Data.Maybe ( isJust, catMaybes )
+import Data.Maybe ( isJust, catMaybes, maybeToList )
 import Control.Monad ( ap )
 
 #if __GLASGOW_HASKELL__ < 707
@@ -180,7 +182,7 @@ recordClassDecl = do
         recordField = do
             typ <- ttype
             i <- ident
-            return $ RecordFieldDecl  typ i
+            return $ RecordFieldDecl typ i
 
 classBody :: P ClassBody
 classBody = ClassBody <$> braces classBodyStatements
@@ -446,6 +448,8 @@ arrayInit = braces $ do
     opt comma
     return $ ArrayInit vis
 
+
+
 ----------------------------------------------------------------------------
 -- Statements
 
@@ -595,12 +599,13 @@ stmtNoTrail =
         return $ Throw e) <|>
     -- try-catch, both with and without a finally clause
     (do tok KW_Try
+        resources <- tryResourceList
         b <- block
         c <- list catch
         mf <- opt $ tok KW_Finally >> block
         -- TODO: here we should check that there exists at
         -- least one catch or finally clause
-        return $ Try b c mf) <|>
+        return $ Try resources b c mf) <|>
     -- expressions as stmts
     ExpStmt <$> endSemi stmtExp
 
@@ -661,6 +666,30 @@ catch = do
     fp <- parens formalParam
     b  <- block
     return $ Catch fp b
+
+tryResourceList :: P [TryResource]
+tryResourceList = do
+    l <- opt $ parens $ do
+            l <- seplist tryResource semiColon
+            _ <- opt semiColon
+            return l
+    case l of
+      Just xs -> return xs
+      Nothing -> return []
+    where
+        tryResource =
+            (TryResourceVarDecl <$> try resourceDecl) <|>
+            (TryResourceQualAccess <$> try fieldAccess) <|>
+            (TryResourceVarAccess <$> ident)
+
+resourceDecl :: P ResourceDecl
+resourceDecl = do
+    ms <- list modifier
+    typ <- ttype
+    vid <- varDeclId
+    tok Op_Equal
+    val <- varInit
+    return $ ResourceDecl ms typ vid val
 
 ----------------------------------------------------------------------------
 -- Expressions

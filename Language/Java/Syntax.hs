@@ -30,6 +30,8 @@ module Language.Java.Syntax
     , BlockStmt(..)
     , Stmt(..)
     , Catch(..)
+    , TryResource(..)
+    , ResourceDecl(..)
     , SwitchBlock(..)
     , SwitchLabel(..)
     , SwitchExpBranch(..)
@@ -311,7 +313,7 @@ data Stmt
     --   can catch it, then control will be transferred to the first such catch clause. If the try statement has a finally
     --   clause, then another block of code is executed, no matter whether the try block completes normally or abruptly,
     --   and no matter whether a catch clause is first given control.
-    | Try Block [Catch] (Maybe {- finally -} Block)
+    | Try [TryResource] Block [Catch] (Maybe {- finally -} Block)
     -- | Statements may have label prefixes.
     | Labeled Ident Stmt
   deriving (Eq,Show,Read,Typeable,Generic,Data)
@@ -319,6 +321,16 @@ data Stmt
 -- | If a value is thrown and the try statement has one or more catch clauses that can catch it, then control will be
 --   transferred to the first such catch clause.
 data Catch = Catch FormalParam Block
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
+
+data TryResource
+  = TryResourceVarDecl ResourceDecl
+  | TryResourceVarAccess Ident
+  | TryResourceQualAccess FieldAccess
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
+
+data ResourceDecl =
+  ResourceDecl [Modifier] Type VarDeclId VarInit
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
 -- | A block of code labelled with a @case@ or @default@ within a @switch@ statement.

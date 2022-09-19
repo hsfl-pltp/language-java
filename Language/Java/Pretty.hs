@@ -255,7 +255,7 @@ instance Pretty Stmt where
   prettyPrec p (Throw e) =
     text "throw" <+> prettyPrec p e <> semi
 
-  prettyPrec p (Try block catches mFinally) =
+  prettyPrec p (Try _resources block catches mFinally) = -- FIXME: do not ignore resources
     text "try" $$ prettyPrec p block $$
       vcat (map (prettyPrec p) catches ++ [ppFinally mFinally])
    where ppFinally Nothing = empty
