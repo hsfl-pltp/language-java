@@ -54,9 +54,25 @@ import Control.Applicative ( (<$>), (<$), (<*) )
 infixl 4 <*>
 #else
 import Control.Applicative ( (<$>), (<$), (<*), (<*>) )
+import GHC.IO (unsafePerformIO)
 #endif
 
 type P = Parsec [L Token] ()
+
+getNextTok :: P (Maybe (L Token))
+getNextTok = do
+    state <- getParserState
+    case stateInput state of
+        [] -> return Nothing
+        (x:_) -> return (Just x)
+
+traceP :: String -> P ()
+traceP s =
+    unsafePerformIO (logToFile s) `seq` return ()
+
+logToFile :: String -> IO ()
+logToFile msg =
+    appendFile "hs-java-parser.log" (msg ++ "\n")
 
 -- A trick to allow >> and >>=, normally infixr 1, to be
 -- used inside branches of <|>, which is declared as infixl 1.
@@ -543,8 +559,8 @@ stmtNoTrail =
     -- switch stmts
     (do tok KW_Switch
         e  <- parens exp
-        sb <- switchBlock
-        return $ Switch e sb) <|>
+        (style, sb) <- switchBlock
+        return $ Switch style e sb) <|>
     -- do-while loops
     (endSemi $ do
         tok KW_Do
@@ -601,21 +617,41 @@ forUp = seplist1 stmtExp comma
 
 -- Switches
 
-switchBlock :: P [SwitchBlock]
-switchBlock = braces $ list switchStmt
+switchBlock :: P (SwitchStyle, [SwitchBlock])
+switchBlock = braces (try old <|> new)
+    where
+      old = do
+        x <- list switchStmtOld
+        return (SwitchOldStyle, x)
+      new = do
+        x <- list switchStmtNew
+        return (SwitchNewStyle, x)
 
-switchStmt :: P SwitchBlock
-switchStmt = do
-    lbl <- switchLabel
+switchStmtOld :: P SwitchBlock
+switchStmtOld = do
+    lbl <- switchLabelOld
     bss <- list blockStmt
     return $ SwitchBlock lbl bss
 
-switchLabel :: P SwitchLabel
-switchLabel = (tok KW_Default >> colon >> return Default) <|>
+switchLabelOld :: P SwitchLabel
+switchLabelOld = (tok KW_Default >> colon >> return Default) <|>
     (do tok KW_Case
-        e <- exp
+        es <- seplist condExp comma
         colon
-        return $ SwitchCase e)
+        return $ SwitchCase es)
+
+switchStmtNew :: P SwitchBlock
+switchStmtNew = do
+    lbl <- switchLabelNew
+    bss <- braces (list blockStmt) <|> (blockStmt >>= \s -> return [s])
+    return $ SwitchBlock lbl bss
+
+switchLabelNew :: P SwitchLabel
+switchLabelNew = (tok KW_Default >> tok LambdaArrow >> return Default) <|>
+    (do tok KW_Case
+        es <- seplist condExp comma
+        tok LambdaArrow
+        return $ SwitchCase es)
 
 -- Try-catch clauses
 
@@ -669,7 +705,7 @@ exp :: P Exp
 exp = assignExp
 
 assignExp :: P Exp
-assignExp = try methodRef <|> try lambdaExp <|> try assignment <|> condExp
+assignExp = try switchExp <|> try methodRef <|> try lambdaExp <|> try assignment <|> condExp
 
 condExp :: P Exp
 condExp = do
@@ -728,6 +764,19 @@ postfixExp = do
     ops <- list postfixOp
     return $ foldl (\a s -> s a) pe ops
 
+switchExp :: P Exp
+switchExp = do
+    tok KW_Switch
+    e <- parens exp
+    branches <- braces switchExpBody
+    return $ SwitchExp e branches
+    where
+        switchExpBody = many switchExpBodyBranch
+        switchExpBodyBranch = do
+            l <- switchLabelNew
+            e <- exp
+            semiColon
+            return (SwitchExpBranch l e)
 
 primary :: P Exp
 primary = primaryNPS |>> primarySuffix

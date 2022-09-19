@@ -67,6 +67,7 @@ instance Pretty ClassDecl where
           , ppExtends p (maybe [] return mSuper)
           , ppImplements p impls
          ] $$ prettyPrec p body
+  -- FIXME: case for record missing
 
 instance Pretty ClassBody where
   prettyPrec p (ClassBody ds) =
@@ -232,7 +233,7 @@ instance Pretty Stmt where
     text "assert" <+> prettyPrec p ass
       <+> maybe empty ((colon <>) . prettyPrec p) mE <> semi
 
-  prettyPrec p (Switch e sBlocks) =
+  prettyPrec p (Switch _style e sBlocks) =
     text "switch" <+> parens (prettyPrec p e)
       $$ braceBlock (map (prettyPrec p) sBlocks)
 
@@ -272,9 +273,9 @@ instance Pretty SwitchBlock where
     vcat (prettyPrec p lbl : map (nest 2 . prettyPrec p) stmts)
 
 instance Pretty SwitchLabel where
-  prettyPrec p (SwitchCase e) =
-    text "case" <+> prettyPrec p e <> colon
-  prettyPrec p Default = text "default:"
+  prettyPrec _p (SwitchCase e) =
+    text "case" <+> hsep (intersperse comma $ map (prettyPrec 0) e) <> colon
+  prettyPrec _p Default = text "default:"
 
 instance Pretty ForInit where
   prettyPrec p (ForLocalVars mods t vds) =
@@ -371,6 +372,8 @@ instance Pretty Exp where
 
   prettyPrec p (MethodRef i1 i2) =
     prettyPrec p i1 <+> text "::" <+> prettyPrec p i2
+
+  -- FIXME: case for newstyle switch exp missing
 
 instance Pretty LambdaParams where
   prettyPrec p (LambdaSingleParam ident) = prettyPrec p ident

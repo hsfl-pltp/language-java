@@ -32,6 +32,8 @@ module Language.Java.Syntax
     , Catch(..)
     , SwitchBlock(..)
     , SwitchLabel(..)
+    , SwitchExpBranch(..)
+    , SwitchStyle(..)
     , ForInit(..)
     , ExceptionType
     , Argument
@@ -290,7 +292,7 @@ data Stmt
     --   evaluates to false.
     | Assert Exp (Maybe Exp)
     -- | The switch statement transfers control to one of several statements depending on the value of an expression.
-    | Switch Exp [SwitchBlock]
+    | Switch SwitchStyle Exp [SwitchBlock]
     -- | The @do@ statement executes a statement and an expression repeatedly until the value of the expression is false.
     | Do Stmt Exp
     -- | A @break@ statement transfers control out of an enclosing statement.
@@ -324,10 +326,16 @@ data SwitchBlock
     = SwitchBlock SwitchLabel [BlockStmt]
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
+data SwitchStyle
+    = SwitchOldStyle
+    | SwitchNewStyle -- JEP 361
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
+
 -- | A label within a @switch@ statement.
 data SwitchLabel
-    -- | The expression contained in the @case@ must be a 'Lit' or an @enum@ constant.
-    = SwitchCase Exp
+    -- | The expressions contained in the @case@ must be a 'Lit' or an @enum@ constant.
+    -- The list must be non-empty.
+    = SwitchCase [Exp]
     | Default
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
@@ -412,6 +420,8 @@ data Exp
     | Lambda LambdaParams LambdaExpression
     -- | Method reference
     | MethodRef Name Ident
+    -- | New-style switch expression (JEP 361)
+    | SwitchExp Exp [SwitchExpBranch]
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
 -- | The left-hand side of an assignment expression. This operand may be a named variable, such as a local
@@ -468,4 +478,9 @@ data MethodInvocation
 --   array and providing some initial values
 data ArrayInit
     = ArrayInit [VarInit]
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
+
+-- | The branch of a newstyle switch expression.
+data SwitchExpBranch
+  = SwitchExpBranch SwitchLabel Exp
   deriving (Eq,Show,Read,Typeable,Generic,Data)
