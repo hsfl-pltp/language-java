@@ -799,13 +799,13 @@ lambdaParams = try (LambdaSingleParam <$> ident)
                <|> (parens $ LambdaInferredParams <$> (seplist ident comma))
 
 lambdaExp :: P Exp
-lambdaExp = Lambda 
+lambdaExp = Lambda
             <$> (lambdaParams <* (tok LambdaArrow))
             <*> ((LambdaBlock <$> (try block))
                  <|> (LambdaExpression <$> exp))
 
 methodRef :: P Exp
-methodRef = MethodRef 
+methodRef = MethodRef
             <$> (name <*  (tok MethodRefSep))
             <*> ident
 
@@ -1032,7 +1032,7 @@ assignOp =
     (tok Op_OrE      >> return OrA      )
 
 infixCombineOp :: P Op
-infixCombineOp = 
+infixCombineOp =
     (tok Op_And     >> return And       ) <|>
     (tok Op_Caret   >> return Xor       ) <|>
     (tok Op_Or      >> return Or        ) <|>
@@ -1050,17 +1050,17 @@ infixOp =
     (tok Op_LShift  >> return LShift    ) <|>
     (tok Op_LThan   >> return LThan     ) <|>
     (try $ do
-       tok Op_GThan   
-       tok Op_GThan   
+       tok Op_GThan
+       tok Op_GThan
        tok Op_GThan
        return RRShift   ) <|>
-           
+
     (try $ do
-       tok Op_GThan 
+       tok Op_GThan
        tok Op_GThan
        return RShift    ) <|>
-           
-    (tok Op_GThan   >> return GThan     ) <|>                                          
+
+    (tok Op_GThan   >> return GThan     ) <|>
     (tok Op_LThanE  >> return LThanE    ) <|>
     (tok Op_GThanE  >> return GThanE    ) <|>
     (tok Op_Equals  >> return Equal     ) <|>

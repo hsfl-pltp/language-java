@@ -128,7 +128,6 @@ data Decl
     | InitDecl Bool Block
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
-
 -- | A class or interface member can be an inner class or interface, a field or
 --   constant, or a method or constructor. An interface may only have as members
 --   constants (not fields), abstract methods, and no constructors.
@@ -210,7 +209,7 @@ data Modifier
   deriving (Eq,Read,Typeable,Generic,Data)
 
 instance Show Modifier where
-   show Public = "public" 
+   show Public = "public"
    show Private = "private"
    show Protected = "protected"
    show Abstract = "abstract"
