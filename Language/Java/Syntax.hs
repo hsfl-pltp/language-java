@@ -35,6 +35,7 @@ module Language.Java.Syntax
     , SwitchBlock(..)
     , SwitchLabel(..)
     , SwitchExpBranch(..)
+    , SwitchExpBranchBody(..)
     , SwitchStyle(..)
     , ForInit(..)
     , ExceptionType
@@ -351,6 +352,15 @@ data SwitchLabel
     | Default
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
+data SwitchExpBranch
+    = SwitchExpBranch SwitchLabel SwitchExpBranchBody
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
+
+data SwitchExpBranchBody
+    = SwitchExpBranchExp Exp
+    | SwitchExpBranchBlock [BlockStmt]
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
+
 -- | Initialization code for a basic @for@ statement.
 data ForInit
     = ForLocalVars [Modifier] Type [VarDecl]
@@ -490,9 +500,4 @@ data MethodInvocation
 --   array and providing some initial values
 data ArrayInit
     = ArrayInit [VarInit]
-  deriving (Eq,Show,Read,Typeable,Generic,Data)
-
--- | The branch of a newstyle switch expression.
-data SwitchExpBranch
-  = SwitchExpBranch SwitchLabel Exp
   deriving (Eq,Show,Read,Typeable,Generic,Data)

@@ -2,6 +2,14 @@ enum Day {
     MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY
 }
 
+enum Suit {
+    Diamonds, Hearts, Spades, Clubs
+}
+
+class JsonElement {
+    String getAsString() { return ""; }
+}
+
 public class CaseTest {
     void switchStatementOld(Day day) {
         switch (day) {
@@ -31,8 +39,22 @@ public class CaseTest {
         System.out.println(switch (day) {
             case MONDAY, FRIDAY, SUNDAY -> 6;
             case TUESDAY                -> 7;
-            case THURSDAY, SATURDAY     -> 8;
+            case THURSDAY, SATURDAY     -> {
+                System.out.println("hello");
+                System.out.println("World");
+                throw new RuntimeException("error");
+            }
             default              -> 9;
         });
     }
+
+    public static Suit fromJSON(JsonElement json) {
+        return switch (json.getAsString()) {
+          case "Karo" -> Suit.Diamonds;
+          case "Herz" -> Suit.Hearts;
+          case "Pick" -> Suit.Spades;
+          case "Kreuz" -> Suit.Clubs;
+          default -> throw new IllegalStateException("Invalid suit: " + json);
+        };
+      }
 }

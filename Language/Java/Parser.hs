@@ -658,6 +658,26 @@ switchLabelNew = (tok KW_Default >> tok LambdaArrow >> return Default) <|>
         tok LambdaArrow
         return $ SwitchCase es)
 
+switchExp :: P Exp
+switchExp = do
+    tok KW_Switch
+    e <- parens exp
+    branches <- braces switchExpBody
+    return $ SwitchExp e branches
+    where
+        switchExpBody = many switchExpBodyBranch
+        switchExpBodyBranch = do
+            lbl <- switchLabelNew
+            body <-
+                (SwitchExpBranchBlock <$> braces (list blockStmt)) <|>
+                (SwitchExpBranchBlock <$> try (blockStmt >>= \s -> return [s])) <|>
+                (SwitchExpBranchExp <$> branchExp)
+            return $ SwitchExpBranch lbl body
+        branchExp = do
+            e <- exp
+            semiColon
+            return e
+
 -- Try-catch clauses
 
 catch :: P Catch
@@ -792,20 +812,6 @@ postfixExp = do
     pe <- postfixExpNES
     ops <- list postfixOp
     return $ foldl (\a s -> s a) pe ops
-
-switchExp :: P Exp
-switchExp = do
-    tok KW_Switch
-    e <- parens exp
-    branches <- braces switchExpBody
-    return $ SwitchExp e branches
-    where
-        switchExpBody = many switchExpBodyBranch
-        switchExpBodyBranch = do
-            l <- switchLabelNew
-            e <- exp
-            semiColon
-            return (SwitchExpBranch l e)
 
 primary :: P Exp
 primary = primaryNPS |>> primarySuffix
