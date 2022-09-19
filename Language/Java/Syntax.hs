@@ -402,7 +402,7 @@ data Exp
     -- | The application of a binary operator to two operand expressions.
     | BinOp Exp Op Exp
     -- | Testing whether the result of an expression is an instance of some reference type.
-    | InstanceOf Exp RefType
+    | InstanceOf Exp RefType (Maybe Name)
     -- | The conditional operator @? :@ uses the boolean value of one expression to decide which of two other
     --   expressions should be evaluated.
     | Cond Exp Exp Exp

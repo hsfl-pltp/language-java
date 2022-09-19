@@ -350,11 +350,15 @@ instance Pretty Exp where
     let prec = opPrec op in
     parenPrec p prec (prettyPrec prec e1 <+> prettyPrec p op <+> prettyPrec prec e2)
 
-  prettyPrec p (InstanceOf e rt) =
-    let cp = opPrec LThan in
-    parenPrec p cp $ prettyPrec cp e
-                   <+> text "instanceof" <+> prettyPrec cp rt
-    
+  prettyPrec p (InstanceOf e rt mName) =
+    let cp = opPrec LThan
+        prettyName =
+          case mName of
+            Nothing -> empty
+            Just n -> char ' ' <> pretty n
+    in parenPrec p cp $ prettyPrec cp e
+                      <+> text "instanceof" <+> prettyPrec cp rt <> prettyName
+
   prettyPrec p (Cond c th el) =
     parenPrec p 13 $ prettyPrec 13 c <+> char '?'
                    <+> prettyPrec p th <+> colon <+> prettyPrec 13 el

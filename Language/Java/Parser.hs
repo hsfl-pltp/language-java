@@ -702,7 +702,8 @@ infixExpSuffix =
         return $ \e1 -> BinOp e1 op e2) <|>
     (do tok KW_Instanceof
         t  <- refType
-        return $ \e1 -> InstanceOf e1 t)
+        mName <- opt name
+        return $ \e1 -> InstanceOf e1 t mName)
 
 unaryExp :: P Exp
 unaryExp = try preIncDec <|>
