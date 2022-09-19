@@ -74,6 +74,7 @@ tokens  :-
     private         { \p _ -> L (pos p) $ KW_Private      }
     protected       { \p _ -> L (pos p) $ KW_Protected    }
     public          { \p _ -> L (pos p) $ KW_Public       }
+    record          { \p _ -> L (pos p) $ KW_Record       }
     return          { \p _ -> L (pos p) $ KW_Return       }
     short           { \p _ -> L (pos p) $ KW_Short        }
     static          { \p _ -> L (pos p) $ KW_Static       }
@@ -288,6 +289,7 @@ data Token
     | KW_Private
     | KW_Protected
     | KW_Public
+    | KW_Record
     | KW_Return
     | KW_Short
     | KW_Static

@@ -13,6 +13,7 @@ module Language.Java.Syntax
     , InterfaceKind(..)
     , Decl(..)
     , MemberDecl(..)
+    , RecordFieldDecl(..)
     , VarDecl(..)
     , VarDeclId(..)
     , VarInit(..)
@@ -86,6 +87,7 @@ data TypeDecl
 -- | A class declaration specifies a new named reference type.
 data ClassDecl
     = ClassDecl [Modifier] Ident [TypeParam] (Maybe RefType) [RefType] ClassBody
+    | RecordDecl [Modifier] Ident [TypeParam] [RecordFieldDecl] [RefType] ClassBody
     | EnumDecl  [Modifier] Ident                             [RefType] EnumBody
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
@@ -144,6 +146,10 @@ data MemberDecl
     | MemberInterfaceDecl InterfaceDecl
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
+-- | A field declaration of a record
+data RecordFieldDecl
+  = RecordFieldDecl Type Ident
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
 
 -- | A declaration of a variable, which may be explicitly initialized.
 data VarDecl

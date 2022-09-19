@@ -125,7 +125,7 @@ classOrInterfaceDecl = do
     return $ de ms
 
 classDecl :: P (Mod ClassDecl)
-classDecl = normalClassDecl <|> enumClassDecl
+classDecl = normalClassDecl <|> recordClassDecl <|> enumClassDecl
 
 normalClassDecl :: P (Mod ClassDecl)
 normalClassDecl = do
@@ -135,7 +135,7 @@ normalClassDecl = do
     mex <- opt extends
     imp <- lopt implements
     bod <- classBody
-    return $ \ms -> ClassDecl ms i tps ((fmap head) mex) imp bod
+    return $ \ms -> ClassDecl ms i tps (fmap head mex) imp bod
 
 extends :: P [RefType]
 extends = tok KW_Extends >> refTypeList
@@ -150,6 +150,21 @@ enumClassDecl = do
     imp <- lopt implements
     bod <- enumBody
     return $ \ms -> EnumDecl ms i imp bod
+
+recordClassDecl :: P (Mod ClassDecl)
+recordClassDecl = do
+    tok KW_Record
+    i <- ident
+    tps <- lopt typeParams
+    imp <- lopt implements
+    fields <- parens (seplist recordField comma)
+    bod <- classBody
+    return $ \ms -> RecordDecl ms i tps fields imp bod
+    where
+        recordField = do
+            typ <- ttype
+            i <- ident
+            return $ RecordFieldDecl  typ i
 
 classBody :: P ClassBody
 classBody = ClassBody <$> braces classBodyStatements
