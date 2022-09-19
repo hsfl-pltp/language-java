@@ -370,8 +370,11 @@ instance Pretty Exp where
   prettyPrec p (Lambda params body) =
     prettyPrec p params <+> text "->" <+> prettyPrec p body
 
-  prettyPrec p (MethodRef i1 i2) =
+  prettyPrec p (MethodRef i1 (MethodRefIdent i2)) =
     prettyPrec p i1 <+> text "::" <+> prettyPrec p i2
+
+  prettyPrec p (MethodRef i1 MethodRefConstructor) =
+    prettyPrec p i1 <+> text "::new"
 
   -- FIXME: case for newstyle switch exp missing
 

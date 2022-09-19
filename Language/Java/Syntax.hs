@@ -48,6 +48,7 @@ module Language.Java.Syntax
     , LambdaExpression(..)
     , ArrayInit(..)
     , MethodInvocation(..)
+    , MethodRefTarget(..)
     , module Language.Java.Syntax.Exp
     , module Language.Java.Syntax.Types
     ) where
@@ -441,7 +442,7 @@ data Exp
     -- | Lambda expression
     | Lambda LambdaParams LambdaExpression
     -- | Method reference
-    | MethodRef Name Ident
+    | MethodRef Name MethodRefTarget
     -- | New-style switch expression (JEP 361)
     | SwitchExp Exp [SwitchExpBranch]
   deriving (Eq,Show,Read,Typeable,Generic,Data)
@@ -500,4 +501,9 @@ data MethodInvocation
 --   array and providing some initial values
 data ArrayInit
     = ArrayInit [VarInit]
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
+
+data MethodRefTarget
+  = MethodRefIdent Ident
+  | MethodRefConstructor
   deriving (Eq,Show,Read,Typeable,Generic,Data)
