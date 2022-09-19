@@ -1,4 +1,3 @@
-package testPackage;
 
 @interface TestAnn1 {}
 @interface TestAnn2 {
@@ -9,7 +8,11 @@ package testPackage;
   String last();
 }
 
-class Other { 
+@interface Property {}
+
+@interface ForAll {}
+
+class Other {
   @TestAnn1
   void Test1() {}
 
@@ -18,4 +21,10 @@ class Other {
 
   @TestAnn3(first = "foo", last = "bar")
   void Test3() {}
+}
+
+class C {
+  @Property boolean reverseTwiceIsOriginal(@ForAll java.util.List<Integer> original) {
+    return true;
+  }
 }

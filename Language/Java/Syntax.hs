@@ -117,7 +117,7 @@ data EnumConstant = EnumConstant Ident [Argument] (Maybe ClassBody)
 --   no implementation, but otherwise unrelated classes can implement it by
 --   providing implementations for its abstract methods.
 data InterfaceDecl
-    = InterfaceDecl InterfaceKind [Modifier] Ident [TypeParam] [RefType] InterfaceBody
+    = InterfaceDecl InterfaceKind [Modifier] Ident [TypeParam] [RefType] {- extends -} [RefType] {- permits -} InterfaceBody
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
 -- | Interface can declare either a normal interface or an annotation
@@ -218,6 +218,7 @@ data Modifier
     | Native
     | Annotation Annotation
     | Synchronized_
+    | Sealed
   deriving (Eq,Read,Typeable,Generic,Data)
 
 instance Show Modifier where
@@ -233,6 +234,7 @@ instance Show Modifier where
    show Native = "native"
    show (Annotation a) = show a
    show Synchronized_ = "synchronized"
+   show Sealed = "sealed"
 
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation = NormalAnnotation        { annName :: Name -- Not type because not type generics not allowed

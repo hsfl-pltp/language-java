@@ -87,12 +87,13 @@ instance Pretty EnumConstant where
       $$ maybePP p mBody
 
 instance Pretty InterfaceDecl where
-  prettyPrec p (InterfaceDecl kind mods ident tParams impls body) =
+  prettyPrec p (InterfaceDecl kind mods ident tParams impls permits body) =
     hsep [hsep (map (prettyPrec p) mods)
           , text (if kind == InterfaceNormal then "interface" else "@interface")
           , prettyPrec p ident
           , ppTypeParams p tParams
           , ppExtends p impls
+          , ppPermits p permits
          ] $$ prettyPrec p body
 
 instance Pretty InterfaceBody where
@@ -542,6 +543,11 @@ ppImplements p rts = text "implements"
 ppExtends :: Int -> [RefType] -> Doc
 ppExtends _ [] = empty
 ppExtends p rts = text "extends"
+    <+> hsep (punctuate comma (map (prettyPrec p) rts))
+
+ppPermits :: Int -> [RefType] -> Doc
+ppPermits _ [] = empty
+ppPermits p rts = text "permits"
     <+> hsep (punctuate comma (map (prettyPrec p) rts))
 
 ppThrows :: Int -> [ExceptionType] -> Doc

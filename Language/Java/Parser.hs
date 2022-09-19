@@ -158,6 +158,9 @@ normalClassDecl = do
 extends :: P [RefType]
 extends = tok KW_Extends >> refTypeList
 
+permits:: P [RefType]
+permits = fixedIdent "permits" () >> refTypeList
+
 implements :: P [RefType]
 implements = tok KW_Implements >> refTypeList
 
@@ -215,8 +218,9 @@ annInterfaceDecl = do
     id  <- ident
     tps <- lopt typeParams
     exs <- lopt extends
+    ps <- lopt permits
     bod <- interfaceBody
-    return $ \ms -> InterfaceDecl InterfaceAnnotation ms id tps exs bod
+    return $ \ms -> InterfaceDecl InterfaceAnnotation ms id tps exs ps bod
 
 interfaceDecl :: P (Mod InterfaceDecl)
 interfaceDecl = do
@@ -224,8 +228,9 @@ interfaceDecl = do
     id  <- ident
     tps <- lopt typeParams
     exs <- lopt extends
+    ps <- lopt permits
     bod <- interfaceBody
-    return $ \ms -> InterfaceDecl InterfaceNormal ms id tps exs bod
+    return $ \ms -> InterfaceDecl InterfaceNormal ms id tps exs ps bod
 
 interfaceBody :: P InterfaceBody
 interfaceBody = InterfaceBody . catMaybes <$>
@@ -284,7 +289,7 @@ constrDecl :: P (Mod MemberDecl)
 constrDecl = do
     tps <- lopt typeParams
     id  <- ident
-    fps <- formalParams
+    fps <- optList formalParams -- record constructors omit the argument list
     thr <- lopt throws
     bod <- constrBody
     return $ \ms -> ConstructorDecl ms tps id fps thr bod
@@ -387,7 +392,9 @@ modifier =
     <|> tok KW_Transient   >> return Transient
     <|> tok KW_Volatile    >> return Volatile
     <|> tok KW_Synchronized >> return Synchronized_
+    <|> fixedIdent "sealed" Sealed
     <|> Annotation <$> annotation
+
 
 annotation :: P Annotation
 annotation = flip ($) <$ tok Op_AtSign <*> name <*> (
@@ -1257,6 +1264,11 @@ ident = javaToken $ \t -> case t of
     IdentTok s -> Just $ Ident s
     _ -> Nothing
 
+fixedIdent :: String -> a -> P a
+fixedIdent fixed result = javaToken $ \t -> case t of
+    IdentTok s | s == fixed -> Just result
+    _ -> Nothing
+
 ------------------------------------------------------------
 
 empty :: P ()
@@ -1267,6 +1279,13 @@ opt = optionMaybe
 
 bopt :: P a -> P Bool
 bopt p = opt p >>= \ma -> return $ isJust ma
+
+optList :: P [a] -> P [a]
+optList p = do
+    mx <- opt p
+    case mx of
+        Just l -> return l
+        Nothing -> return []
 
 lopt :: P [a] -> P [a]
 lopt p = do mas <- opt p
