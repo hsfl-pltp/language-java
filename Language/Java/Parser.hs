@@ -2,7 +2,7 @@
 
 
 module Language.Java.Parser (
-    parser,
+    parser, parserWithMode, ParserMode(..),
 
     compilationUnit, packageDecl, importDecl, typeDecl,
 
@@ -43,10 +43,9 @@ import Language.Java.Pretty (pretty)
 import Text.Parsec hiding ( Empty )
 import Text.Parsec.Pos
 
-import Prelude hiding ( exp, catch, (>>), (>>=) )
+import Prelude hiding ( exp, (>>), (>>=) )
 import qualified Prelude as P ( (>>), (>>=) )
-import Data.Maybe ( isJust, catMaybes, maybeToList )
-import Control.Monad ( ap )
+import Data.Maybe ( isJust, catMaybes )
 
 #if __GLASGOW_HASKELL__ < 707
 import Control.Applicative ( (<$>), (<$), (<*) )
@@ -59,7 +58,20 @@ import Control.Applicative ( (<$>), (<$), (<*), (<*>) )
 import GHC.IO (unsafePerformIO)
 #endif
 
-type P = Parsec [L Token] ()
+data ParserState
+    = ParserState
+    { ps_mode :: ParserMode }
+    deriving (Eq, Show)
+
+data ParserMode =
+    ParseFull      -- the default
+    | ParseShallow -- do not parse methods bodies
+    deriving (Eq, Show)
+
+defaultParserState :: ParserState
+defaultParserState = ParserState ParseFull
+
+type P = Parsec [L Token] ParserState
 
 getNextTok :: P (Maybe (L Token))
 getNextTok = do
@@ -79,8 +91,12 @@ logToFile msg =
 -- A trick to allow >> and >>=, normally infixr 1, to be
 -- used inside branches of <|>, which is declared as infixl 1.
 -- There are no clashes with other operators of precedence 2.
+(>>) :: P a -> P b -> P b
 (>>) = (P.>>)
+
+(>>=) :: P a -> (a -> P b) -> P b
 (>>=) = (P.>>=)
+
 infixr 2 >>, >>=
 -- Note also when reading that <$> is infixl 4 and thus has
 -- lower precedence than all the others (>>, >>=, and <|>).
@@ -88,11 +104,14 @@ infixr 2 >>, >>=
 ----------------------------------------------------------------------------
 -- Top-level parsing
 
-parseCompilationUnit :: String -> Either ParseError CompilationUnit
-parseCompilationUnit inp =
-    runParser compilationUnit () "" (lexer inp)
+parser :: P a -> FilePath -> String -> Either ParseError a
+parser = parserWithState defaultParserState
 
-parser p = runParser p () "" . lexer
+parserWithMode :: ParserMode -> P a -> FilePath -> String -> Either ParseError a
+parserWithMode mode = parserWithState (ParserState mode)
+
+parserWithState :: ParserState -> P a -> FilePath -> String -> Either ParseError a
+parserWithState state p srcName src = runParser p state srcName (lexer src)
 
 --class Parse a where
 --  parse :: String -> a
@@ -461,7 +480,24 @@ arrayInit = braces $ do
 -- Statements
 
 block :: P Block
-block = braces $ Block <$> list blockStmt
+block = do
+    state <- getState
+    case ps_mode state of
+        ParseFull -> braces $ Block <$> list blockStmt
+        ParseShallow -> Block <$> parseNestedCurly (-1)
+
+-- | Parses anything between properly balance curly brackets.
+-- level must initially be -1
+parseNestedCurly :: Int -> P [a]
+parseNestedCurly level = do
+    newLevel <-
+        javaToken $ \t ->
+            case t of
+                OpenCurly -> Just (level + 1)
+                _ | level < 0 -> Nothing -- need to start with {
+                CloseCurly -> Just (level - 1)
+                _ -> Just level
+    if newLevel < 0 then return [] else parseNestedCurly newLevel
 
 blockStmt :: P BlockStmt
 blockStmt =
@@ -1352,10 +1388,3 @@ colon     = tok Op_Colon
 semiColon = tok SemiColon
 period    = tok Period
 
-------------------------------------------------------------
-
-test = "public class Foo { }"
-testFile file = do
-  i <- readFile file
-  let r = parseCompilationUnit i
-  putStrLn$ either (("Parsing error:\n"++) . show) (show . pretty) r
