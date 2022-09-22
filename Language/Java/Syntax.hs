@@ -49,6 +49,8 @@ module Language.Java.Syntax
     , ArrayInit(..)
     , MethodInvocation(..)
     , MethodRefTarget(..)
+    , Location(..)
+    , dummyLocation
     , module Language.Java.Syntax.Exp
     , module Language.Java.Syntax.Types
     ) where
@@ -90,11 +92,22 @@ data TypeDecl
     | InterfaceTypeDecl InterfaceDecl
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
+data Location =
+  Location
+  { loc_file :: FilePath
+  , loc_line :: Int
+  , loc_column :: Int
+  }
+  deriving (Eq,Show,Read,Typeable,Generic,Data)
+
+dummyLocation :: Location
+dummyLocation = Location "<input>" 0 0
+
 -- | A class declaration specifies a new named reference type.
 data ClassDecl
-    = ClassDecl [Modifier] Ident [TypeParam] (Maybe RefType) [RefType] ClassBody
-    | RecordDecl [Modifier] Ident [TypeParam] [RecordFieldDecl] [RefType] ClassBody
-    | EnumDecl  [Modifier] Ident                             [RefType] EnumBody
+    = ClassDecl Location [Modifier] Ident [TypeParam] (Maybe RefType) [RefType] ClassBody
+    | RecordDecl Location [Modifier] Ident [TypeParam] [RecordFieldDecl] [RefType] ClassBody
+    | EnumDecl Location [Modifier] Ident                             [RefType] EnumBody
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
 -- | A class body may contain declarations of members of the class, that is,
@@ -141,11 +154,11 @@ data Decl
 --   constants (not fields), abstract methods, and no constructors.
 data MemberDecl
     -- | The variables of a class type are introduced by field declarations.
-    = FieldDecl [Modifier] Type [VarDecl]
+    = FieldDecl Location [Modifier] Type [VarDecl]
     -- | A method declares executable code that can be invoked, passing a fixed number of values as arguments.
-    | MethodDecl      [Modifier] [TypeParam] (Maybe Type) Ident [FormalParam] [ExceptionType] (Maybe Exp) MethodBody
+    | MethodDecl Location [Modifier] [TypeParam] (Maybe Type) Ident [FormalParam] [ExceptionType] (Maybe Exp) MethodBody
     -- | A constructor is used in the creation of an object that is an instance of a class.
-    | ConstructorDecl [Modifier] [TypeParam]              Ident [FormalParam] [ExceptionType] ConstructorBody
+    | ConstructorDecl Location [Modifier] [TypeParam]              Ident [FormalParam] [ExceptionType] ConstructorBody
     -- | A member class is a class whose declaration is directly enclosed in another class or interface declaration.
     | MemberClassDecl ClassDecl
     -- | A member interface is an interface whose declaration is directly enclosed in another class or interface declaration.

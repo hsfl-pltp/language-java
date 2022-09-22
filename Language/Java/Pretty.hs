@@ -52,14 +52,14 @@ instance Pretty TypeDecl where
   prettyPrec p (InterfaceTypeDecl id) = prettyPrec p id
 
 instance Pretty ClassDecl where
-  prettyPrec p (EnumDecl mods ident impls body) =
+  prettyPrec p (EnumDecl _loc mods ident impls body) =
     hsep [hsep (map (prettyPrec p) mods)
           , text "enum"
           , prettyPrec p ident
           , ppImplements p impls
          ] $$ prettyPrec p body
 
-  prettyPrec p (ClassDecl mods ident tParams mSuper impls body) =
+  prettyPrec p (ClassDecl _loc mods ident tParams mSuper impls body) =
     hsep [hsep (map (prettyPrec p) mods)
           , text "class"
           , prettyPrec p ident
@@ -106,10 +106,10 @@ instance Pretty Decl where
     opt b (text "static") <+> prettyPrec p bl
 
 instance Pretty MemberDecl where
-  prettyPrec p (FieldDecl mods t vds) =
+  prettyPrec p (FieldDecl _loc mods t vds) =
     hsep (map (prettyPrec p) mods ++ prettyPrec p t:punctuate (text ",") (map (prettyPrec p) vds)) <> semi
 
-  prettyPrec p (MethodDecl mods tParams mt ident fParams throws def body) =
+  prettyPrec p (MethodDecl _loc mods tParams mt ident fParams throws def body) =
     hsep [hsep (map (prettyPrec p) mods)
           , ppTypeParams p tParams
           , ppResultType p mt
@@ -119,7 +119,7 @@ instance Pretty MemberDecl where
           , ppDefault p def
          ] $$ prettyPrec p body
 
-  prettyPrec p (ConstructorDecl mods tParams ident fParams throws body) =
+  prettyPrec p (ConstructorDecl _loc mods tParams ident fParams throws body) =
     hsep [hsep (map (prettyPrec p) mods)
           , ppTypeParams p tParams
           , prettyPrec p ident

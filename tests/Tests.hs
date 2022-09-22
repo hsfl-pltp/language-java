@@ -26,7 +26,7 @@ instance Arbitrary ImportDecl where
 instance Arbitrary TypeDecl where
     arbitrary = ClassTypeDecl <$> arbitrary
 instance Arbitrary ClassDecl where
-    arbitrary = ClassDecl <$> pure [] <*> arbitrary <*> pure [] <*> pure Nothing <*> pure [] <*> arbitrary
+    arbitrary = ClassDecl dummyLocation <$> pure [] <*> arbitrary <*> pure [] <*> pure Nothing <*> pure [] <*> arbitrary
 instance Arbitrary ClassBody where
     arbitrary = ClassBody <$> pure []
 instance Arbitrary Name where
@@ -76,7 +76,7 @@ main = do
         , testGroup "parsing unit bad" (map (toTestCase ParseFull False) allBadJavas)
         , testGroup "parsing shallow unit bad" (map (toTestCase ParseShallow False) shallowBadJavas)
         , testProperty "parsing.generating==id"
-                (\g -> case parser compilationUnit "<input>" (show $ pretty g) of
+                (\g -> case parserWithState (ParserState ParseFull False) compilationUnit "<input>" (show $ pretty g) of
                             Right g'  -> g == g'
                             Left perr -> error (show (pretty g) ++ show perr))
         ]

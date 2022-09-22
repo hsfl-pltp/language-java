@@ -2,7 +2,7 @@
 
 
 module Language.Java.Parser (
-    parser, parserWithMode, ParserMode(..),
+    parser, parserWithMode, ParserMode(..), parserWithState, ParserState(..),
 
     compilationUnit, packageDecl, importDecl, typeDecl,
 
@@ -60,7 +60,8 @@ import GHC.IO (unsafePerformIO)
 
 data ParserState
     = ParserState
-    { ps_mode :: ParserMode }
+    { ps_mode :: ParserMode,
+      ps_locations :: Bool }
     deriving (Eq, Show)
 
 data ParserMode =
@@ -69,9 +70,19 @@ data ParserMode =
     deriving (Eq, Show)
 
 defaultParserState :: ParserState
-defaultParserState = ParserState ParseFull
+defaultParserState = ParserState ParseFull True
 
 type P = Parsec [L Token] ParserState
+
+getLocation :: P Location
+getLocation = do
+    myState <- getState
+    if ps_locations myState
+        then do
+            state <- getParserState
+            let p = statePos state
+            return $ Location { loc_file = sourceName p, loc_line = sourceLine p, loc_column = sourceColumn p }
+        else return dummyLocation
 
 getNextTok :: P (Maybe (L Token))
 getNextTok = do
@@ -108,7 +119,7 @@ parser :: P a -> FilePath -> String -> Either ParseError a
 parser = parserWithState defaultParserState
 
 parserWithMode :: ParserMode -> P a -> FilePath -> String -> Either ParseError a
-parserWithMode mode = parserWithState (ParserState mode)
+parserWithMode mode = parserWithState (ParserState mode True)
 
 parserWithState :: ParserState -> P a -> FilePath -> String -> Either ParseError a
 parserWithState state p srcName src = runParser p state srcName (lexer src)
@@ -166,13 +177,14 @@ classDecl = normalClassDecl <|> recordClassDecl <|> enumClassDecl
 
 normalClassDecl :: P (Mod ClassDecl)
 normalClassDecl = do
+    loc <- getLocation
     tok KW_Class
     i   <- ident
     tps <- lopt typeParams
     mex <- opt extends
     imp <- lopt implements
     bod <- classBody
-    return $ \ms -> ClassDecl ms i tps (fmap head mex) imp bod
+    return $ \ms -> ClassDecl loc ms i tps (fmap head mex) imp bod
 
 extends :: P [RefType]
 extends = tok KW_Extends >> refTypeList
@@ -185,21 +197,23 @@ implements = tok KW_Implements >> refTypeList
 
 enumClassDecl :: P (Mod ClassDecl)
 enumClassDecl = do
+    loc <- getLocation
     tok KW_Enum
     i   <- ident
     imp <- lopt implements
     bod <- enumBody
-    return $ \ms -> EnumDecl ms i imp bod
+    return $ \ms -> EnumDecl loc ms i imp bod
 
 recordClassDecl :: P (Mod ClassDecl)
 recordClassDecl = do
+    loc <- getLocation
     tok KW_Record
     i <- ident
     tps <- lopt typeParams
     fields <- parens (seplist recordField comma)
     imp <- lopt implements
     bod <- classBody
-    return $ \ms -> RecordDecl ms i tps fields imp bod
+    return $ \ms -> RecordDecl loc ms i tps fields imp bod
     where
         recordField = do
             typ <- ttype
@@ -285,19 +299,21 @@ memberDecl =
 
 fieldDecl :: P (Mod MemberDecl)
 fieldDecl = endSemi $ do
+    loc <- getLocation
     typ <- ttype
     vds <- varDecls
-    return $ \ms -> FieldDecl ms typ vds
+    return $ \ms -> FieldDecl loc ms typ vds
 
 methodDecl :: P (Mod MemberDecl)
 methodDecl = do
+    loc <- getLocation
     tps <- lopt typeParams
     rt  <- resultType
     id  <- ident
     fps <- formalParams
     thr <- lopt throws
     bod <- methodBody
-    return $ \ms -> MethodDecl ms tps rt id fps thr Nothing bod
+    return $ \ms -> MethodDecl loc ms tps rt id fps thr Nothing bod
 
 methodBody :: P MethodBody
 methodBody = MethodBody <$>
@@ -306,12 +322,13 @@ methodBody = MethodBody <$>
 
 constrDecl :: P (Mod MemberDecl)
 constrDecl = do
+    loc <- getLocation
     tps <- lopt typeParams
     id  <- ident
     fps <- optList formalParams -- record constructors omit the argument list
     thr <- lopt throws
     bod <- constrBody
-    return $ \ms -> ConstructorDecl ms tps id fps thr bod
+    return $ \ms -> ConstructorDecl loc ms tps id fps thr bod
 
 constrBody :: P ConstructorBody
 constrBody = braces $ do
@@ -357,6 +374,7 @@ interfaceMemberDecl =
 
 absMethodDecl :: P (Mod MemberDecl)
 absMethodDecl = do
+    loc <- getLocation
     tps <- lopt typeParams
     rt  <- resultType
     id  <- ident
@@ -364,7 +382,7 @@ absMethodDecl = do
     thr <- lopt throws
     def <- opt defaultValue
     semiColon
-    return $ \ms -> MethodDecl ms tps rt id fps thr def (MethodBody Nothing)
+    return $ \ms -> MethodDecl loc ms tps rt id fps thr def (MethodBody Nothing)
 
 defaultValue :: P Exp
 defaultValue = tok KW_Default >> exp
