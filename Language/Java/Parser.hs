@@ -185,7 +185,8 @@ normalClassDecl = do
     mex <- opt extends
     imp <- lopt implements
     bod <- classBody
-    return $ \ms -> ClassDecl loc ms i tps (fmap head mex) imp bod
+    endLoc <- getLocation
+    return $ \ms -> ClassDecl (loc, endLoc) ms i tps (fmap head mex) imp bod
 
 extends :: P [RefType]
 extends = tok KW_Extends >> refTypeList
@@ -203,7 +204,8 @@ enumClassDecl = do
     i   <- ident
     imp <- lopt implements
     bod <- enumBody
-    return $ \ms -> EnumDecl loc ms i imp bod
+    endLoc <- getLocation
+    return $ \ms -> EnumDecl (loc, endLoc) ms i imp bod
 
 recordClassDecl :: P (Mod ClassDecl)
 recordClassDecl = do
@@ -214,7 +216,8 @@ recordClassDecl = do
     fields <- parens (seplist recordField comma)
     imp <- lopt implements
     bod <- classBody
-    return $ \ms -> RecordDecl loc ms i tps fields imp bod
+    endLoc <- getLocation
+    return $ \ms -> RecordDecl (loc, endLoc) ms i tps fields imp bod
     where
         recordField = do
             typ <- ttype
@@ -302,7 +305,8 @@ fieldDecl = endSemi $ do
     loc <- getLocation
     typ <- ttype
     vds <- varDecls
-    return $ \ms -> FieldDecl loc ms typ vds
+    endLoc <- getLocation
+    return $ \ms -> FieldDecl (loc, endLoc) ms typ vds
 
 methodDecl :: P (Mod MemberDecl)
 methodDecl = do
@@ -313,7 +317,8 @@ methodDecl = do
     fps <- formalParams
     thr <- lopt throws
     bod <- methodBody
-    return $ \ms -> MethodDecl loc ms tps rt id fps thr Nothing bod
+    endLoc <- getLocation
+    return $ \ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr Nothing bod
 
 methodBody :: P MethodBody
 methodBody = MethodBody <$>
@@ -328,7 +333,8 @@ constrDecl = do
     fps <- optList formalParams -- record constructors omit the argument list
     thr <- lopt throws
     bod <- constrBody
-    return $ \ms -> ConstructorDecl loc ms tps id fps thr bod
+    endLoc <- getLocation
+    return $ \ms -> ConstructorDecl (loc, endLoc) ms tps id fps thr bod
 
 constrBody :: P ConstructorBody
 constrBody = braces $ do
@@ -382,7 +388,8 @@ absMethodDecl = do
     thr <- lopt throws
     def <- opt defaultValue
     semiColon
-    return $ \ms -> MethodDecl loc ms tps rt id fps thr def (MethodBody Nothing)
+    endLoc <- getLocation
+    return $ \ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr def (MethodBody Nothing)
 
 defaultValue :: P Exp
 defaultValue = tok KW_Default >> exp
