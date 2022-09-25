@@ -2,7 +2,7 @@
 
 
 module Language.Java.Parser (
-    parser, parserWithMode, ParserMode(..), parserWithState, ParserState(..),
+    JavaParser, parser, parserWithMode, ParserMode(..), parserWithState, ParserState(..),
 
     compilationUnit, packageDecl, importDecl, typeDecl,
 
@@ -72,7 +72,8 @@ data ParserMode =
 defaultParserState :: ParserState
 defaultParserState = ParserState ParseFull True
 
-type P = Parsec [L Token] ParserState
+type JavaParser = Parsec [L Token] ParserState
+type P = JavaParser
 
 getLocation :: P Location
 getLocation = do
@@ -292,7 +293,6 @@ memberDecl =
     (try $ do
         id  <- try annInterfaceDecl <|> try interfaceDecl
         return $ \ms -> MemberInterfaceDecl (id ms)) <|>
-
     try fieldDecl <|>
     try methodDecl <|>
     constrDecl
