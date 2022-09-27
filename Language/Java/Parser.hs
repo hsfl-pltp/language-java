@@ -187,8 +187,7 @@ normalClassDecl = do
     tps <- lopt typeParams
     mex <- opt extends
     imp <- lopt implements
-    bod <- classBody
-    endLoc <- getLocation
+    (bod, endLoc) <- classBody
     return $ \loc ms -> ClassDecl (loc, endLoc) ms i tps (fmap head mex) imp bod
 
 extends :: P [RefType]
@@ -205,8 +204,7 @@ enumClassDecl = do
     tok KW_Enum
     i   <- ident
     imp <- lopt implements
-    bod <- enumBody
-    endLoc <- getLocation
+    (bod, endLoc) <- enumBody
     return $ \loc ms -> EnumDecl (loc, endLoc) ms i imp bod
 
 recordClassDecl :: P (Mod ClassDecl)
@@ -216,8 +214,7 @@ recordClassDecl = do
     tps <- lopt typeParams
     fields <- parens (seplist recordField comma)
     imp <- lopt implements
-    bod <- classBody
-    endLoc <- getLocation
+    (bod, endLoc) <- classBody
     return $ \loc ms -> RecordDecl (loc, endLoc) ms i tps fields imp bod
     where
         recordField = do
@@ -225,10 +222,17 @@ recordClassDecl = do
             i <- ident
             return $ RecordFieldDecl typ i
 
-classBody :: P ClassBody
-classBody = ClassBody <$> braces classBodyStatements
+classBody :: P (ClassBody, Location)
+classBody = do
+    (b, loc) <- braces classBodyStatements
+    return (ClassBody b, loc)
 
-enumBody :: P EnumBody
+classBodyNoLoc :: P ClassBody
+classBodyNoLoc = do
+    (b, _) <- classBody
+    return b
+
+enumBody :: P (EnumBody, Location)
 enumBody = braces $ do
     ecs <- seplist enumConst comma
     optional comma
@@ -239,7 +243,7 @@ enumConst :: P EnumConstant
 enumConst = do
     id  <- ident
     as  <- lopt args
-    mcb <- opt classBody
+    mcb <- opt classBodyNoLoc
     return $ EnumConstant id as mcb
 
 enumBodyDecls :: P [Decl]
@@ -257,8 +261,7 @@ annInterfaceDecl = do
     tps <- lopt typeParams
     exs <- lopt extends
     ps <- lopt permits
-    bod <- interfaceBody
-    endLoc <- getLocation
+    (bod, endLoc) <- interfaceBody
     return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceAnnotation ms id tps exs ps bod
 
 interfaceDecl :: P (Mod InterfaceDecl)
@@ -268,13 +271,11 @@ interfaceDecl = do
     tps <- lopt typeParams
     exs <- lopt extends
     ps <- lopt permits
-    bod <- interfaceBody
-    endLoc <- getLocation
+    (bod, endLoc) <- interfaceBody
     return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceNormal ms id tps exs ps bod
 
-interfaceBody :: P InterfaceBody
-interfaceBody = InterfaceBody . catMaybes <$>
-    braces (list interfaceBodyDecl)
+interfaceBody :: P (InterfaceBody, Location)
+interfaceBody = braces (InterfaceBody . catMaybes <$> (list interfaceBodyDecl))
 
 -- Declarations
 
@@ -319,14 +320,19 @@ methodDecl = do
     id  <- ident
     fps <- formalParams
     thr <- lopt throws
-    bod <- methodBody
-    endLoc <- getLocation
+    (bod, endLoc) <- methodBody
     return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr Nothing bod
 
-methodBody :: P MethodBody
-methodBody = MethodBody <$>
-    (const Nothing <$> semiColon <|> Just <$> block)
-
+methodBody :: P (MethodBody, Location)
+methodBody = onlySemi <|> fullBody
+  where
+    onlySemi = do
+        loc <- getLocation
+        semiColon
+        return (MethodBody Nothing, loc)
+    fullBody = do
+        (b, loc) <- blockWithLoc
+        return (MethodBody (Just b), loc)
 
 constrDecl :: P (Mod MemberDecl)
 constrDecl = do
@@ -339,7 +345,7 @@ constrDecl = do
     return $ \loc ms -> ConstructorDecl (loc, endLoc) ms tps id fps thr bod
 
 constrBody :: P ConstructorBody
-constrBody = braces $ do
+constrBody = bracesNoLoc $ do
     mec <- opt (try explConstrInv)
     bss <- list blockStmt
     return $ ConstructorBody mec bss
@@ -497,7 +503,7 @@ varInit =
     InitExp   <$> exp
 
 arrayInit :: P ArrayInit
-arrayInit = braces $ do
+arrayInit = bracesNoLoc $ do
     vis <- seplist varInit comma
     opt comma
     return $ ArrayInit vis
@@ -507,17 +513,27 @@ arrayInit = braces $ do
 ----------------------------------------------------------------------------
 -- Statements
 
-block :: P Block
-block = do
+blockWithLoc :: P (Block, Location)
+blockWithLoc = do
     state <- getState
     case ps_mode state of
         ParseFull -> braces $ Block <$> list blockStmt
-        ParseShallow -> Block <$> parseNestedCurly (-1)
+        ParseShallow -> shallowP
+  where
+    shallowP = do
+      loc <- parseNestedCurly (-1)
+      return $ (Block [], loc)
+
+block :: P Block
+block = do
+    (b, _) <- blockWithLoc
+    return b
 
 -- | Parses anything between properly balance curly brackets.
 -- level must initially be -1
-parseNestedCurly :: Int -> P [a]
+parseNestedCurly :: Int -> P Location
 parseNestedCurly level = do
+    loc <- getLocation
     newLevel <-
         javaToken $ \t ->
             case t of
@@ -525,7 +541,7 @@ parseNestedCurly level = do
                 _ | level < 0 -> Nothing -- need to start with {
                 CloseCurly -> Just (level - 1)
                 _ -> Just level
-    if newLevel < 0 then return [] else parseNestedCurly newLevel
+    if newLevel < 0 then return loc else parseNestedCurly newLevel
 
 blockStmt :: P BlockStmt
 blockStmt =
@@ -695,7 +711,7 @@ forUp = seplist1 stmtExp comma
 -- Switches
 
 switchBlock :: P (SwitchStyle, [SwitchBlock])
-switchBlock = braces (try old <|> new)
+switchBlock = bracesNoLoc (try old <|> new)
     where
       old = do
         x <- list switchStmtOld
@@ -720,7 +736,7 @@ switchLabelOld = (tok KW_Default >> colon >> return Default) <|>
 switchStmtNew :: P SwitchBlock
 switchStmtNew = do
     lbl <- switchLabelNew
-    bss <- braces (list blockStmt) <|> (blockStmt >>= \s -> return [s])
+    bss <- bracesNoLoc (list blockStmt) <|> (blockStmt >>= \s -> return [s])
     return $ SwitchBlock lbl bss
 
 switchLabelNew :: P SwitchLabel
@@ -734,14 +750,14 @@ switchExp :: P Exp
 switchExp = do
     tok KW_Switch
     e <- parens exp
-    branches <- braces switchExpBody
+    branches <- bracesNoLoc switchExpBody
     return $ SwitchExp e branches
     where
         switchExpBody = many switchExpBodyBranch
         switchExpBodyBranch = do
             lbl <- switchLabelNew
             body <-
-                (SwitchExpBranchBlock <$> braces (list blockStmt)) <|>
+                (SwitchExpBranchBlock <$> bracesNoLoc (list blockStmt)) <|>
                 (SwitchExpBranchBlock <$> try (blockStmt >>= \s -> return [s])) <|>
                 (SwitchExpBranchExp <$> branchExp)
             return $ SwitchExpBranch lbl body
@@ -925,7 +941,7 @@ instanceCreationNPS =
        tas <- lopt typeArgs
        tds <- typeDeclSpecifier
        as  <- args
-       mcb <- opt classBody
+       mcb <- opt classBodyNoLoc
        return $ InstanceCreation tas tds as mcb
 
 typeDeclSpecifier :: P TypeDeclSpecifier
@@ -952,7 +968,7 @@ instanceCreationSuffix =
         tas <- lopt typeArgs
         i   <- ident
         as  <- args
-        mcb <- opt classBody
+        mcb <- opt classBodyNoLoc
         return $ \p -> QualInstanceCreation p tas i as mcb
 
 instanceCreation :: P Exp
@@ -1402,11 +1418,19 @@ pos2sourcePos (l,c) = newPos "" l c
 
 type Mod a = Location -> [Modifier] -> a
 
-parens, braces, brackets, angles :: P a -> P a
+parens, brackets, bracesNoLoc, angles :: P a -> P a
 parens   = between (tok OpenParen)  (tok CloseParen)
-braces   = between (tok OpenCurly)  (tok CloseCurly)
 brackets = between (tok OpenSquare) (tok CloseSquare)
+bracesNoLoc = between (tok OpenCurly) (tok CloseCurly)
 angles   = between (tok Op_LThan)   (tok Op_GThan)
+
+braces :: P a -> P (a, Location)
+braces p  = do
+    _ <- tok OpenCurly
+    x <- p
+    endLoc <- getLocation
+    _ <- tok CloseCurly
+    pure (x, endLoc)
 
 endSemi :: P a -> P a
 endSemi p = p >>= \a -> semiColon >> return a
