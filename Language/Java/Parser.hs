@@ -2,6 +2,7 @@
 
 module Language.Java.Parser (
     JavaParser, parser, parserWithMode, ParserMode(..), parserWithState, ParserState(..),
+    getLocation,
 
     compilationUnit, packageDecl, importDecl, typeDecl,
 
