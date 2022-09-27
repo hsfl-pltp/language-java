@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 
-
 module Language.Java.Parser (
     JavaParser, parser, parserWithMode, ParserMode(..), parserWithState, ParserState(..),
 
@@ -81,8 +80,11 @@ getLocation = do
     if ps_locations myState
         then do
             state <- getParserState
-            let p = statePos state
-            return $ Location { loc_file = sourceName p, loc_line = sourceLine p, loc_column = sourceColumn p }
+            case stateInput state of
+                [] -> return locationEof
+                _ ->
+                    let p = statePos state
+                     in return $ Location { loc_file = sourceName p, loc_line = sourceLine p, loc_column = sourceColumn p }
         else return dummyLocation
 
 getNextTok :: P (Maybe (L Token))
@@ -166,19 +168,19 @@ typeDecl = Just <$> classOrInterfaceDecl <|>
 
 classOrInterfaceDecl :: P TypeDecl
 classOrInterfaceDecl = do
+    startLoc <- getLocation
     ms <- list modifier
     de <- (do cd <- classDecl
-              return $ \ms -> ClassTypeDecl (cd ms)) <|>
+              return $ ClassTypeDecl (cd startLoc ms)) <|>
           (do id <- annInterfaceDecl <|> interfaceDecl
-              return $ \ms -> InterfaceTypeDecl (id ms))
-    return $ de ms
+              return $ InterfaceTypeDecl (id startLoc ms))
+    return $ de
 
 classDecl :: P (Mod ClassDecl)
 classDecl = normalClassDecl <|> recordClassDecl <|> enumClassDecl
 
 normalClassDecl :: P (Mod ClassDecl)
 normalClassDecl = do
-    loc <- getLocation
     tok KW_Class
     i   <- ident
     tps <- lopt typeParams
@@ -186,7 +188,7 @@ normalClassDecl = do
     imp <- lopt implements
     bod <- classBody
     endLoc <- getLocation
-    return $ \ms -> ClassDecl (loc, endLoc) ms i tps (fmap head mex) imp bod
+    return $ \loc ms -> ClassDecl (loc, endLoc) ms i tps (fmap head mex) imp bod
 
 extends :: P [RefType]
 extends = tok KW_Extends >> refTypeList
@@ -199,17 +201,15 @@ implements = tok KW_Implements >> refTypeList
 
 enumClassDecl :: P (Mod ClassDecl)
 enumClassDecl = do
-    loc <- getLocation
     tok KW_Enum
     i   <- ident
     imp <- lopt implements
     bod <- enumBody
     endLoc <- getLocation
-    return $ \ms -> EnumDecl (loc, endLoc) ms i imp bod
+    return $ \loc ms -> EnumDecl (loc, endLoc) ms i imp bod
 
 recordClassDecl :: P (Mod ClassDecl)
 recordClassDecl = do
-    loc <- getLocation
     tok KW_Record
     i <- ident
     tps <- lopt typeParams
@@ -217,7 +217,7 @@ recordClassDecl = do
     imp <- lopt implements
     bod <- classBody
     endLoc <- getLocation
-    return $ \ms -> RecordDecl (loc, endLoc) ms i tps fields imp bod
+    return $ \loc ms -> RecordDecl (loc, endLoc) ms i tps fields imp bod
     where
         recordField = do
             typ <- ttype
@@ -257,7 +257,8 @@ annInterfaceDecl = do
     exs <- lopt extends
     ps <- lopt permits
     bod <- interfaceBody
-    return $ \ms -> InterfaceDecl InterfaceAnnotation ms id tps exs ps bod
+    endLoc <- getLocation
+    return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceAnnotation ms id tps exs ps bod
 
 interfaceDecl :: P (Mod InterfaceDecl)
 interfaceDecl = do
@@ -267,7 +268,8 @@ interfaceDecl = do
     exs <- lopt extends
     ps <- lopt permits
     bod <- interfaceBody
-    return $ \ms -> InterfaceDecl InterfaceNormal ms id tps exs ps bod
+    endLoc <- getLocation
+    return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceNormal ms id tps exs ps bod
 
 interfaceBody :: P InterfaceBody
 interfaceBody = InterfaceBody . catMaybes <$>
@@ -284,33 +286,33 @@ classBodyStatement =
        mst <- bopt (tok KW_Static)
        blk <- block
        return $ Just $ InitDecl mst blk) <|>
-    (do ms  <- list modifier
+    (do loc <- getLocation
+        ms  <- list modifier
         dec <- memberDecl
-        return $ Just $ MemberDecl (dec ms))
+        return $ Just $ MemberDecl (dec loc ms))
 
 memberDecl :: P (Mod MemberDecl)
 memberDecl =
     (try $ do
         cd  <- classDecl
-        return $ \ms -> MemberClassDecl (cd ms)) <|>
+        return $ \loc ms -> MemberClassDecl (cd loc ms)) <|>
     (try $ do
         id  <- try annInterfaceDecl <|> try interfaceDecl
-        return $ \ms -> MemberInterfaceDecl (id ms)) <|>
+        return $ \loc ms -> MemberInterfaceDecl (id loc ms)) <|>
     try fieldDecl <|>
     try methodDecl <|>
     constrDecl
 
 fieldDecl :: P (Mod MemberDecl)
-fieldDecl = endSemi $ do
-    loc <- getLocation
+fieldDecl = do
     typ <- ttype
     vds <- varDecls
+    semiColon
     endLoc <- getLocation
-    return $ \ms -> FieldDecl (loc, endLoc) ms typ vds
+    return $ \loc ms -> FieldDecl (loc, endLoc) ms typ vds
 
 methodDecl :: P (Mod MemberDecl)
 methodDecl = do
-    loc <- getLocation
     tps <- lopt typeParams
     rt  <- resultType
     id  <- ident
@@ -318,7 +320,7 @@ methodDecl = do
     thr <- lopt throws
     bod <- methodBody
     endLoc <- getLocation
-    return $ \ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr Nothing bod
+    return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr Nothing bod
 
 methodBody :: P MethodBody
 methodBody = MethodBody <$>
@@ -327,14 +329,13 @@ methodBody = MethodBody <$>
 
 constrDecl :: P (Mod MemberDecl)
 constrDecl = do
-    loc <- getLocation
     tps <- lopt typeParams
     id  <- ident
     fps <- optList formalParams -- record constructors omit the argument list
     thr <- lopt throws
     bod <- constrBody
     endLoc <- getLocation
-    return $ \ms -> ConstructorDecl (loc, endLoc) ms tps id fps thr bod
+    return $ \loc ms -> ConstructorDecl (loc, endLoc) ms tps id fps thr bod
 
 constrBody :: P ConstructorBody
 constrBody = braces $ do
@@ -364,23 +365,24 @@ explConstrInv = endSemi $
 -- TODO: This should be parsed like class bodies, and post-checked.
 --       That would give far better error messages.
 interfaceBodyDecl :: P (Maybe MemberDecl)
-interfaceBodyDecl = semiColon >> return Nothing <|>
-    do ms  <- list modifier
+interfaceBodyDecl =
+    semiColon >> return Nothing <|>
+    do loc <- getLocation
+       ms  <- list modifier
        imd <- interfaceMemberDecl
-       return $ Just (imd ms)
+       return $ Just (imd loc ms)
 
 interfaceMemberDecl :: P (Mod MemberDecl)
 interfaceMemberDecl =
     (do cd  <- classDecl
-        return $ \ms -> MemberClassDecl (cd ms)) <|>
+        return $ \loc ms -> MemberClassDecl (cd loc ms)) <|>
     (do id  <- try annInterfaceDecl <|> try interfaceDecl
-        return $ \ms -> MemberInterfaceDecl (id ms)) <|>
+        return $ \loc ms -> MemberInterfaceDecl (id loc ms)) <|>
     try fieldDecl <|>
     absMethodDecl
 
 absMethodDecl :: P (Mod MemberDecl)
 absMethodDecl = do
-    loc <- getLocation
     tps <- lopt typeParams
     rt  <- resultType
     id  <- ident
@@ -389,7 +391,7 @@ absMethodDecl = do
     def <- opt defaultValue
     semiColon
     endLoc <- getLocation
-    return $ \ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr def (MethodBody Nothing)
+    return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr def (MethodBody Nothing)
 
 defaultValue :: P Exp
 defaultValue = tok KW_Default >> exp
@@ -527,9 +529,10 @@ parseNestedCurly level = do
 blockStmt :: P BlockStmt
 blockStmt =
     (try $ do
+        loc <- getLocation
         ms  <- list modifier
         cd  <- classDecl
-        return $ LocalClass (cd ms)) <|>
+        return $ LocalClass (cd loc ms)) <|>
     (try $ do
         (m,t,vds) <- endSemi $ localVarDecl
         return $ LocalVars m t vds) <|>
@@ -1396,7 +1399,7 @@ matchToken t = javaToken (\r -> if r == t then Just () else Nothing)
 pos2sourcePos :: (Int, Int) -> SourcePos
 pos2sourcePos (l,c) = newPos "" l c
 
-type Mod a = [Modifier] -> a
+type Mod a = Location -> [Modifier] -> a
 
 parens, braces, brackets, angles :: P a -> P a
 parens   = between (tok OpenParen)  (tok CloseParen)

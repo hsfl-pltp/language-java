@@ -87,7 +87,7 @@ instance Pretty EnumConstant where
       $$ maybePP p mBody
 
 instance Pretty InterfaceDecl where
-  prettyPrec p (InterfaceDecl kind mods ident tParams impls permits body) =
+  prettyPrec p (InterfaceDecl _ kind mods ident tParams impls permits body) =
     hsep [hsep (map (prettyPrec p) mods)
           , text (if kind == InterfaceNormal then "interface" else "@interface")
           , prettyPrec p ident

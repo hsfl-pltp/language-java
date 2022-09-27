@@ -52,6 +52,8 @@ module Language.Java.Syntax
     , Location(..)
     , SourceSpan
     , dummyLocation
+    , locationEof
+    , isEof
     , module Language.Java.Syntax.Exp
     , module Language.Java.Syntax.Types
     ) where
@@ -104,7 +106,13 @@ data Location =
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
 dummyLocation :: Location
-dummyLocation = Location "<input>" 0 0
+dummyLocation = Location "<input>" 1 1
+
+locationEof :: Location
+locationEof = Location "" 0 0
+
+isEof :: Location -> Bool
+isEof loc = loc == locationEof
 
 -- | A class declaration specifies a new named reference type.
 data ClassDecl
@@ -133,7 +141,7 @@ data EnumConstant = EnumConstant Ident [Argument] (Maybe ClassBody)
 --   no implementation, but otherwise unrelated classes can implement it by
 --   providing implementations for its abstract methods.
 data InterfaceDecl
-    = InterfaceDecl InterfaceKind [Modifier] Ident [TypeParam] [RefType] {- extends -} [RefType] {- permits -} InterfaceBody
+    = InterfaceDecl SourceSpan InterfaceKind [Modifier] Ident [TypeParam] [RefType] {- extends -} [RefType] {- permits -} InterfaceBody
   deriving (Eq,Show,Read,Typeable,Generic,Data)
 
 -- | Interface can declare either a normal interface or an annotation
