@@ -52,6 +52,7 @@ module Language.Java.Syntax
     , Location(..)
     , SourceSpan
     , dummyLocation
+    , dummySourceSpan
     , locationEof
     , isEof
     , module Language.Java.Syntax.Exp
@@ -107,6 +108,9 @@ data Location =
 
 dummyLocation :: Location
 dummyLocation = Location "<input>" 1 1
+
+dummySourceSpan :: SourceSpan
+dummySourceSpan = (dummyLocation, dummyLocation)
 
 locationEof :: Location
 locationEof = Location "" 0 0

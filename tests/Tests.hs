@@ -26,7 +26,7 @@ instance Arbitrary ImportDecl where
 instance Arbitrary TypeDecl where
     arbitrary = ClassTypeDecl <$> arbitrary
 instance Arbitrary ClassDecl where
-    arbitrary = ClassDecl dummyLocation <$> pure [] <*> arbitrary <*> pure [] <*> pure Nothing <*> pure [] <*> arbitrary
+    arbitrary = ClassDecl dummySourceSpan <$> pure [] <*> arbitrary <*> pure [] <*> pure Nothing <*> pure [] <*> arbitrary
 instance Arbitrary ClassBody where
     arbitrary = ClassBody <$> pure []
 instance Arbitrary Name where

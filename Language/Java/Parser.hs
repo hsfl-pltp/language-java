@@ -42,6 +42,7 @@ import Language.Java.Pretty (pretty)
 
 import Text.Parsec hiding ( Empty )
 import Text.Parsec.Pos
+import Text.ParserCombinators.Parsec.Error
 
 import Prelude hiding ( exp, (>>), (>>=) )
 import qualified Prelude as P ( (>>), (>>=) )
@@ -126,10 +127,14 @@ parserWithMode :: ParserMode -> P a -> FilePath -> String -> Either ParseError a
 parserWithMode mode = parserWithState (ParserState mode True)
 
 parserWithState :: ParserState -> P a -> FilePath -> String -> Either ParseError a
-parserWithState state p srcName src = runParser p state srcName (lexer src)
-
---class Parse a where
---  parse :: String -> a
+parserWithState state p srcName src =
+  case lexer src of
+    Left (line, col, err) ->
+      let msg = Message err
+          pos = newPos srcName line col
+      in Left (newErrorMessage msg pos)
+    Right tokens ->
+      runParser p state srcName tokens
 
 ----------------------------------------------------------------------------
 -- Packages and compilation units
@@ -1440,4 +1445,3 @@ comma     = tok Comma
 colon     = tok Op_Colon
 semiColon = tok SemiColon
 period    = tok Period
-
