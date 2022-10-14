@@ -307,7 +307,7 @@ data Stmt
   = -- | A statement can be a nested block.
     StmtBlock Block
   | -- | The @if-then@ statement allows conditional execution of a statement.
-    IfThen Exp Stmt
+    IfThen SourceSpan Exp Stmt
   | -- | The @if-then-else@ statement allows conditional choice of two statements, executing one or the other but not both.
     IfThenElse Exp Stmt Stmt
   | -- | The @while@ statement executes an expression and a statement repeatedly until the value of the expression is false.

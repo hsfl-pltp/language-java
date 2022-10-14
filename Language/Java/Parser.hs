@@ -79,6 +79,9 @@ import Control.Applicative ( (<$>), (<$), (<*), (<*>) )
 import GHC.IO (unsafePerformIO)
 #endif
 
+mapFst :: (a -> b) -> (a, c) -> (b, c)
+mapFst f (x, y) = (f x, y)
+
 data ParserState = ParserState
   { ps_mode :: ParserMode,
     ps_locations :: Bool
@@ -96,6 +99,9 @@ defaultParserState = ParserState ParseFull True
 type JavaParser = Parsec [L Token] ParserState
 
 type P = JavaParser
+
+noLoc :: P (a, Location) -> P a
+noLoc = fmap fst
 
 getLocation :: P Location
 getLocation = do
@@ -260,11 +266,6 @@ classBody = do
   (b, loc) <- braces classBodyStatements
   return (ClassBody b, loc)
 
-classBodyNoLoc :: P ClassBody
-classBodyNoLoc = do
-  (b, _) <- classBody
-  return b
-
 enumBody :: P (EnumBody, Location)
 enumBody = braces $ do
   ecs <- seplist enumConst comma
@@ -276,7 +277,7 @@ enumConst :: P EnumConstant
 enumConst = do
   id <- ident
   as <- lopt args
-  mcb <- opt classBodyNoLoc
+  mcb <- opt (noLoc classBody)
   return $ EnumConstant id as mcb
 
 enumBodyDecls :: P [Decl]
@@ -320,7 +321,7 @@ classBodyStatement =
   )
     <|> ( try $ do
             mst <- bopt (tok KW_Static)
-            blk <- block
+            blk <- blockNoLoc
             return $ Just $ InitDecl mst blk
         )
     <|> ( do
@@ -370,7 +371,7 @@ methodBody = onlySemi <|> fullBody
       semiColon
       return (MethodBody Nothing, loc)
     fullBody = do
-      (b, loc) <- blockWithLoc
+      (b, loc) <- block
       return (MethodBody (Just b), loc)
 
 constrDecl :: P (Mod MemberDecl)
@@ -384,14 +385,14 @@ constrDecl = do
   return $ \loc ms -> ConstructorDecl (loc, endLoc) ms tps id fps thr bod
 
 constrBody :: P ConstructorBody
-constrBody = bracesNoLoc $ do
+constrBody = noLoc . braces $ do
   mec <- opt (try explConstrInv)
   bss <- list blockStmt
   return $ ConstructorBody mec bss
 
 explConstrInv :: P ExplConstrInv
 explConstrInv =
-  endSemi $
+  noLoc . endSemi $
     ( try $ do
         tas <- lopt refTypeArgs
         tok KW_This
@@ -555,7 +556,7 @@ varInit =
     <|> InitExp <$> exp
 
 arrayInit :: P ArrayInit
-arrayInit = bracesNoLoc $ do
+arrayInit = noLoc . braces $ do
   vis <- seplist varInit comma
   opt comma
   return $ ArrayInit vis
@@ -563,8 +564,8 @@ arrayInit = bracesNoLoc $ do
 ----------------------------------------------------------------------------
 -- Statements
 
-blockWithLoc :: P (Block, Location)
-blockWithLoc = do
+block :: P (Block, Location)
+block = do
   state <- getState
   case ps_mode state of
     ParseFull -> braces $ Block <$> list blockStmt
@@ -572,12 +573,10 @@ blockWithLoc = do
   where
     shallowP = do
       loc <- parseNestedCurly (-1)
-      return $ (Block [], loc)
+      return (Block [], loc)
 
-block :: P Block
-block = do
-  (b, _) <- blockWithLoc
-  return b
+blockNoLoc :: P Block
+blockNoLoc = fmap fst block
 
 -- | Parses anything between properly balance curly brackets.
 -- level must initially be -1
@@ -602,33 +601,34 @@ blockStmt =
       return $ LocalClass (cd loc ms)
   )
     <|> ( try $ do
-            (m, t, vds) <- endSemi $ localVarDecl
+            (m, t, vds) <- noLoc . endSemi $ localVarDecl
             return $ LocalVars m t vds
         )
-    <|> BlockStmt <$> stmt
+    <|> BlockStmt . fst <$> stmt
 
-stmt :: P Stmt
+stmt :: P (Stmt, Location)
 stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
   where
     ifStmt = do
+      startLoc <- getLocation
       tok KW_If
       e <- parens exp
       ( try $
           do
-            th <- stmtNSI
+            th <- noLoc stmtNSI
             tok KW_Else
-            el <- stmt
-            return $ IfThenElse e th el
+            (el, endLoc) <- stmt
+            return (IfThenElse e th el, endLoc)
         )
         <|> ( do
-                th <- stmt
-                return $ IfThen e th
+                (th, endLoc) <- stmt
+                return (IfThen (startLoc, endLoc) e th, endLoc)
             )
     whileStmt = do
       tok KW_While
       e <- parens exp
-      s <- stmt
-      return $ While e s
+      (s, endLoc) <- stmt
+      return (While e s, endLoc)
     forStmt = do
       tok KW_For
       f <-
@@ -649,29 +649,29 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                     e <- exp
                     return $ EnhancedFor ms t i e
                 )
-      s <- stmt
-      return $ f s
+      (s, endLoc) <- stmt
+      return (f s, endLoc)
     labeledStmt = try $ do
       lbl <- ident
       colon
-      s <- stmt
-      return $ Labeled lbl s
+      (s, endLoc) <- stmt
+      return (Labeled lbl s, endLoc)
 
-stmtNSI :: P Stmt
+stmtNSI :: P (Stmt, Location)
 stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
   where
     ifStmt = do
       tok KW_If
       e <- parens exp
-      th <- stmtNSI
+      th <- noLoc stmtNSI
       tok KW_Else
-      el <- stmtNSI
-      return $ IfThenElse e th el
+      (el, endLoc) <- stmtNSI
+      return (IfThenElse e th el, endLoc)
     whileStmt = do
       tok KW_While
       e <- parens exp
-      s <- stmtNSI
-      return $ While e s
+      (s, endLoc) <- stmtNSI
+      return (While e s, endLoc)
     forStmt = do
       tok KW_For
       f <-
@@ -692,21 +692,24 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                     e <- exp
                     return $ EnhancedFor ms t i e
                 )
-      s <- stmtNSI
-      return $ f s
+      (s, endLoc) <- stmtNSI
+      return (f s, endLoc)
     labeledStmt = try $ do
       i <- ident
       colon
-      s <- stmtNSI
-      return $ Labeled i s
+      (s, endLoc) <- stmtNSI
+      return (Labeled i s, endLoc)
 
-stmtNoTrail :: P Stmt
+stmtNoTrail :: P (Stmt, Location)
 stmtNoTrail =
   -- empty statement
-  const Empty <$> semiColon
+  do
+    semiColon
+    endLoc <- getLocation
+    return (Empty, endLoc)
     <|>
     -- inner block
-    StmtBlock <$> block
+    mapFst StmtBlock <$> block
     <|>
     -- assertions
     ( endSemi $ do
@@ -720,14 +723,14 @@ stmtNoTrail =
     ( do
         tok KW_Switch
         e <- parens exp
-        (style, sb) <- switchBlock
-        return $ Switch style e sb
+        ((style, sb), endLoc) <- switchBlock
+        return (Switch style e sb, endLoc)
     )
     <|>
     -- do-while loops
     ( endSemi $ do
         tok KW_Do
-        s <- stmt
+        s <- noLoc stmt
         tok KW_While
         e <- parens exp
         return $ Do s e
@@ -758,8 +761,8 @@ stmtNoTrail =
     ( do
         tok KW_Synchronized
         e <- parens exp
-        b <- block
-        return $ Synchronized e b
+        (b, endLoc) <- block
+        return (Synchronized e b, endLoc)
     )
     <|>
     -- throw
@@ -773,16 +776,22 @@ stmtNoTrail =
     ( do
         tok KW_Try
         resources <- tryResourceList
-        b <- block
+        (b, endLoc) <- block
         c <- list catch
         mf <- opt $ tok KW_Finally >> block
         -- TODO: here we should check that there exists at
         -- least one catch or finally clause
-        return $ Try resources b c mf
+        return
+          ( Try resources b (map fst c) (fmap fst mf),
+            case (mf, c) of
+              (Nothing, []) -> endLoc
+              (Nothing, _) -> snd (last c)
+              (Just (_, finallyEndLoc), _) -> finallyEndLoc
+          )
     )
     <|>
     -- expressions as stmts
-    ExpStmt <$> endSemi stmtExp
+    mapFst ExpStmt <$> endSemi stmtExp
 
 -- For loops
 
@@ -802,8 +811,8 @@ forUp = seplist1 stmtExp comma
 
 -- Switches
 
-switchBlock :: P (SwitchStyle, [SwitchBlock])
-switchBlock = bracesNoLoc (try old <|> new)
+switchBlock :: P ((SwitchStyle, [SwitchBlock]), Location)
+switchBlock = braces (try old <|> new)
   where
     old = do
       x <- list switchStmtOld
@@ -831,7 +840,7 @@ switchLabelOld =
 switchStmtNew :: P SwitchBlock
 switchStmtNew = do
   lbl <- switchLabelNew
-  bss <- bracesNoLoc (list blockStmt) <|> (blockStmt >>= \s -> return [s])
+  bss <- noLoc (braces (list blockStmt)) <|> (blockStmt >>= \s -> return [s])
   return $ SwitchBlock lbl bss
 
 switchLabelNew :: P SwitchLabel
@@ -848,14 +857,14 @@ switchExp :: P Exp
 switchExp = do
   tok KW_Switch
   e <- parens exp
-  branches <- bracesNoLoc switchExpBody
+  branches <- noLoc (braces switchExpBody)
   return $ SwitchExp e branches
   where
     switchExpBody = many switchExpBodyBranch
     switchExpBodyBranch = do
       lbl <- switchLabelNew
       body <-
-        (SwitchExpBranchBlock <$> bracesNoLoc (list blockStmt))
+        (SwitchExpBranchBlock <$> noLoc (braces (list blockStmt)))
           <|> (SwitchExpBranchBlock <$> try (blockStmt >>= \s -> return [s]))
           <|> (SwitchExpBranchExp <$> branchExp)
       return $ SwitchExpBranch lbl body
@@ -866,12 +875,12 @@ switchExp = do
 
 -- Try-catch clauses
 
-catch :: P Catch
+catch :: P (Catch, Location)
 catch = do
   tok KW_Catch
   fp <- parens formalParam
-  b <- block
-  return $ Catch fp b
+  (b, endLoc) <- block
+  return (Catch fp b, endLoc)
 
 tryResourceList :: P [TryResource]
 tryResourceList = do
@@ -1055,7 +1064,7 @@ instanceCreationNPS =
     tas <- lopt typeArgs
     tds <- typeDeclSpecifier
     as <- args
-    mcb <- opt classBodyNoLoc
+    mcb <- opt (noLoc classBody)
     return $ InstanceCreation tas tds as mcb
 
 typeDeclSpecifier :: P TypeDeclSpecifier
@@ -1086,7 +1095,7 @@ instanceCreationSuffix =
     tas <- lopt typeArgs
     i <- ident
     as <- args
-    mcb <- opt classBodyNoLoc
+    mcb <- opt (noLoc classBody)
     return $ \p -> QualInstanceCreation p tas i as mcb
 
 instanceCreation :: P Exp
@@ -1109,7 +1118,7 @@ lambdaExp :: P Exp
 lambdaExp =
   Lambda
     <$> (lambdaParams <* (tok LambdaArrow))
-    <*> ( (LambdaBlock <$> (try block))
+    <*> ( (LambdaBlock <$> (try blockNoLoc))
             <|> (LambdaExpression <$> exp)
         )
 
@@ -1120,7 +1129,7 @@ methodRef = do
   target <-
     (tok KW_New >> return MethodRefConstructor)
       <|> (MethodRefIdent <$> ident)
-  return (MethodRef n target)
+  return $ MethodRef n target
 
 {-
 instanceCreation =
@@ -1579,10 +1588,9 @@ pos2sourcePos (l, c) = newPos "" l c
 
 type Mod a = Location -> [Modifier] -> a
 
-parens, brackets, bracesNoLoc, angles :: P a -> P a
+parens, brackets, angles :: P a -> P a
 parens = between (tok OpenParen) (tok CloseParen)
 brackets = between (tok OpenSquare) (tok CloseSquare)
-bracesNoLoc = between (tok OpenCurly) (tok CloseCurly)
 angles = between (tok Op_LThan) (tok Op_GThan)
 
 braces :: P a -> P (a, Location)
@@ -1593,8 +1601,12 @@ braces p = do
   _ <- tok CloseCurly
   pure (x, endLoc)
 
-endSemi :: P a -> P a
-endSemi p = p >>= \a -> semiColon >> return a
+endSemi :: P a -> P (a, Location)
+endSemi p = do
+  a <- p
+  semiColon
+  endLoc <- getLocation
+  return (a, endLoc)
 
 comma, colon, semiColon, period :: P ()
 comma = tok Comma
