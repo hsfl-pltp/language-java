@@ -309,7 +309,7 @@ data Stmt
   | -- | The @if-then@ statement allows conditional execution of a statement.
     IfThen SourceSpan Exp Stmt
   | -- | The @if-then-else@ statement allows conditional choice of two statements, executing one or the other but not both.
-    IfThenElse Exp Stmt Stmt
+    IfThenElse SourceSpan Exp Stmt Stmt
   | -- | The @while@ statement executes an expression and a statement repeatedly until the value of the expression is false.
     While Exp Stmt
   | -- | The basic @for@ statement executes some initialization code, then executes an expression, a statement, and some

@@ -613,12 +613,12 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
       startLoc <- getLocation
       tok KW_If
       e <- parens exp
-      ( try $
-          do
+      try
+        ( do
             th <- noLoc stmtNSI
             tok KW_Else
             (el, endLoc) <- stmt
-            return (IfThenElse e th el, endLoc)
+            return (IfThenElse (startLoc, endLoc) e th el, endLoc)
         )
         <|> ( do
                 (th, endLoc) <- stmt
@@ -661,12 +661,13 @@ stmtNSI :: P (Stmt, Location)
 stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
   where
     ifStmt = do
+      startLoc <- getLocation
       tok KW_If
       e <- parens exp
       th <- noLoc stmtNSI
       tok KW_Else
       (el, endLoc) <- stmtNSI
-      return (IfThenElse e th el, endLoc)
+      return (IfThenElse (startLoc, endLoc) e th el, endLoc)
     whileStmt = do
       tok KW_While
       e <- parens exp

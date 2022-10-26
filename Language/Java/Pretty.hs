@@ -213,7 +213,7 @@ instance Pretty Stmt where
   prettyPrec p (StmtBlock block) = prettyPrec p block
   prettyPrec p (IfThen _ c th) =
     text "if" <+> parens (prettyPrec 0 c) $+$ prettyNestedStmt 0 th
-  prettyPrec p (IfThenElse c th el) =
+  prettyPrec p (IfThenElse _ c th el) =
     text "if" <+> parens (prettyPrec p c) $+$ prettyNestedStmt 0 th $+$ text "else" $+$ prettyNestedStmt 0 el
   prettyPrec p (While c stmt) =
     text "while" <+> parens (prettyPrec p c) $+$ prettyNestedStmt 0 stmt
