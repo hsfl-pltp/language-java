@@ -543,12 +543,13 @@ varDeclId = do
 arrBrackets :: P ()
 arrBrackets = brackets $ return ()
 
-localVarDecl :: P ([Modifier], Type, [VarDecl])
+localVarDecl :: P (Location, [Modifier], Type, [VarDecl])
 localVarDecl = do
+  startLoc <- getLocation
   ms <- list modifier
   typ <- ttype
   vds <- varDecls
-  return (ms, typ, vds)
+  return (startLoc, ms, typ, vds)
 
 varInit :: P VarInit
 varInit =
@@ -594,16 +595,18 @@ parseNestedCurly level = do
 
 blockStmt :: P BlockStmt
 blockStmt =
-  ( try $ do
-      loc <- getLocation
-      ms <- list modifier
-      cd <- classDecl
-      return $ LocalClass (cd loc ms)
-  )
-    <|> ( try $ do
-            (m, t, vds) <- noLoc . endSemi $ localVarDecl
-            return $ LocalVars m t vds
-        )
+  try
+    ( do
+        loc <- getLocation
+        ms <- list modifier
+        cd <- classDecl
+        return $ LocalClass (cd loc ms)
+    )
+    <|> try
+      ( do
+          ((startLoc, m, t, vds), endLoc) <- endSemi localVarDecl
+          return $ LocalVars (startLoc, endLoc) m t vds
+      )
     <|> BlockStmt . fst <$> stmt
 
 stmt :: P (Stmt, Location)
@@ -801,7 +804,7 @@ forInit =
   ( do
       try
         ( do
-            (m, t, vds) <- localVarDecl
+            (_, m, t, vds) <- localVarDecl
             return $ ForLocalVars m t vds
         )
   )

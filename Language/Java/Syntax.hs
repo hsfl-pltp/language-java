@@ -299,7 +299,7 @@ data Block = Block [BlockStmt]
 data BlockStmt
   = BlockStmt Stmt
   | LocalClass ClassDecl
-  | LocalVars [Modifier] Type [VarDecl]
+  | LocalVars SourceSpan [Modifier] Type [VarDecl]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 -- | A Java statement.

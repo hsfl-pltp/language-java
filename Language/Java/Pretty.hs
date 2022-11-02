@@ -205,7 +205,7 @@ instance Pretty Block where
 instance Pretty BlockStmt where
   prettyPrec p (BlockStmt stmt) = prettyPrec p stmt
   prettyPrec p (LocalClass cd) = prettyPrec p cd
-  prettyPrec p (LocalVars mods t vds) =
+  prettyPrec p (LocalVars _ mods t vds) =
     hsep (map (prettyPrec p) mods) <+> prettyPrec p t
       <+> hsep (punctuate comma $ map (prettyPrec p) vds) <> semi
 
