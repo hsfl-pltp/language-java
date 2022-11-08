@@ -243,7 +243,7 @@ instance Pretty Stmt where
         prettyPrec p stmt
       ]
   prettyPrec p Empty = semi
-  prettyPrec p (ExpStmt e) = prettyPrec p e <> semi
+  prettyPrec p (ExpStmt _ e) = prettyPrec p e <> semi
   prettyPrec p (Assert ass mE) =
     text "assert" <+> prettyPrec p ass
       <+> maybe empty ((colon <>) . prettyPrec p) mE <> semi

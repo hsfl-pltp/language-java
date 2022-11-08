@@ -795,7 +795,10 @@ stmtNoTrail =
     )
     <|>
     -- expressions as stmts
-    mapFst ExpStmt <$> endSemi stmtExp
+    do
+      startLoc <- getLocation
+      (s, endLoc) <- endSemi stmtExp
+      return (ExpStmt (startLoc, endLoc) s, endLoc)
 
 -- For loops
 

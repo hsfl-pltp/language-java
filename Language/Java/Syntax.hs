@@ -322,7 +322,7 @@ data Stmt
   | -- | Certain kinds of expressions may be used as statements by following them with semicolons:
     --   assignments, pre- or post-inc- or decrementation, method invocation or class instance
     --   creation expressions.
-    ExpStmt Exp
+    ExpStmt SourceSpan Exp
   | -- | An assertion is a statement containing a boolean expression, where an error is reported if the expression
     --   evaluates to false.
     Assert Exp (Maybe Exp)
