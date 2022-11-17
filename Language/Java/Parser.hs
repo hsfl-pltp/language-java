@@ -778,19 +778,24 @@ stmtNoTrail =
     <|>
     -- try-catch, both with and without a finally clause
     ( do
+        startLoc <- getLocation
         tok KW_Try
         resources <- tryResourceList
-        (b, endLoc) <- block
+        b <- noLoc block
+        blockEndLoc <- getLocation
         c <- list catch
-        mf <- opt $ tok KW_Finally >> block
+        catchEndLoc <- getLocation
+        mf <- opt (tok KW_Finally >> noLoc block)
+        finallyEndLoc <- getLocation
         -- TODO: here we should check that there exists at
         -- least one catch or finally clause
+        let endLoc = case (mf, c) of
+              (Nothing, []) -> blockEndLoc
+              (Nothing, _) -> catchEndLoc
+              (Just _, _) -> finallyEndLoc
         return
-          ( Try resources b (map fst c) (fmap fst mf),
-            case (mf, c) of
-              (Nothing, []) -> endLoc
-              (Nothing, _) -> snd (last c)
-              (Just (_, finallyEndLoc), _) -> finallyEndLoc
+          ( Try (startLoc, endLoc) resources b c mf,
+            endLoc
           )
     )
     <|>
@@ -882,12 +887,12 @@ switchExp = do
 
 -- Try-catch clauses
 
-catch :: P (Catch, Location)
+catch :: P Catch
 catch = do
   tok KW_Catch
   fp <- parens formalParam
-  (b, endLoc) <- block
-  return (Catch fp b, endLoc)
+  b <- noLoc block
+  return (Catch fp b)
 
 tryResourceList :: P [TryResource]
 tryResourceList = do
@@ -961,17 +966,19 @@ assignExp = try switchExp <|> try methodRef <|> try lambdaExp <|> try assignment
 
 condExp :: P Exp
 condExp = do
+  startLoc <- getLocation
   ie <- infixExp
-  ces <- list condExpSuffix
+  ces <- list (condExpSuffix startLoc)
   return $ foldl (\a s -> s a) ie ces
 
-condExpSuffix :: P (Exp -> Exp)
-condExpSuffix = do
+condExpSuffix :: Location -> P (Exp -> Exp)
+condExpSuffix startLoc = do
   tok Op_Query
   th <- exp
   colon
   el <- condExp
-  return $ \ce -> Cond ce th el
+  endLoc <- getLocation
+  return $ \ce -> Cond (startLoc, endLoc) ce th el
 
 infixExp :: P Exp
 infixExp = do

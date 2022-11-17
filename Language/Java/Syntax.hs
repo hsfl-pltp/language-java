@@ -346,7 +346,7 @@ data Stmt
     --   can catch it, then control will be transferred to the first such catch clause. If the try statement has a finally
     --   clause, then another block of code is executed, no matter whether the try block completes normally or abruptly,
     --   and no matter whether a catch clause is first given control.
-    Try [TryResource] Block [Catch] (Maybe {- finally -} Block)
+    Try SourceSpan [TryResource] Block [Catch] (Maybe {- finally -} Block)
   | -- | Statements may have label prefixes.
     Labeled Ident Stmt
   deriving (Eq, Show, Read, Typeable, Generic, Data)
@@ -468,7 +468,7 @@ data Exp
     InstanceOf Exp RefType (Maybe Name)
   | -- | The conditional operator @? :@ uses the boolean value of one expression to decide which of two other
     --   expressions should be evaluated.
-    Cond Exp Exp Exp
+    Cond SourceSpan Exp Exp Exp
   | -- | Assignment of the result of an expression to a variable.
     Assign Lhs AssignOp Exp
   | -- | Lambda expression

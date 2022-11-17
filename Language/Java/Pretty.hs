@@ -262,7 +262,7 @@ instance Pretty Stmt where
     text "synchronized" <+> parens (prettyPrec p e) $$ prettyPrec p block
   prettyPrec p (Throw e) =
     text "throw" <+> prettyPrec p e <> semi
-  prettyPrec p (Try _resources block catches mFinally) =
+  prettyPrec p (Try _ _resources block catches mFinally) =
     -- FIXME: do not ignore resources
     text "try" $$ prettyPrec p block
       $$ vcat (map (prettyPrec p) catches ++ [ppFinally mFinally])
@@ -355,7 +355,7 @@ instance Pretty Exp where
           prettyPrec cp e
             <+> text "instanceof"
             <+> prettyPrec cp rt <> prettyName
-  prettyPrec p (Cond c th el) =
+  prettyPrec p (Cond _ c th el) =
     parenPrec p 13 $
       prettyPrec 13 c <+> char '?'
         <+> prettyPrec p th
