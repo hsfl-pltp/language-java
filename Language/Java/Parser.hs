@@ -600,14 +600,17 @@ blockStmt =
         loc <- getLocation
         ms <- list modifier
         cd <- classDecl
-        return $ LocalClass (cd loc ms)
+        return (LocalClass (cd loc ms))
     )
     <|> try
       ( do
           ((startLoc, m, t, vds), endLoc) <- endSemi localVarDecl
-          return $ LocalVars (startLoc, endLoc) m t vds
+          return (LocalVars (startLoc, endLoc) m t vds)
       )
-    <|> BlockStmt . fst <$> stmt
+    <|> do
+      startLoc <- getLocation
+      (s, endLoc) <- stmt
+      return (BlockStmt (startLoc, endLoc) s)
 
 stmt :: P (Stmt, Location)
 stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail

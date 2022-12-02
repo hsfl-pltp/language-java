@@ -297,7 +297,7 @@ data Block = Block [BlockStmt]
 -- | A block statement is either a normal statement, a local
 --   class declaration or a local variable declaration.
 data BlockStmt
-  = BlockStmt Stmt
+  = BlockStmt SourceSpan Stmt
   | LocalClass ClassDecl
   | LocalVars SourceSpan [Modifier] Type [VarDecl]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
