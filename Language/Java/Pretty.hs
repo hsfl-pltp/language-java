@@ -369,7 +369,7 @@ instance Pretty Exp where
         <+> prettyPrec p th
         <+> colon
         <+> prettyPrec 13 el
-  prettyPrec p (Assign lhs aop e) =
+  prettyPrec p (Assign _ lhs aop e) =
     hsep [prettyPrec p lhs, prettyPrec p aop, prettyPrec p e]
   prettyPrec p (Lambda params body) =
     prettyPrec p params <+> text "->" <+> prettyPrec p body

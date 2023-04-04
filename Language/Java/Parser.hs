@@ -975,10 +975,12 @@ postIncDec = do
 
 assignment :: P Exp
 assignment = do
+  startLoc <- getLocation
   lh <- lhs
   op <- assignOp
   e <- assignExp
-  return $ Assign lh op e
+  endLoc <- getLocation
+  return (Assign (startLoc, endLoc) lh op e)
 
 lhs :: P Lhs
 lhs =

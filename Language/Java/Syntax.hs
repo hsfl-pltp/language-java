@@ -470,7 +470,7 @@ data Exp
     --   expressions should be evaluated.
     Cond SourceSpan Exp Exp Exp
   | -- | Assignment of the result of an expression to a variable.
-    Assign Lhs AssignOp Exp
+    Assign SourceSpan Lhs AssignOp Exp
   | -- | Lambda expression
     Lambda LambdaParams LambdaExpression
   | -- | Method reference
