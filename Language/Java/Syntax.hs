@@ -83,7 +83,7 @@ newtype PackageDecl = PackageDecl Name
 --   The last argument signals whether the declaration brings all names in the named type or package, or only brings
 --   a single name into scope.
 data ImportDecl
-  = ImportDecl Bool {- static? -} Name Bool {- .*? -}
+  = ImportDecl SourceSpan Bool {- static? -} Name Bool {- .*? -}
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 -----------------------------------------------------------------------

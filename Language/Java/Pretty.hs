@@ -39,7 +39,7 @@ instance Pretty PackageDecl where
   prettyPrec p (PackageDecl name) = text "package" <+> prettyPrec p name <> semi
 
 instance Pretty ImportDecl where
-  prettyPrec p (ImportDecl st name wc) =
+  prettyPrec p (ImportDecl _ st name wc) =
     text "import"
       <+> opt st (text "static")
       <+> prettyPrec p name

@@ -184,12 +184,14 @@ packageDecl = do
 
 importDecl :: P ImportDecl
 importDecl = do
+  startLoc <- getLocation
   tok KW_Import
   st <- bopt $ tok KW_Static
   n <- name
   ds <- bopt $ period >> tok Op_Star
   semiColon
-  return $ ImportDecl st n ds
+  endLoc <- getLocation
+  return (ImportDecl (startLoc, endLoc) st n ds)
 
 typeDecl :: P (Maybe TypeDecl)
 typeDecl =
