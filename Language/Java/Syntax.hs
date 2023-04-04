@@ -446,9 +446,9 @@ data Exp
   | -- | Post-decrementation expression, i.e. an expression followed by @--@.
     PostDecrement Exp
   | -- | Pre-incrementation expression, i.e. an expression preceded by @++@.
-    PreIncrement Exp
+    PreIncrement SourceSpan Exp
   | -- | Pre-decrementation expression, i.e. an expression preceded by @--@.
-    PreDecrement Exp
+    PreDecrement SourceSpan Exp
   | -- | Unary plus, the promotion of the value of the expression to a primitive numeric type.
     PrePlus Exp
   | -- | Unary minus, the promotion of the negation of the value of the expression to a primitive numeric type.

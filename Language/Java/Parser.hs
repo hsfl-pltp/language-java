@@ -1389,9 +1389,18 @@ literal =
 -- Operators
 
 preIncDecOp, prefixOp, postfixOp :: P (Exp -> Exp)
-preIncDecOp =
-  (tok Op_PPlus >> return PreIncrement)
-    <|> (tok Op_MMinus >> return PreDecrement)
+preIncDecOp = do
+  startLoc <- getLocation
+  ( do
+      tok Op_PPlus
+      endLoc <- getLocation
+      return (PreIncrement (startLoc, endLoc))
+    )
+    <|> ( do
+            tok Op_MMinus
+            endLoc <- getLocation
+            return (PreDecrement (startLoc, endLoc))
+        )
 prefixOp =
   (tok Op_Bang >> return PreNot)
     <|> (tok Op_Tilde >> return PreBitCompl)
