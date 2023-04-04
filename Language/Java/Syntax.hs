@@ -264,21 +264,28 @@ instance Show Modifier where
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation
   = NormalAnnotation
-      { annName :: Name, -- Not type because not type generics not allowed
+      { span :: SourceSpan,
+        annName :: Name, -- Not type because not type generics not allowed
         annKV :: [(Ident, ElementValue)]
       }
   | SingleElementAnnotation
-      { annName :: Name,
+      { span :: SourceSpan,
+        annName :: Name,
         annValue :: ElementValue
       }
-  | MarkerAnnotation {annName :: Name}
+  | MarkerAnnotation
+      { span :: SourceSpan,
+        annName :: Name
+      }
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
-desugarAnnotation (MarkerAnnotation n) = (n, [])
-desugarAnnotation (SingleElementAnnotation n e) = (n, [(Ident "value", e)])
-desugarAnnotation (NormalAnnotation n kv) = (n, kv)
+desugarAnnotation (MarkerAnnotation span n) = (span, n, [])
+desugarAnnotation (SingleElementAnnotation span n e) = (span, n, [(Ident "value", e)])
+desugarAnnotation (NormalAnnotation span n kv) = (span, n, kv)
 
-desugarAnnotation' = uncurry NormalAnnotation . desugarAnnotation
+desugarAnnotation' (MarkerAnnotation span n) = NormalAnnotation span n []
+desugarAnnotation' (SingleElementAnnotation span n e) = NormalAnnotation span n [(Ident "value", e)]
+desugarAnnotation' normal = normal
 
 -- | Annotations may contain  annotations or (loosely) expressions
 data ElementValue

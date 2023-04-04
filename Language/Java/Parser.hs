@@ -523,13 +523,28 @@ modifier =
           )
 
 annotation :: P Annotation
-annotation =
+annotation = do
+  startLoc <- getLocation
   flip ($)
     <$ tok Op_AtSign
     <*> name
-    <*> ( try (flip NormalAnnotation <$> parens evlist)
-            <|> try (flip SingleElementAnnotation <$> parens elementValue)
-            <|> try (MarkerAnnotation <$ return ())
+    <*> ( try
+            ( do
+                elist <- parens evlist
+                endLoc <- getLocation
+                return (flip (NormalAnnotation (startLoc, endLoc)) elist)
+            )
+            <|> try
+              ( do
+                  e <- parens elementValue
+                  endLoc <- getLocation
+                  return (flip (SingleElementAnnotation (startLoc, endLoc)) e)
+              )
+            <|> try
+              ( do
+                  endLoc <- getLocation
+                  MarkerAnnotation (startLoc, endLoc) <$ return ()
+              )
         )
 
 evlist :: P [(Ident, ElementValue)]
