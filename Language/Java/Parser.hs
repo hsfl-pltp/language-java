@@ -486,14 +486,10 @@ ellipsis = period >> period >> period
 
 modifier :: P Modifier
 modifier =
-  tok KW_Public
-    >> return Public
-      <|> tok KW_Protected
+  tok KW_Protected
     >> return Protected
       <|> tok KW_Private
     >> return Private
-      <|> tok KW_Abstract
-    >> return Abstract
       <|> tok KW_Static
     >> return Static
       <|> tok KW_Strictfp
@@ -510,6 +506,19 @@ modifier =
     >> return Synchronized_
       <|> fixedIdent "sealed" Sealed
       <|> Annotation <$> annotation
+      <|> ( do
+              startLoc <- getLocation
+              ( do
+                  tok KW_Public
+                  endLoc <- getLocation
+                  return (Public (startLoc, endLoc))
+                )
+                <|> ( do
+                        tok KW_Abstract
+                        endLoc <- getLocation
+                        return (Abstract (startLoc, endLoc))
+                    )
+          )
 
 annotation :: P Annotation
 annotation =

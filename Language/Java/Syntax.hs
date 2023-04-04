@@ -231,10 +231,10 @@ data ExplConstrInv
 --   a few of these modifiers are allowed for each declaration type, for instance
 --   a member type declaration may only specify one of public, private or protected.
 data Modifier
-  = Public
+  = Public SourceSpan
   | Private
   | Protected
-  | Abstract
+  | Abstract SourceSpan
   | Final
   | Static
   | StrictFP
@@ -247,10 +247,10 @@ data Modifier
   deriving (Eq, Read, Typeable, Generic, Data)
 
 instance Show Modifier where
-  show Public = "public"
+  show (Public _) = "public"
   show Private = "private"
   show Protected = "protected"
-  show Abstract = "abstract"
+  show (Abstract _) = "abstract"
   show Final = "final"
   show Static = "static"
   show StrictFP = "strictfp"
