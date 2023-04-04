@@ -192,7 +192,7 @@ data VarDecl
 data VarDeclId
   = VarId Ident
   | -- | Multi-dimensional arrays are represented by nested applications of 'VarDeclArray'.
-    VarDeclArray VarDeclId
+    VarDeclArray SourceSpan VarDeclId
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 -- | Explicit initializer for a variable declaration.

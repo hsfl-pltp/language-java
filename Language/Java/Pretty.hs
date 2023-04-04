@@ -40,10 +40,11 @@ instance Pretty PackageDecl where
 
 instance Pretty ImportDecl where
   prettyPrec p (ImportDecl st name wc) =
-    text "import" <+> opt st (text "static")
+    text "import"
+      <+> opt st (text "static")
       <+> prettyPrec p name
-      <> opt wc (text ".*")
-      <> semi
+        <> opt wc (text ".*")
+        <> semi
 
 -----------------------------------------------------------------------
 -- Declarations
@@ -82,8 +83,8 @@ instance Pretty EnumBody where
   prettyPrec p (EnumBody cs ds) =
     braceBlock $
       punctuate comma (map (prettyPrec p) cs)
-        ++ opt (not $ null ds) semi :
-      map (prettyPrec p) ds
+        ++ opt (not $ null ds) semi
+        : map (prettyPrec p) ds
 
 instance Pretty EnumConstant where
   prettyPrec p (EnumConstant ident args mBody) =
@@ -146,7 +147,7 @@ instance Pretty VarDecl where
 
 instance Pretty VarDeclId where
   prettyPrec p (VarId ident) = prettyPrec p ident
-  prettyPrec p (VarDeclArray vId) = prettyPrec p vId <> text "[]"
+  prettyPrec p (VarDeclArray _ vId) = prettyPrec p vId <> text "[]"
 
 instance Pretty VarInit where
   prettyPrec p (InitExp e) = prettyPrec p e
@@ -174,10 +175,12 @@ instance Pretty ExplConstrInv where
   prettyPrec p (SuperInvoke rts args) =
     ppTypeParams p rts <+> text "super" <> ppArgs p args <> semi
   prettyPrec p (PrimarySuperInvoke e rts args) =
-    prettyPrec p e <> char '.'
-      <> ppTypeParams p rts <+> text "super"
-      <> ppArgs p args
-      <> semi
+    prettyPrec p e
+      <> char '.'
+      <> ppTypeParams p rts
+      <+> text "super"
+        <> ppArgs p args
+        <> semi
 
 instance Pretty Modifier where
   prettyPrec p (Annotation ann) = prettyPrec p ann $+$ nest (-1) (text "")
@@ -206,7 +209,8 @@ instance Pretty BlockStmt where
   prettyPrec p (BlockStmt _ stmt) = prettyPrec p stmt
   prettyPrec p (LocalClass cd) = prettyPrec p cd
   prettyPrec p (LocalVars _ mods t vds) =
-    hsep (map (prettyPrec p) mods) <+> prettyPrec p t
+    hsep (map (prettyPrec p) mods)
+      <+> prettyPrec p t
       <+> hsep (punctuate comma $ map (prettyPrec p) vds) <> semi
 
 instance Pretty Stmt where
@@ -245,10 +249,12 @@ instance Pretty Stmt where
   prettyPrec p Empty = semi
   prettyPrec p (ExpStmt _ e) = prettyPrec p e <> semi
   prettyPrec p (Assert ass mE) =
-    text "assert" <+> prettyPrec p ass
+    text "assert"
+      <+> prettyPrec p ass
       <+> maybe empty ((colon <>) . prettyPrec p) mE <> semi
   prettyPrec p (Switch _style e sBlocks) =
-    text "switch" <+> parens (prettyPrec p e)
+    text "switch"
+      <+> parens (prettyPrec p e)
       $$ braceBlock (map (prettyPrec p) sBlocks)
   prettyPrec p (Do stmt e) =
     text "do" $+$ prettyPrec p stmt <+> text "while" <+> parens (prettyPrec p e) <> semi
@@ -264,7 +270,8 @@ instance Pretty Stmt where
     text "throw" <+> prettyPrec p e <> semi
   prettyPrec p (Try _ _resources block catches mFinally) =
     -- FIXME: do not ignore resources
-    text "try" $$ prettyPrec p block
+    text "try"
+      $$ prettyPrec p block
       $$ vcat (map (prettyPrec p) catches ++ [ppFinally mFinally])
     where
       ppFinally Nothing = empty
@@ -289,8 +296,8 @@ instance Pretty ForInit where
   prettyPrec p (ForLocalVars mods t vds) =
     hsep $
       map (prettyPrec p) mods
-        ++ prettyPrec p t :
-      punctuate comma (map (prettyPrec p) vds)
+        ++ prettyPrec p t
+        : punctuate comma (map (prettyPrec p) vds)
   prettyPrec p (ForInitExps es) =
     hsep $ punctuate comma (map (prettyPrec p) es)
 
@@ -321,8 +328,8 @@ instance Pretty Exp where
   prettyPrec p (ArrayCreate t es k) =
     text "new"
       <+> hcat
-        ( prettyPrec p t :
-          map (brackets . prettyPrec p) es
+        ( prettyPrec p t
+            : map (brackets . prettyPrec p) es
             ++ replicate k (text "[]")
         )
   prettyPrec p (ArrayCreateInit t k init) =
@@ -357,7 +364,8 @@ instance Pretty Exp where
             <+> prettyPrec cp rt <> prettyName
   prettyPrec p (Cond _ c th el) =
     parenPrec p 13 $
-      prettyPrec 13 c <+> char '?'
+      prettyPrec 13 c
+        <+> char '?'
         <+> prettyPrec p th
         <+> colon
         <+> prettyPrec 13 el
@@ -483,7 +491,7 @@ instance Pretty ArrayInit where
   prettyPrec p (ArrayInit vInits) =
     braceBlock $ map (\v -> prettyPrec p v <> comma) vInits
 
---braces $ hsep (punctuate comma (map (prettyPrec p) vInits))
+-- braces $ hsep (punctuate comma (map (prettyPrec p) vInits))
 
 ppArgs :: Pretty a => Int -> [a] -> Doc
 ppArgs p = parens . hsep . punctuate comma . map (prettyPrec p)
@@ -536,8 +544,8 @@ instance Pretty TypeParam where
       <+> opt
         (not $ null rts)
         ( hsep $
-            text "extends" :
-            punctuate (text " &") (map (prettyPrec p) rts)
+            text "extends"
+              : punctuate (text " &") (map (prettyPrec p) rts)
         )
 
 ppTypeParams :: Pretty a => Int -> [a] -> Doc

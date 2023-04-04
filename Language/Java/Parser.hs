@@ -222,7 +222,7 @@ classDecl = normalClassDecl <|> recordClassDecl <|> enumClassDecl
 normalClassDecl :: P (Mod ClassDecl)
 normalClassDecl = do
   tok KW_Class
-  i <- ident
+  i <- noLoc ident
   tps <- lopt typeParams
   mex <- opt extends
   imp <- lopt implements
@@ -241,7 +241,7 @@ implements = tok KW_Implements >> refTypeList
 enumClassDecl :: P (Mod ClassDecl)
 enumClassDecl = do
   tok KW_Enum
-  i <- ident
+  i <- noLoc ident
   imp <- lopt implements
   (bod, endLoc) <- enumBody
   return $ \loc ms -> EnumDecl (loc, endLoc) ms i imp bod
@@ -249,7 +249,7 @@ enumClassDecl = do
 recordClassDecl :: P (Mod ClassDecl)
 recordClassDecl = do
   tok KW_Record
-  i <- ident
+  i <- noLoc ident
   tps <- lopt typeParams
   fields <- parens (seplist recordField comma)
   imp <- lopt implements
@@ -258,7 +258,7 @@ recordClassDecl = do
   where
     recordField = do
       typ <- ttype
-      i <- ident
+      i <- noLoc ident
       return $ RecordFieldDecl typ i
 
 classBody :: P (ClassBody, Location)
@@ -275,7 +275,7 @@ enumBody = braces $ do
 
 enumConst :: P EnumConstant
 enumConst = do
-  id <- ident
+  id <- noLoc ident
   as <- lopt args
   mcb <- opt (noLoc classBody)
   return $ EnumConstant id as mcb
@@ -291,7 +291,7 @@ classBodyStatements = catMaybes <$> list classBodyStatement
 annInterfaceDecl :: P (Mod InterfaceDecl)
 annInterfaceDecl = do
   tok KW_AnnInterface
-  id <- ident
+  id <- noLoc ident
   tps <- lopt typeParams
   exs <- lopt extends
   ps <- lopt permits
@@ -301,7 +301,7 @@ annInterfaceDecl = do
 interfaceDecl :: P (Mod InterfaceDecl)
 interfaceDecl = do
   tok KW_Interface
-  id <- ident
+  id <- noLoc ident
   tps <- lopt typeParams
   exs <- lopt extends
   ps <- lopt permits
@@ -357,7 +357,7 @@ methodDecl :: P (Mod MemberDecl)
 methodDecl = do
   tps <- lopt typeParams
   rt <- resultType
-  id <- ident
+  id <- noLoc ident
   fps <- formalParams
   thr <- lopt throws
   (bod, endLoc) <- methodBody
@@ -377,7 +377,7 @@ methodBody = onlySemi <|> fullBody
 constrDecl :: P (Mod MemberDecl)
 constrDecl = do
   tps <- lopt typeParams
-  id <- ident
+  id <- noLoc ident
   fps <- optList formalParams -- record constructors omit the argument list
   thr <- lopt throws
   bod <- constrBody
@@ -418,12 +418,13 @@ explConstrInv =
 --       That would give far better error messages.
 interfaceBodyDecl :: P (Maybe MemberDecl)
 interfaceBodyDecl =
-  semiColon >> return Nothing
-    <|> do
-      loc <- getLocation
-      ms <- list modifier
-      imd <- interfaceMemberDecl
-      return $ Just (imd loc ms)
+  semiColon
+    >> return Nothing
+      <|> do
+        loc <- getLocation
+        ms <- list modifier
+        imd <- interfaceMemberDecl
+        return $ Just (imd loc ms)
 
 interfaceMemberDecl :: P (Mod MemberDecl)
 interfaceMemberDecl =
@@ -442,7 +443,7 @@ absMethodDecl :: P (Mod MemberDecl)
 absMethodDecl = do
   tps <- lopt typeParams
   rt <- resultType
-  id <- ident
+  id <- noLoc ident
   fps <- formalParams
   thr <- lopt throws
   def <- opt defaultValue
@@ -485,23 +486,36 @@ ellipsis = period >> period >> period
 
 modifier :: P Modifier
 modifier =
-  tok KW_Public >> return Public
-    <|> tok KW_Protected >> return Protected
-    <|> tok KW_Private >> return Private
-    <|> tok KW_Abstract >> return Abstract
-    <|> tok KW_Static >> return Static
-    <|> tok KW_Strictfp >> return StrictFP
-    <|> tok KW_Final >> return Final
-    <|> tok KW_Native >> return Native
-    <|> tok KW_Transient >> return Transient
-    <|> tok KW_Volatile >> return Volatile
-    <|> tok KW_Synchronized >> return Synchronized_
-    <|> fixedIdent "sealed" Sealed
-    <|> Annotation <$> annotation
+  tok KW_Public
+    >> return Public
+      <|> tok KW_Protected
+    >> return Protected
+      <|> tok KW_Private
+    >> return Private
+      <|> tok KW_Abstract
+    >> return Abstract
+      <|> tok KW_Static
+    >> return Static
+      <|> tok KW_Strictfp
+    >> return StrictFP
+      <|> tok KW_Final
+    >> return Final
+      <|> tok KW_Native
+    >> return Native
+      <|> tok KW_Transient
+    >> return Transient
+      <|> tok KW_Volatile
+    >> return Volatile
+      <|> tok KW_Synchronized
+    >> return Synchronized_
+      <|> fixedIdent "sealed" Sealed
+      <|> Annotation <$> annotation
 
 annotation :: P Annotation
 annotation =
-  flip ($) <$ tok Op_AtSign <*> name
+  flip ($)
+    <$ tok Op_AtSign
+    <*> name
     <*> ( try (flip NormalAnnotation <$> parens evlist)
             <|> try (flip SingleElementAnnotation <$> parens elementValue)
             <|> try (MarkerAnnotation <$ return ())
@@ -511,7 +525,7 @@ evlist :: P [(Ident, ElementValue)]
 evlist = seplist1 elementValuePair comma
 
 elementValuePair :: P (Ident, ElementValue)
-elementValuePair = (,) <$> ident <* tok Op_Equal <*> elementValue
+elementValuePair = (,) <$> noLoc ident <* tok Op_Equal <*> elementValue
 
 elementValue :: P ElementValue
 elementValue =
@@ -520,7 +534,7 @@ elementValue =
             <|> InitExp <$> condExp
         )
     <|> EVAnn
-    <$> annotation
+      <$> annotation
 
 ----------------------------------------------------------------------------
 -- Variable declarations
@@ -536,9 +550,10 @@ varDecl = do
 
 varDeclId :: P VarDeclId
 varDeclId = do
-  id <- ident
+  startLoc <- getLocation
+  (id, endLoc) <- ident
   abs <- list arrBrackets
-  return $ foldl (\f _ -> VarDeclArray . f) VarId abs id
+  return $ foldl (\f _ -> VarDeclArray (startLoc, endLoc) . f) VarId abs id
 
 arrBrackets :: P ()
 arrBrackets = brackets $ return ()
@@ -650,7 +665,7 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
             <|> ( do
                     ms <- list modifier
                     t <- ttype
-                    i <- ident
+                    i <- noLoc ident
                     colon
                     e <- exp
                     return $ EnhancedFor ms t i e
@@ -658,7 +673,7 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
       (s, endLoc) <- stmt
       return (f s, endLoc)
     labeledStmt = try $ do
-      lbl <- ident
+      lbl <- noLoc ident
       colon
       (s, endLoc) <- stmt
       return (Labeled lbl s, endLoc)
@@ -694,7 +709,7 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
             <|> ( do
                     ms <- list modifier
                     t <- ttype
-                    i <- ident
+                    i <- noLoc ident
                     colon
                     e <- exp
                     return $ EnhancedFor ms t i e
@@ -702,7 +717,7 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
       (s, endLoc) <- stmtNSI
       return (f s, endLoc)
     labeledStmt = try $ do
-      i <- ident
+      i <- noLoc ident
       colon
       (s, endLoc) <- stmtNSI
       return (Labeled i s, endLoc)
@@ -746,14 +761,14 @@ stmtNoTrail =
     -- break
     ( endSemi $ do
         tok KW_Break
-        mi <- opt ident
+        mi <- opt (noLoc ident)
         return $ Break mi
     )
     <|>
     -- continue
     ( endSemi $ do
         tok KW_Continue
-        mi <- opt ident
+        mi <- opt (noLoc ident)
         return $ Continue mi
     )
     <|>
@@ -911,7 +926,7 @@ tryResourceList = do
     tryResource =
       (TryResourceVarDecl <$> try resourceDecl)
         <|> (TryResourceQualAccess <$> try fieldAccess)
-        <|> (TryResourceVarAccess <$> ident)
+        <|> (TryResourceVarAccess <$> noLoc ident)
 
 resourceDecl :: P ResourceDecl
 resourceDecl = do
@@ -1089,13 +1104,13 @@ typeDeclSpecifier =
   ( try $ do
       ct <- classType
       period
-      i <- ident
+      i <- noLoc ident
       tok Op_LThan
       tok Op_GThan
       return $ TypeDeclSpecifierWithDiamond ct i Diamond
   )
     <|> ( try $ do
-            i <- ident
+            i <- noLoc ident
             tok Op_LThan
             tok Op_GThan
             return $ TypeDeclSpecifierUnqualifiedWithDiamond i Diamond
@@ -1110,7 +1125,7 @@ instanceCreationSuffix =
   do
     period >> tok KW_New
     tas <- lopt typeArgs
-    i <- ident
+    i <- noLoc ident
     as <- args
     mcb <- opt (noLoc classBody)
     return $ \p -> QualInstanceCreation p tas i as mcb
@@ -1127,9 +1142,9 @@ instanceCreation =
 
 lambdaParams :: P LambdaParams
 lambdaParams =
-  try (LambdaSingleParam <$> ident)
+  try (LambdaSingleParam <$> noLoc ident)
     <|> try (parens $ LambdaFormalParams <$> (seplist formalParam comma))
-    <|> (parens $ LambdaInferredParams <$> (seplist ident comma))
+    <|> (parens $ LambdaInferredParams <$> (seplist (noLoc ident) comma))
 
 lambdaExp :: P Exp
 lambdaExp =
@@ -1145,7 +1160,7 @@ methodRef = do
   tok MethodRefSep
   target <-
     (tok KW_New >> return MethodRefConstructor)
-      <|> (MethodRefIdent <$> ident)
+      <|> (MethodRefIdent <$> noLoc ident)
   return $ MethodRef n target
 
 {-
@@ -1169,20 +1184,20 @@ fieldAccessNPS :: P FieldAccess
 fieldAccessNPS =
   ( do
       tok KW_Super >> period
-      i <- ident
+      i <- noLoc ident
       return $ SuperFieldAccess i
   )
     <|> ( do
             n <- name
             period >> tok KW_Super >> period
-            i <- ident
+            i <- noLoc ident
             return $ ClassFieldAccess n i
         )
 
 fieldAccessSuffix :: P (Exp -> FieldAccess)
 fieldAccessSuffix = do
   period
-  i <- ident
+  i <- noLoc ident
   return $ \p -> PrimaryFieldAccess p i
 
 fieldAccess :: P FieldAccess
@@ -1225,7 +1240,7 @@ methodInvocationNPS =
   ( do
       tok KW_Super >> period
       rts <- lopt refTypeArgs
-      i <- ident
+      i <- noLoc ident
       as <- args
       return $ SuperMethodCall rts i as
   )
@@ -1239,7 +1254,7 @@ methodInvocationNPS =
                 <|> ( period >> do
                         msp <- opt (tok KW_Super >> period)
                         rts <- lopt refTypeArgs
-                        i <- ident
+                        i <- noLoc ident
                         as <- args
                         let mc = maybe TypeMethodCall (const ClassMethodCall) msp
                         return $ \n -> mc n rts i as
@@ -1251,7 +1266,7 @@ methodInvocationSuffix :: P (Exp -> MethodInvocation)
 methodInvocationSuffix = do
   period
   rts <- lopt refTypeArgs
-  i <- ident
+  i <- noLoc ident
   as <- args
   return $ \p -> PrimaryMethodCall p [] i as
 
@@ -1433,14 +1448,22 @@ ttype = try (RefType <$> refType) <|> PrimType <$> primType
 
 primType :: P PrimType
 primType =
-  tok KW_Boolean >> return BooleanT
-    <|> tok KW_Byte >> return ByteT
-    <|> tok KW_Short >> return ShortT
-    <|> tok KW_Int >> return IntT
-    <|> tok KW_Long >> return LongT
-    <|> tok KW_Char >> return CharT
-    <|> tok KW_Float >> return FloatT
-    <|> tok KW_Double >> return DoubleT
+  tok KW_Boolean
+    >> return BooleanT
+      <|> tok KW_Byte
+    >> return ByteT
+      <|> tok KW_Short
+    >> return ShortT
+      <|> tok KW_Int
+    >> return IntT
+      <|> tok KW_Long
+    >> return LongT
+      <|> tok KW_Char
+    >> return CharT
+      <|> tok KW_Float
+    >> return FloatT
+      <|> tok KW_Double
+    >> return DoubleT
 
 refType :: P RefType
 refType =
@@ -1464,7 +1487,7 @@ refType =
                 bs
                 ct
         )
-      <?> "refType"
+    <?> "refType"
 
 nonArrayType :: P Type
 nonArrayType =
@@ -1476,7 +1499,7 @@ classType = ClassType <$> seplist1 classTypeSpec period
 
 classTypeSpec :: P (Ident, [TypeArgument])
 classTypeSpec = do
-  i <- ident
+  i <- noLoc ident
   tas <- lopt typeArgs
   return (i, tas)
 
@@ -1494,7 +1517,7 @@ typeParams = angles $ seplist1 typeParam comma
 
 typeParam :: P TypeParam
 typeParam = do
-  i <- ident
+  i <- noLoc ident
   bs <- lopt bounds
   return $ TypeParam i bs
 
@@ -1506,13 +1529,16 @@ typeArgs = angles $ seplist1 typeArg comma
 
 typeArg :: P TypeArgument
 typeArg =
-  tok Op_Query >> Wildcard <$> opt wildcardBound
-    <|> ActualType <$> refType
+  tok Op_Query
+    >> Wildcard <$> opt wildcardBound
+      <|> ActualType <$> refType
 
 wildcardBound :: P WildcardBound
 wildcardBound =
-  tok KW_Extends >> ExtendsBound <$> refType
-    <|> tok KW_Super >> SuperBound <$> refType
+  tok KW_Extends
+    >> ExtendsBound <$> refType
+      <|> tok KW_Super
+    >> SuperBound <$> refType
 
 refTypeArgs :: P [RefType]
 refTypeArgs = angles refTypeList
@@ -1521,12 +1547,14 @@ refTypeArgs = angles refTypeList
 -- Names
 
 name :: P Name
-name = Name <$> seplist1 ident period
+name = Name <$> seplist1 (noLoc ident) period
 
-ident :: P Ident
-ident = javaToken $ \t -> case t of
-  IdentTok s -> Just $ Ident s
-  _ -> Nothing
+ident :: P (Ident, Location)
+ident = do
+  loc <- getLocation
+  javaToken $ \t -> case t of
+    IdentTok s -> Just (Ident s, loc)
+    _ -> Nothing
 
 fixedIdent :: String -> a -> P a
 fixedIdent fixed result = javaToken $ \t -> case t of
@@ -1565,11 +1593,11 @@ list1 :: P a -> P [a]
 list1 = many1
 
 seplist :: P a -> P sep -> P [a]
---seplist = sepBy
+-- seplist = sepBy
 seplist p sep = option [] $ seplist1 p sep
 
 seplist1 :: P a -> P sep -> P [a]
---seplist1 = sepBy1
+-- seplist1 = sepBy1
 seplist1 p sep =
   p >>= \a ->
     try
