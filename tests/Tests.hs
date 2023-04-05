@@ -67,13 +67,13 @@ getAllJavaPaths path = map (path </>) . filter isJavaFile <$> getDirectoryConten
 main :: IO ()
 main = do
   exists <- doesDirectoryExist testJavaDirectory
-  when (not exists) $ error "cannot find tests files java directory"
+  unless exists $ error "cannot find tests files java directory"
 
   allGoodJavas <- getAllJavaPaths (testJavaDirectory </> "good")
   allBadJavas <- getAllJavaPaths (testJavaDirectory </> "bad")
   let -- the bad tests that work with shallow parsing
-      shallowGoodJavas = ["tests/java/bad/DiamondIncorrectPlacement.java"]
-      shallowBadJavas = filter (\p -> not (p `elem` shallowGoodJavas)) allBadJavas
+      shallowGoodJavas = [testJavaDirectory </> "bad" </> "DiamondIncorrectPlacement.java"]
+      shallowBadJavas = filter (`notElem` shallowGoodJavas) allBadJavas
 
   defaultMain $
     testGroup
