@@ -340,8 +340,8 @@ instance Pretty Exp where
   prettyPrec p (MethodInv mi) = parenPrec p 1 $ prettyPrec 1 mi
   prettyPrec p (ArrayAccess ain) = parenPrec p 1 $ prettyPrec 1 ain
   prettyPrec p (ExpName name) = prettyPrec p name
-  prettyPrec p (PostIncrement e) = parenPrec p 1 $ prettyPrec 2 e <> text "++"
-  prettyPrec p (PostDecrement e) = parenPrec p 1 $ prettyPrec 2 e <> text "--"
+  prettyPrec p (PostIncrement _ e) = parenPrec p 1 $ prettyPrec 2 e <> text "++"
+  prettyPrec p (PostDecrement _ e) = parenPrec p 1 $ prettyPrec 2 e <> text "--"
   prettyPrec p (PreIncrement _ e) = parenPrec p 1 $ text "++" <> prettyPrec 2 e
   prettyPrec p (PreDecrement _ e) = parenPrec p 1 $ text "--" <> prettyPrec 2 e
   prettyPrec p (PrePlus e) = parenPrec p 2 $ char '+' <> prettyPrec 2 e

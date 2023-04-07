@@ -449,9 +449,9 @@ data Exp
     -- | An expression name, e.g. a variable.
     ExpName Name
   | -- | Post-incrementation expression, i.e. an expression followed by @++@.
-    PostIncrement Exp
+    PostIncrement SourceSpan Exp
   | -- | Post-decrementation expression, i.e. an expression followed by @--@.
-    PostDecrement Exp
+    PostDecrement SourceSpan Exp
   | -- | Pre-incrementation expression, i.e. an expression preceded by @++@.
     PreIncrement SourceSpan Exp
   | -- | Pre-decrementation expression, i.e. an expression preceded by @--@.

@@ -1425,9 +1425,18 @@ prefixOp =
     <|> (tok Op_Tilde >> return PreBitCompl)
     <|> (tok Op_Plus >> return PrePlus)
     <|> (tok Op_Minus >> return PreMinus)
-postfixOp =
-  (tok Op_PPlus >> return PostIncrement)
-    <|> (tok Op_MMinus >> return PostDecrement)
+postfixOp = do
+  startLoc <- getLocation
+  ( do
+      tok Op_PPlus
+      endLoc <- getLocation
+      return (PostIncrement (startLoc, endLoc))
+    )
+    <|> ( do
+            tok Op_MMinus
+            endLoc <- getLocation
+            return (PostDecrement (startLoc, endLoc))
+        )
 
 assignOp :: P AssignOp
 assignOp =
