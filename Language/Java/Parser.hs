@@ -1410,16 +1410,9 @@ literal =
 preIncDecOp, prefixOp, postfixOp :: P (Exp -> Exp)
 preIncDecOp = do
   startLoc <- getLocation
-  ( do
-      tok Op_PPlus
-      endLoc <- getLocation
-      return (PreIncrement (startLoc, endLoc))
-    )
-    <|> ( do
-            tok Op_MMinus
-            endLoc <- getLocation
-            return (PreDecrement (startLoc, endLoc))
-        )
+  constr <- attrTok Op_PPlus PreIncrement <|> attrTok Op_MMinus PreDecrement
+  endLoc <- getLocation
+  return (constr (startLoc, endLoc))
 prefixOp =
   (tok Op_Bang >> return PreNot)
     <|> (tok Op_Tilde >> return PreBitCompl)
@@ -1427,16 +1420,13 @@ prefixOp =
     <|> (tok Op_Minus >> return PreMinus)
 postfixOp = do
   startLoc <- getLocation
-  ( do
-      tok Op_PPlus
-      endLoc <- getLocation
-      return (PostIncrement (startLoc, endLoc))
-    )
-    <|> ( do
-            tok Op_MMinus
-            endLoc <- getLocation
-            return (PostDecrement (startLoc, endLoc))
-        )
+  constr <- attrTok Op_PPlus PostIncrement <|> attrTok Op_MMinus PostDecrement
+  endLoc <- getLocation
+  return (constr (startLoc, endLoc))
+
+attrTok :: Token -> b -> P b
+attrTok token constr =
+  tok token >> return constr
 
 assignOp :: P AssignOp
 assignOp =
