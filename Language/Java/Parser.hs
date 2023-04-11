@@ -510,16 +510,9 @@ modifier =
       <|> Annotation <$> annotation
       <|> ( do
               startLoc <- getLocation
-              ( do
-                  tok KW_Public
-                  endLoc <- getLocation
-                  return (Public (startLoc, endLoc))
-                )
-                <|> ( do
-                        tok KW_Abstract
-                        endLoc <- getLocation
-                        return (Abstract (startLoc, endLoc))
-                    )
+              constr <- attrTok KW_Public Public <|> attrTok KW_Abstract Abstract
+              endLoc <- getLocation
+              return (constr (startLoc, endLoc))
           )
 
 annotation :: P Annotation
