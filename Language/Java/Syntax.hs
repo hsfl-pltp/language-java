@@ -83,7 +83,7 @@ newtype PackageDecl = PackageDecl Name
 --   The last argument signals whether the declaration brings all names in the named type or package, or only brings
 --   a single name into scope.
 data ImportDecl
-  = ImportDecl Bool {- static? -} Name Bool {- .*? -}
+  = ImportDecl SourceSpan Bool {- static? -} Name Bool {- .*? -}
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 -----------------------------------------------------------------------
@@ -192,7 +192,7 @@ data VarDecl
 data VarDeclId
   = VarId Ident
   | -- | Multi-dimensional arrays are represented by nested applications of 'VarDeclArray'.
-    VarDeclArray VarDeclId
+    VarDeclArray SourceSpan VarDeclId
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 -- | Explicit initializer for a variable declaration.
@@ -231,10 +231,10 @@ data ExplConstrInv
 --   a few of these modifiers are allowed for each declaration type, for instance
 --   a member type declaration may only specify one of public, private or protected.
 data Modifier
-  = Public
+  = Public SourceSpan
   | Private
   | Protected
-  | Abstract
+  | Abstract SourceSpan
   | Final
   | Static
   | StrictFP
@@ -247,10 +247,10 @@ data Modifier
   deriving (Eq, Read, Typeable, Generic, Data)
 
 instance Show Modifier where
-  show Public = "public"
+  show (Public _) = "public"
   show Private = "private"
   show Protected = "protected"
-  show Abstract = "abstract"
+  show (Abstract _) = "abstract"
   show Final = "final"
   show Static = "static"
   show StrictFP = "strictfp"
@@ -264,21 +264,28 @@ instance Show Modifier where
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation
   = NormalAnnotation
-      { annName :: Name, -- Not type because not type generics not allowed
+      { span :: SourceSpan,
+        annName :: Name, -- Not type because not type generics not allowed
         annKV :: [(Ident, ElementValue)]
       }
   | SingleElementAnnotation
-      { annName :: Name,
+      { span :: SourceSpan,
+        annName :: Name,
         annValue :: ElementValue
       }
-  | MarkerAnnotation {annName :: Name}
+  | MarkerAnnotation
+      { span :: SourceSpan,
+        annName :: Name
+      }
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
-desugarAnnotation (MarkerAnnotation n) = (n, [])
-desugarAnnotation (SingleElementAnnotation n e) = (n, [(Ident "value", e)])
-desugarAnnotation (NormalAnnotation n kv) = (n, kv)
+desugarAnnotation (MarkerAnnotation span n) = (span, n, [])
+desugarAnnotation (SingleElementAnnotation span n e) = (span, n, [(Ident "value", e)])
+desugarAnnotation (NormalAnnotation span n kv) = (span, n, kv)
 
-desugarAnnotation' = uncurry NormalAnnotation . desugarAnnotation
+desugarAnnotation' (MarkerAnnotation span n) = NormalAnnotation span n []
+desugarAnnotation' (SingleElementAnnotation span n e) = NormalAnnotation span n [(Ident "value", e)]
+desugarAnnotation' normal = normal
 
 -- | Annotations may contain  annotations or (loosely) expressions
 data ElementValue
@@ -442,13 +449,13 @@ data Exp
     -- | An expression name, e.g. a variable.
     ExpName Name
   | -- | Post-incrementation expression, i.e. an expression followed by @++@.
-    PostIncrement Exp
+    PostIncrement SourceSpan Exp
   | -- | Post-decrementation expression, i.e. an expression followed by @--@.
-    PostDecrement Exp
+    PostDecrement SourceSpan Exp
   | -- | Pre-incrementation expression, i.e. an expression preceded by @++@.
-    PreIncrement Exp
+    PreIncrement SourceSpan Exp
   | -- | Pre-decrementation expression, i.e. an expression preceded by @--@.
-    PreDecrement Exp
+    PreDecrement SourceSpan Exp
   | -- | Unary plus, the promotion of the value of the expression to a primitive numeric type.
     PrePlus Exp
   | -- | Unary minus, the promotion of the negation of the value of the expression to a primitive numeric type.
@@ -470,7 +477,7 @@ data Exp
     --   expressions should be evaluated.
     Cond SourceSpan Exp Exp Exp
   | -- | Assignment of the result of an expression to a variable.
-    Assign Lhs AssignOp Exp
+    Assign SourceSpan Lhs AssignOp Exp
   | -- | Lambda expression
     Lambda LambdaParams LambdaExpression
   | -- | Method reference

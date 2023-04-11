@@ -184,12 +184,14 @@ packageDecl = do
 
 importDecl :: P ImportDecl
 importDecl = do
+  startLoc <- getLocation
   tok KW_Import
   st <- bopt $ tok KW_Static
   n <- name
   ds <- bopt $ period >> tok Op_Star
+  endLoc <- getLocation
   semiColon
-  return $ ImportDecl st n ds
+  return (ImportDecl (startLoc, endLoc) st n ds)
 
 typeDecl :: P (Maybe TypeDecl)
 typeDecl =
@@ -418,12 +420,13 @@ explConstrInv =
 --       That would give far better error messages.
 interfaceBodyDecl :: P (Maybe MemberDecl)
 interfaceBodyDecl =
-  semiColon >> return Nothing
-    <|> do
-      loc <- getLocation
-      ms <- list modifier
-      imd <- interfaceMemberDecl
-      return $ Just (imd loc ms)
+  semiColon
+    >> return Nothing
+      <|> do
+        loc <- getLocation
+        ms <- list modifier
+        imd <- interfaceMemberDecl
+        return $ Just (imd loc ms)
 
 interfaceMemberDecl :: P (Mod MemberDecl)
 interfaceMemberDecl =
@@ -485,26 +488,56 @@ ellipsis = period >> period >> period
 
 modifier :: P Modifier
 modifier =
-  tok KW_Public >> return Public
-    <|> tok KW_Protected >> return Protected
-    <|> tok KW_Private >> return Private
-    <|> tok KW_Abstract >> return Abstract
-    <|> tok KW_Static >> return Static
-    <|> tok KW_Strictfp >> return StrictFP
-    <|> tok KW_Final >> return Final
-    <|> tok KW_Native >> return Native
-    <|> tok KW_Transient >> return Transient
-    <|> tok KW_Volatile >> return Volatile
-    <|> tok KW_Synchronized >> return Synchronized_
-    <|> fixedIdent "sealed" Sealed
-    <|> Annotation <$> annotation
+  tok KW_Protected
+    >> return Protected
+      <|> tok KW_Private
+    >> return Private
+      <|> tok KW_Static
+    >> return Static
+      <|> tok KW_Strictfp
+    >> return StrictFP
+      <|> tok KW_Final
+    >> return Final
+      <|> tok KW_Native
+    >> return Native
+      <|> tok KW_Transient
+    >> return Transient
+      <|> tok KW_Volatile
+    >> return Volatile
+      <|> tok KW_Synchronized
+    >> return Synchronized_
+      <|> fixedIdent "sealed" Sealed
+      <|> Annotation <$> annotation
+      <|> ( do
+              startLoc <- getLocation
+              constr <- attrTok KW_Public Public <|> attrTok KW_Abstract Abstract
+              endLoc <- getLocation
+              return (constr (startLoc, endLoc))
+          )
 
 annotation :: P Annotation
-annotation =
-  flip ($) <$ tok Op_AtSign <*> name
-    <*> ( try (flip NormalAnnotation <$> parens evlist)
-            <|> try (flip SingleElementAnnotation <$> parens elementValue)
-            <|> try (MarkerAnnotation <$ return ())
+annotation = do
+  startLoc <- getLocation
+  flip ($)
+    <$ tok Op_AtSign
+    <*> name
+    <*> ( try
+            ( do
+                elist <- parens evlist
+                endLoc <- getLocation
+                return (flip (NormalAnnotation (startLoc, endLoc)) elist)
+            )
+            <|> try
+              ( do
+                  e <- parens elementValue
+                  endLoc <- getLocation
+                  return (flip (SingleElementAnnotation (startLoc, endLoc)) e)
+              )
+            <|> try
+              ( do
+                  endLoc <- getLocation
+                  MarkerAnnotation (startLoc, endLoc) <$ return ()
+              )
         )
 
 evlist :: P [(Ident, ElementValue)]
@@ -520,7 +553,7 @@ elementValue =
             <|> InitExp <$> condExp
         )
     <|> EVAnn
-    <$> annotation
+      <$> annotation
 
 ----------------------------------------------------------------------------
 -- Variable declarations
@@ -536,9 +569,11 @@ varDecl = do
 
 varDeclId :: P VarDeclId
 varDeclId = do
+  startLoc <- getLocation
   id <- ident
   abs <- list arrBrackets
-  return $ foldl (\f _ -> VarDeclArray . f) VarId abs id
+  endLoc <- getLocation
+  return $ foldl (\f _ -> VarDeclArray (startLoc, endLoc) . f) VarId abs id
 
 arrBrackets :: P ()
 arrBrackets = brackets $ return ()
@@ -950,10 +985,12 @@ postIncDec = do
 
 assignment :: P Exp
 assignment = do
+  startLoc <- getLocation
   lh <- lhs
   op <- assignOp
   e <- assignExp
-  return $ Assign lh op e
+  endLoc <- getLocation
+  return (Assign (startLoc, endLoc) lh op e)
 
 lhs :: P Lhs
 lhs =
@@ -1364,17 +1401,25 @@ literal =
 -- Operators
 
 preIncDecOp, prefixOp, postfixOp :: P (Exp -> Exp)
-preIncDecOp =
-  (tok Op_PPlus >> return PreIncrement)
-    <|> (tok Op_MMinus >> return PreDecrement)
+preIncDecOp = do
+  startLoc <- getLocation
+  constr <- attrTok Op_PPlus PreIncrement <|> attrTok Op_MMinus PreDecrement
+  endLoc <- getLocation
+  return (constr (startLoc, endLoc))
 prefixOp =
   (tok Op_Bang >> return PreNot)
     <|> (tok Op_Tilde >> return PreBitCompl)
     <|> (tok Op_Plus >> return PrePlus)
     <|> (tok Op_Minus >> return PreMinus)
-postfixOp =
-  (tok Op_PPlus >> return PostIncrement)
-    <|> (tok Op_MMinus >> return PostDecrement)
+postfixOp = do
+  startLoc <- getLocation
+  constr <- attrTok Op_PPlus PostIncrement <|> attrTok Op_MMinus PostDecrement
+  endLoc <- getLocation
+  return (constr (startLoc, endLoc))
+
+attrTok :: Token -> b -> P b
+attrTok token constr =
+  tok token >> return constr
 
 assignOp :: P AssignOp
 assignOp =
@@ -1433,14 +1478,22 @@ ttype = try (RefType <$> refType) <|> PrimType <$> primType
 
 primType :: P PrimType
 primType =
-  tok KW_Boolean >> return BooleanT
-    <|> tok KW_Byte >> return ByteT
-    <|> tok KW_Short >> return ShortT
-    <|> tok KW_Int >> return IntT
-    <|> tok KW_Long >> return LongT
-    <|> tok KW_Char >> return CharT
-    <|> tok KW_Float >> return FloatT
-    <|> tok KW_Double >> return DoubleT
+  tok KW_Boolean
+    >> return BooleanT
+      <|> tok KW_Byte
+    >> return ByteT
+      <|> tok KW_Short
+    >> return ShortT
+      <|> tok KW_Int
+    >> return IntT
+      <|> tok KW_Long
+    >> return LongT
+      <|> tok KW_Char
+    >> return CharT
+      <|> tok KW_Float
+    >> return FloatT
+      <|> tok KW_Double
+    >> return DoubleT
 
 refType :: P RefType
 refType =
@@ -1464,7 +1517,7 @@ refType =
                 bs
                 ct
         )
-      <?> "refType"
+    <?> "refType"
 
 nonArrayType :: P Type
 nonArrayType =
@@ -1506,13 +1559,16 @@ typeArgs = angles $ seplist1 typeArg comma
 
 typeArg :: P TypeArgument
 typeArg =
-  tok Op_Query >> Wildcard <$> opt wildcardBound
-    <|> ActualType <$> refType
+  tok Op_Query
+    >> Wildcard <$> opt wildcardBound
+      <|> ActualType <$> refType
 
 wildcardBound :: P WildcardBound
 wildcardBound =
-  tok KW_Extends >> ExtendsBound <$> refType
-    <|> tok KW_Super >> SuperBound <$> refType
+  tok KW_Extends
+    >> ExtendsBound <$> refType
+      <|> tok KW_Super
+    >> SuperBound <$> refType
 
 refTypeArgs :: P [RefType]
 refTypeArgs = angles refTypeList
@@ -1525,7 +1581,7 @@ name = Name <$> seplist1 ident period
 
 ident :: P Ident
 ident = javaToken $ \t -> case t of
-  IdentTok s -> Just $ Ident s
+  IdentTok s -> Just (Ident s)
   _ -> Nothing
 
 fixedIdent :: String -> a -> P a
@@ -1565,11 +1621,11 @@ list1 :: P a -> P [a]
 list1 = many1
 
 seplist :: P a -> P sep -> P [a]
---seplist = sepBy
+-- seplist = sepBy
 seplist p sep = option [] $ seplist1 p sep
 
 seplist1 :: P a -> P sep -> P [a]
---seplist1 = sepBy1
+-- seplist1 = sepBy1
 seplist1 p sep =
   p >>= \a ->
     try
