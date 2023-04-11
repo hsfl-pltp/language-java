@@ -189,8 +189,8 @@ importDecl = do
   st <- bopt $ tok KW_Static
   n <- name
   ds <- bopt $ period >> tok Op_Star
-  semiColon
   endLoc <- getLocation
+  semiColon
   return (ImportDecl (startLoc, endLoc) st n ds)
 
 typeDecl :: P (Maybe TypeDecl)
