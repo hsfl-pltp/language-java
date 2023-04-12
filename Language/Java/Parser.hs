@@ -59,7 +59,7 @@ module Language.Java.Parser
 where
 
 import Data.Maybe (catMaybes, isJust)
-import Language.Java.Lexer (L (..), Token (..), lexer)
+import Language.Java.Lexer (L1 (..), Token (..), lexer)
 import Language.Java.Pretty (pretty)
 import Language.Java.Syntax
 import Text.Parsec hiding (Empty)
@@ -96,7 +96,7 @@ data ParserMode
 defaultParserState :: ParserState
 defaultParserState = ParserState ParseFull True
 
-type JavaParser = Parsec [L Token] ParserState
+type JavaParser = Parsec [L1 Token] ParserState
 
 type P = JavaParser
 
@@ -116,7 +116,20 @@ getLocation = do
            in return $ Location {loc_file = sourceName p, loc_line = sourceLine p, loc_column = sourceColumn p}
     else return dummyLocation
 
-getNextTok :: P (Maybe (L Token))
+getEndLoc :: P Location
+getEndLoc = do
+  state <- getState
+  if ps_locations state
+    then do
+      parserState <- getParserState
+      case stateInput parserState of
+        [] -> return locationEof
+        L1 (line, column) len _ : _ ->
+          let file = sourceName (statePos parserState)
+          in  return ( Location {loc_file = file, loc_line = line, loc_column = column + len})
+    else return dummyLocation
+
+getNextTok :: P (Maybe (L1 Token))
 getNextTok = do
   state <- getParserState
   case stateInput state of
@@ -571,12 +584,13 @@ varDeclId :: P VarDeclId
 varDeclId = do
   startLoc <- getLocation
   id <- ident
-  abs <- list arrBrackets
-  endLoc <- getLocation
+  abls <- list arrBrackets
+  let endLoc = (snd . last) abls
+  let abs = map fst abls
   return $ foldl (\f _ -> VarDeclArray (startLoc, endLoc) . f) VarId abs id
 
-arrBrackets :: P ()
-arrBrackets = brackets $ return ()
+arrBrackets :: P ((), Location)
+arrBrackets = emptyBrackets $ return ()
 
 localVarDecl :: P (Location, [Modifier], Type, [VarDecl])
 localVarDecl = do
@@ -1648,9 +1662,9 @@ startSuff start suffix = do
 javaToken :: (Token -> Maybe a) -> P a
 javaToken test = token showT posT testT
   where
-    showT (L _ t) = show t
-    posT (L p _) = pos2sourcePos p
-    testT (L _ t) = test t
+    showT (L1 _ _ t) = show t
+    posT (L1 p _ _) = pos2sourcePos p
+    testT (L1 _ _ t) = test t
 
 tok, matchToken :: Token -> P ()
 tok = matchToken
@@ -1673,6 +1687,13 @@ braces p = do
   endLoc <- getLocation
   _ <- tok CloseCurly
   pure (x, endLoc)
+
+emptyBrackets :: P () -> P ((), Location)
+emptyBrackets _ = do
+  _ <- tok OpenSquare
+  endLoc <- getEndLoc
+  _ <- tok CloseSquare
+  pure ((), endLoc)
 
 endSemi :: P a -> P (a, Location)
 endSemi p = do
