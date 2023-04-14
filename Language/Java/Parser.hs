@@ -492,7 +492,7 @@ absMethodDecl = do
   return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr def (MethodBody Nothing)
 
 defaultValue :: P Exp
-defaultValue = tok KW_Default >> exp
+defaultValue = tok KW_Default >> noLoc exp
 
 throws :: P [RefType]
 throws = tok KW_Throws >> refTypeList
@@ -587,7 +587,7 @@ elementValue :: P ElementValue
 elementValue =
   EVVal
     <$> ( InitArray <$> arrayInit
-            <|> InitExp <$> condExp
+            <|> InitExp <$> noLoc condExp
         )
     <|> EVAnn
       <$> annotation
@@ -624,7 +624,7 @@ localVarDecl = do
 varInit :: P VarInit
 varInit =
   InitArray <$> arrayInit
-    <|> InitExp <$> exp
+    <|> InitExp <$> noLoc exp
 
 arrayInit :: P ArrayInit
 arrayInit = noLoc . braces $ do
@@ -653,7 +653,7 @@ blockNoLoc = fmap fst block
 -- level must initially be -1
 parseNestedCurly :: Int -> P Location
 parseNestedCurly level = do
-  loc <- getLocation
+  loc <- getEndLoc
   newLevel <-
     javaToken $ \t ->
       case t of
@@ -688,7 +688,7 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
     ifStmt = do
       startLoc <- getLocation
       tok KW_If
-      e <- parens exp
+      e <- parens (noLoc exp)
       try
         ( do
             th <- noLoc stmtNSI
@@ -702,7 +702,7 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
             )
     whileStmt = do
       tok KW_While
-      e <- parens exp
+      e <- parens (noLoc exp)
       (s, endLoc) <- stmt
       return (While e s, endLoc)
     forStmt = do
@@ -712,7 +712,7 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
           ( try $ do
               fi <- opt forInit
               semiColon
-              e <- opt exp
+              e <- opt (noLoc exp)
               semiColon
               fu <- opt forUp
               return $ BasicFor fi e fu
@@ -722,7 +722,7 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                     t <- ttype
                     i <- noLoc ident
                     colon
-                    e <- exp
+                    e <- (noLoc exp)
                     return $ EnhancedFor ms t i e
                 )
       (s, endLoc) <- stmt
@@ -739,14 +739,14 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
     ifStmt = do
       startLoc <- getLocation
       tok KW_If
-      e <- parens exp
+      e <- parens (noLoc exp)
       th <- noLoc stmtNSI
       tok KW_Else
       (el, endLoc) <- stmtNSI
       return (IfThenElse (startLoc, endLoc) e th el, endLoc)
     whileStmt = do
       tok KW_While
-      e <- parens exp
+      e <- parens (noLoc exp)
       (s, endLoc) <- stmtNSI
       return (While e s, endLoc)
     forStmt = do
@@ -756,7 +756,7 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
           ( try $ do
               fi <- opt forInit
               semiColon
-              e <- opt exp
+              e <- opt (noLoc exp)
               semiColon
               fu <- opt forUp
               return $ BasicFor fi e fu
@@ -766,7 +766,7 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                     t <- ttype
                     i <- noLoc ident
                     colon
-                    e <- exp
+                    e <- noLoc exp
                     return $ EnhancedFor ms t i e
                 )
       (s, endLoc) <- stmtNSI
@@ -791,15 +791,15 @@ stmtNoTrail =
     -- assertions
     ( endSemi $ do
         tok KW_Assert
-        e <- exp
-        me2 <- opt $ colon >> exp
-        return $ Assert e me2
+        e <- noLoc exp
+        me2 <- opt $ colon >> noLoc exp
+        return (Assert e me2)
     )
     <|>
     -- switch stmts
     ( do
         tok KW_Switch
-        e <- parens exp
+        e <- parens (noLoc exp)
         ((style, sb), endLoc) <- switchBlock
         return (Switch style e sb, endLoc)
     )
@@ -809,7 +809,7 @@ stmtNoTrail =
         tok KW_Do
         s <- noLoc stmt
         tok KW_While
-        e <- parens exp
+        e <- parens (noLoc exp)
         return $ Do s e
     )
     <|>
@@ -830,14 +830,14 @@ stmtNoTrail =
     -- return
     ( endSemi $ do
         tok KW_Return
-        me <- opt exp
+        me <- opt (noLoc exp)
         return $ Return me
     )
     <|>
     -- synchronized
     ( do
         tok KW_Synchronized
-        e <- parens exp
+        e <- parens (noLoc exp)
         (b, endLoc) <- block
         return (Synchronized e b, endLoc)
     )
@@ -845,7 +845,7 @@ stmtNoTrail =
     -- throw
     ( endSemi $ do
         tok KW_Throw
-        e <- exp
+        e <- noLoc exp
         return $ Throw e
     )
     <|>
@@ -917,7 +917,7 @@ switchLabelOld =
   (tok KW_Default >> colon >> return Default)
     <|> ( do
             tok KW_Case
-            es <- seplist condExp comma
+            es <- seplist (noLoc condExp) comma
             colon
             return $ SwitchCase es
         )
@@ -933,17 +933,17 @@ switchLabelNew =
   (tok KW_Default >> tok LambdaArrow >> return Default)
     <|> ( do
             tok KW_Case
-            es <- seplist condExp comma
+            es <- seplist (noLoc condExp) comma
             tok LambdaArrow
             return $ SwitchCase es
         )
 
-switchExp :: P Exp
+switchExp :: P (Exp, Location)
 switchExp = do
   tok KW_Switch
-  e <- parens exp
-  branches <- noLoc (braces switchExpBody)
-  return $ SwitchExp e branches
+  e <- parens (noLoc exp)
+  (branches, loc) <- braces switchExpBody
+  return $ (SwitchExp e branches, loc)
   where
     switchExpBody = many switchExpBodyBranch
     switchExpBodyBranch = do
@@ -954,7 +954,7 @@ switchExp = do
           <|> (SwitchExpBranchExp <$> branchExp)
       return $ SwitchExpBranch lbl body
     branchExp = do
-      e <- exp
+      e <- noLoc exp
       semiColon
       return e
 
@@ -999,11 +999,11 @@ stmtExp :: P Exp
 stmtExp =
   try preIncDec
     <|> try postIncDec
-    <|> try assignment
+    <|> try (noLoc assignment)
     -- There are sharing gains to be made by unifying these two
     <|> try methodInvocationExp
-    <|> try lambdaExp
-    <|> try methodRef
+    <|> try (noLoc lambdaExp)
+    <|> try (noLoc methodRef)
     <|> instanceCreation
 
 preIncDec :: P Exp
@@ -1018,14 +1018,13 @@ postIncDec = do
   ops <- list1 postfixOp
   return $ foldl (\a s -> s a) e ops
 
-assignment :: P Exp
+assignment :: P (Exp, Location)
 assignment = do
   startLoc <- getLocation
   lh <- lhs
   op <- assignOp
-  e <- assignExp
-  endLoc <- getLocation
-  return (Assign (startLoc, endLoc) lh op e)
+  (e,loc) <- assignExp
+  return (Assign (startLoc, loc) lh op e, loc)
 
 lhs :: P Lhs
 lhs =
@@ -1033,27 +1032,28 @@ lhs =
     <|> try (ArrayLhs <$> arrayAccess)
     <|> NameLhs <$> noLoc name
 
-exp :: P Exp
+exp :: P (Exp, Location)
 exp = assignExp
 
-assignExp :: P Exp
+assignExp :: P (Exp, Location)
 assignExp = try switchExp <|> try methodRef <|> try lambdaExp <|> try assignment <|> condExp
 
-condExp :: P Exp
+condExp :: P (Exp, Location)
 condExp = do
   startLoc <- getLocation
   ie <- infixExp
-  ces <- list (condExpSuffix startLoc)
-  return $ foldl (\a s -> s a) ie ces
+  cesWithLoc <- list (condExpSuffix startLoc)
+  let ces = map fst cesWithLoc
+      loc = snd (last cesWithLoc)
+  return (foldl (\a s -> s a) ie ces, loc)
 
-condExpSuffix :: Location -> P (Exp -> Exp)
+condExpSuffix :: Location -> P (Exp -> Exp, Location)
 condExpSuffix startLoc = do
   tok Op_Query
-  th <- exp
+  th <- noLoc exp
   colon
-  el <- condExp
-  endLoc <- getLocation
-  return $ \ce -> Cond (startLoc, endLoc) ce th el
+  (el,endLoc) <- condExp
+  return  (\ce -> Cond (startLoc, endLoc) ce th el,endLoc)
 
 infixExp :: P Exp
 infixExp = do
@@ -1121,7 +1121,7 @@ primaryNoNewArrayNPS :: P Exp
 primaryNoNewArrayNPS =
   Lit <$> literal
     <|> const This <$> tok KW_This
-    <|> parens exp
+    <|> parens (noLoc exp)
     <|>
     -- TODO: These two following should probably be merged more
     ( try $ do
@@ -1203,22 +1203,38 @@ lambdaParams =
     <|> try (parens $ LambdaFormalParams <$> (seplist formalParam comma))
     <|> (parens $ LambdaInferredParams <$> (seplist (noLoc ident) comma))
 
-lambdaExp :: P Exp
-lambdaExp =
-  Lambda
-    <$> (lambdaParams <* (tok LambdaArrow))
-    <*> ( (LambdaBlock <$> (try blockNoLoc))
-            <|> (LambdaExpression <$> exp)
-        )
-
-methodRef :: P Exp
+lambdaExp :: P (Exp, Location)
+lambdaExp = do
+  params <- lambdaParams
+  tok LambdaArrow
+  (e, loc) <- 
+    (
+      do
+        (b, loc) <- try block
+        return (LambdaBlock b, loc)
+    )
+    <|>
+    (
+      do
+        (e, loc) <- exp
+        return (LambdaExpression e, loc)
+    )
+  return (Lambda params e, loc)
+ 
+methodRef :: P (Exp, Location)
 methodRef = do
   n <- noLoc name
   tok MethodRefSep
-  target <-
-    (tok KW_New >> return MethodRefConstructor)
-      <|> (MethodRefIdent <$> noLoc ident)
-  return $ MethodRef n target
+  (target, loc) <-
+    (do 
+      (_,loc) <- tokWithEndLoc KW_New  
+      return (MethodRefConstructor, loc)
+      )
+      <|> ( do
+            (id, loc) <- ident
+            return (MethodRefIdent id,loc)
+            )
+  return (MethodRef n target, loc)
 
 {-
 instanceCreation =
@@ -1368,19 +1384,19 @@ methodInvocation =
 -}
 
 args :: P [Argument]
-args = parens $ seplist exp comma
+args = parens $ seplist (noLoc exp) comma
 
 -- Arrays
 
 arrayAccessNPS :: P ArrayIndex
 arrayAccessNPS = do
   n <- noLoc name
-  e <- list1 $ brackets exp
+  e <- list1 $ brackets (noLoc exp)
   return $ ArrayIndex (ExpName n) e
 
 arrayAccessSuffix :: P (Exp -> ArrayIndex)
 arrayAccessSuffix = do
-  e <- list1 $ brackets exp
+  e <- list1 $ brackets (noLoc exp)
   return $ \ref -> ArrayIndex ref e
 
 arrayAccess =
@@ -1414,7 +1430,7 @@ arrayCreation = do
         return $ \t -> ArrayCreateInit t (length ds) ai
       )
       <|> ( do
-              des <- list1 $ try $ brackets exp
+              des <- list1 $ try $ brackets (noLoc exp)
               ds <- list $ brackets empty
               return $ \t -> ArrayCreate t des (length ds)
           )
