@@ -58,9 +58,9 @@ module Language.Java.Parser
   )
 where
 
+import Data.Functor ((<&>))
 import Data.Maybe (catMaybes, isJust)
 import Language.Java.Lexer (L1 (..), Token (..), lexer)
-import Language.Java.Pretty (pretty)
 import Language.Java.Syntax
 import Text.Parsec
   ( ParseError,
@@ -151,20 +151,21 @@ getEndLoc = do
            in return (Location {loc_file = file, loc_line = line, loc_column = column + len})
     else return dummyLocation
 
-getNextTok :: P (Maybe (L1 Token))
-getNextTok = do
-  state <- getParserState
-  case stateInput state of
-    [] -> return Nothing
-    (x : _) -> return (Just x)
+-- unused Functions
+-- getNextTok :: P (Maybe (L1 Token))
+-- getNextTok = do
+--  state <- getParserState
+--  case stateInput state of
+--    [] -> return Nothing
+--    (x : _) -> return (Just x)
 
-traceP :: String -> P ()
-traceP s =
-  unsafePerformIO (logToFile s) `seq` return ()
+-- traceP :: String -> P ()
+-- traceP s =
+-- unsafePerformIO (logToFile s) `seq` return ()
 
-logToFile :: String -> IO ()
-logToFile msg =
-  appendFile "hs-java-parser.log" (msg ++ "\n")
+-- logToFile :: String -> IO ()
+-- logToFile msg =
+--   appendFile "hs-java-parser.log" (msg ++ "\n")
 
 -- A trick to allow >> and >>=, normally infixr 1, to be
 -- used inside branches of <|>, which is declared as infixl 1.
@@ -222,19 +223,15 @@ importDecl = do
   startLoc <- getLocation
   tok KW_Import
   st <- bopt $ tok KW_Static
-  (n, locNoStar) <- name
-  star <- opt (period >> tokWithEndLoc Op_Star)
-  semiColon
-  case star of
-    Just (_, locStar) ->
-      return (ImportDecl (startLoc, locStar) st n True)
-    Nothing ->
-      return (ImportDecl (startLoc, locNoStar) st n False)
+  n <- noLoc name
+  star <- bopt (period >> tok Op_Star)
+  (_, endLoc) <- tokWithEndLoc SemiColon
+  return (ImportDecl (startLoc, endLoc) st n star)
 
 typeDecl :: P (Maybe TypeDecl)
 typeDecl =
   Just <$> classOrInterfaceDecl
-    <|> const Nothing <$> semiColon
+    <|> Nothing <$ semiColon
 
 ----------------------------------------------------------------------------
 -- Declarations
@@ -245,21 +242,19 @@ classOrInterfaceDecl :: P TypeDecl
 classOrInterfaceDecl = do
   startLoc <- getLocation
   ms <- list modifier
-  de <-
-    ( do
-        cd <- classDecl
-        return $ ClassTypeDecl (cd startLoc ms)
-      )
-      <|> ( do
-              id <- annInterfaceDecl <|> interfaceDecl
-              return $ InterfaceTypeDecl (id startLoc ms)
-          )
-  return $ de
+  ( do
+      cd <- noLoc classDecl
+      return (ClassTypeDecl (cd startLoc ms))
+    )
+    <|> ( do
+            iDecl <- annInterfaceDecl <|> interfaceDecl
+            return (InterfaceTypeDecl (iDecl startLoc ms))
+        )
 
-classDecl :: P (Mod ClassDecl)
+classDecl :: P (Mod ClassDecl, Location)
 classDecl = normalClassDecl <|> recordClassDecl <|> enumClassDecl
 
-normalClassDecl :: P (Mod ClassDecl)
+normalClassDecl :: P (Mod ClassDecl, Location)
 normalClassDecl = do
   tok KW_Class
   i <- noLoc ident
@@ -267,7 +262,7 @@ normalClassDecl = do
   mex <- opt extends
   imp <- lopt implements
   (bod, endLoc) <- classBody
-  return $ \loc ms -> ClassDecl (loc, endLoc) ms i tps (fmap head mex) imp bod
+  return (\loc ms -> ClassDecl (loc, endLoc) ms i tps (fmap head mex) imp bod, endLoc)
 
 extends :: P [RefType]
 extends = tok KW_Extends >> refTypeList
@@ -278,23 +273,23 @@ permits = fixedIdent "permits" () >> refTypeList
 implements :: P [RefType]
 implements = tok KW_Implements >> refTypeList
 
-enumClassDecl :: P (Mod ClassDecl)
+enumClassDecl :: P (Mod ClassDecl, Location)
 enumClassDecl = do
   tok KW_Enum
   i <- noLoc ident
   imp <- lopt implements
   (bod, endLoc) <- enumBody
-  return $ \loc ms -> EnumDecl (loc, endLoc) ms i imp bod
+  return (\loc ms -> EnumDecl (loc, endLoc) ms i imp bod, endLoc)
 
-recordClassDecl :: P (Mod ClassDecl)
+recordClassDecl :: P (Mod ClassDecl, Location)
 recordClassDecl = do
   tok KW_Record
   i <- noLoc ident
   tps <- lopt typeParams
-  fields <- parens (seplist recordField comma)
+  fields <- noLoc $ parens (seplist recordField comma)
   imp <- lopt implements
   (bod, endLoc) <- classBody
-  return $ \loc ms -> RecordDecl (loc, endLoc) ms i tps fields imp bod
+  return (\loc ms -> RecordDecl (loc, endLoc) ms i tps fields imp bod, endLoc)
   where
     recordField = do
       typ <- ttype
@@ -315,10 +310,10 @@ enumBody = braces $ do
 
 enumConst :: P EnumConstant
 enumConst = do
-  id <- noLoc ident
+  i <- noLoc ident
   as <- lopt args
   mcb <- opt (noLoc classBody)
-  return $ EnumConstant id as mcb
+  return $ EnumConstant i as mcb
 
 enumBodyDecls :: P [Decl]
 enumBodyDecls = semiColon >> classBodyStatements
@@ -331,56 +326,59 @@ classBodyStatements = catMaybes <$> list classBodyStatement
 annInterfaceDecl :: P (Mod InterfaceDecl)
 annInterfaceDecl = do
   tok KW_AnnInterface
-  id <- noLoc ident
+  i <- noLoc ident
   tps <- lopt typeParams
   exs <- lopt extends
   ps <- lopt permits
   (bod, endLoc) <- interfaceBody
-  return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceAnnotation ms id tps exs ps bod
+  return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceAnnotation ms i tps exs ps bod
 
 interfaceDecl :: P (Mod InterfaceDecl)
 interfaceDecl = do
   tok KW_Interface
-  id <- noLoc ident
+  i <- noLoc ident
   tps <- lopt typeParams
   exs <- lopt extends
   ps <- lopt permits
   (bod, endLoc) <- interfaceBody
-  return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceNormal ms id tps exs ps bod
+  return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceNormal ms i tps exs ps bod
 
 interfaceBody :: P (InterfaceBody, Location)
-interfaceBody = braces (InterfaceBody . catMaybes <$> (list interfaceBodyDecl))
+interfaceBody = braces (InterfaceBody . catMaybes <$> list interfaceBodyDecl)
 
 -- Declarations
 
 classBodyStatement :: P (Maybe Decl)
 classBodyStatement =
-  ( try $ do
-      list1 semiColon
-      return Nothing
-  )
-    <|> ( try $ do
-            mst <- bopt (tok KW_Static)
-            blk <- blockNoLoc
-            return $ Just $ InitDecl mst blk
-        )
+  try
+    ( do
+        _ <- list1 semiColon
+        return Nothing
+    )
+    <|> try
+      ( do
+          mst <- bopt (tok KW_Static)
+          Just . InitDecl mst <$> blockNoLoc
+      )
     <|> ( do
             loc <- getLocation
             ms <- list modifier
             dec <- memberDecl
-            return $ Just $ MemberDecl (dec loc ms)
+            return (Just (MemberDecl (dec loc ms)))
         )
 
 memberDecl :: P (Mod MemberDecl)
 memberDecl =
-  ( try $ do
-      cd <- classDecl
-      return $ \loc ms -> MemberClassDecl (cd loc ms)
-  )
-    <|> ( try $ do
-            id <- try annInterfaceDecl <|> try interfaceDecl
-            return $ \loc ms -> MemberInterfaceDecl (id loc ms)
-        )
+  try
+    ( do
+        cd <- noLoc classDecl
+        return (\loc ms -> MemberClassDecl (cd loc ms))
+    )
+    <|> try
+      ( do
+          iDecl <- try annInterfaceDecl <|> try interfaceDecl
+          return (\loc ms -> MemberInterfaceDecl (iDecl loc ms))
+      )
     <|> try fieldDecl
     <|> try methodDecl
     <|> constrDecl
@@ -397,18 +395,17 @@ methodDecl :: P (Mod MemberDecl)
 methodDecl = do
   tps <- lopt typeParams
   rt <- resultType
-  id <- noLoc ident
+  i <- noLoc ident
   fps <- formalParams
   thr <- lopt throws
   (bod, endLoc) <- methodBody
-  return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr Nothing bod
+  return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt i fps thr Nothing bod
 
 methodBody :: P (MethodBody, Location)
 methodBody = onlySemi <|> fullBody
   where
     onlySemi = do
-      loc <- getLocation
-      semiColon
+      (_, loc) <- tokWithEndLoc SemiColon
       return (MethodBody Nothing, loc)
     fullBody = do
       (b, loc) <- block
@@ -417,41 +414,41 @@ methodBody = onlySemi <|> fullBody
 constrDecl :: P (Mod MemberDecl)
 constrDecl = do
   tps <- lopt typeParams
-  id <- noLoc ident
+  i <- noLoc ident
   fps <- optList formalParams -- record constructors omit the argument list
   thr <- lopt throws
-  bod <- constrBody
-  endLoc <- getLocation
-  return $ \loc ms -> ConstructorDecl (loc, endLoc) ms tps id fps thr bod
+  (bod, endLoc) <- constrBody
+  return $ \loc ms -> ConstructorDecl (loc, endLoc) ms tps i fps thr bod
 
-constrBody :: P ConstructorBody
+constrBody :: P (ConstructorBody, Location)
 constrBody = noLoc . braces $ do
   mec <- opt (try explConstrInv)
-  bss <- list blockStmt
-  return $ ConstructorBody mec bss
+  bssWithLoc <- list blockStmt
+  let bss = map fst bssWithLoc
+      loc = (snd . last) bssWithLoc
+  return (ConstructorBody mec bss, loc)
 
 explConstrInv :: P ExplConstrInv
 explConstrInv =
   noLoc . endSemi $
-    ( try $ do
-        tas <- lopt refTypeArgs
-        tok KW_This
-        as <- args
-        return $ ThisInvoke tas as
-    )
-      <|> ( try $ do
-              tas <- lopt refTypeArgs
-              tok KW_Super
-              as <- args
-              return $ SuperInvoke tas as
-          )
+    try
+      ( do
+          tas <- lopt refTypeArgs
+          tok KW_This
+          ThisInvoke tas <$> args
+      )
+      <|> try
+        ( do
+            tas <- lopt refTypeArgs
+            tok KW_Super
+            SuperInvoke tas <$> args
+        )
       <|> ( do
               pri <- primary
               period
               tas <- lopt refTypeArgs
               tok KW_Super
-              as <- args
-              return $ PrimarySuperInvoke pri tas as
+              PrimarySuperInvoke pri tas <$> args
           )
 
 -- TODO: This should be parsed like class bodies, and post-checked.
@@ -469,12 +466,12 @@ interfaceBodyDecl =
 interfaceMemberDecl :: P (Mod MemberDecl)
 interfaceMemberDecl =
   ( do
-      cd <- classDecl
-      return $ \loc ms -> MemberClassDecl (cd loc ms)
+      cd <- noLoc classDecl
+      return (\loc ms -> MemberClassDecl (cd loc ms))
   )
     <|> ( do
-            id <- try annInterfaceDecl <|> try interfaceDecl
-            return $ \loc ms -> MemberInterfaceDecl (id loc ms)
+            iDecl <- try annInterfaceDecl <|> try interfaceDecl
+            return (\loc ms -> MemberInterfaceDecl (iDecl loc ms))
         )
     <|> try fieldDecl
     <|> absMethodDecl
@@ -483,13 +480,13 @@ absMethodDecl :: P (Mod MemberDecl)
 absMethodDecl = do
   tps <- lopt typeParams
   rt <- resultType
-  id <- noLoc ident
+  i <- noLoc ident
   fps <- formalParams
   thr <- lopt throws
   def <- opt defaultValue
   endLoc <- getEndLoc
   semiColon
-  return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt id fps thr def (MethodBody Nothing)
+  return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt i fps thr def (MethodBody Nothing)
 
 defaultValue :: P Exp
 defaultValue = tok KW_Default >> noLoc exp
@@ -500,7 +497,7 @@ throws = tok KW_Throws >> refTypeList
 -- Formal parameters
 
 formalParams :: P [FormalParam]
-formalParams = parens $ do
+formalParams = noLoc $ parens $ do
   fps <- seplist formalParam comma
   if validateFPs fps
     then return fps
@@ -509,15 +506,14 @@ formalParams = parens $ do
     validateFPs :: [FormalParam] -> Bool
     validateFPs [] = True
     validateFPs [_] = True
-    validateFPs (FormalParam _ _ b _ : xs) = not b
+    validateFPs (FormalParam _ _ b _ : _) = not b
 
 formalParam :: P FormalParam
 formalParam = do
   ms <- list modifier
   typ <- ttype
   var <- bopt ellipsis
-  vid <- varDeclId
-  return $ FormalParam ms typ var vid
+  FormalParam ms typ var <$> varDeclId
 
 ellipsis :: P ()
 ellipsis = period >> period >> period
@@ -555,27 +551,19 @@ modifier =
 annotation :: P Annotation
 annotation = do
   startLoc <- getLocation
-  flip ($)
-    <$ tok Op_AtSign
-    <*> noLoc name
-    <*> ( try
-            ( do
-                elist <- parens evlist
-                endLoc <- getLocation
-                return (flip (NormalAnnotation (startLoc, endLoc)) elist)
-            )
-            <|> try
-              ( do
-                  e <- parens elementValue
-                  endLoc <- getLocation
-                  return (flip (SingleElementAnnotation (startLoc, endLoc)) e)
-              )
-            <|> try
-              ( do
-                  endLoc <- getLocation
-                  MarkerAnnotation (startLoc, endLoc) <$ return ()
-              )
-        )
+  tok Op_AtSign
+  (n, nLoc) <- name
+  try
+    ( do
+        (elist, endLoc) <- parens evlist
+        return (NormalAnnotation (startLoc, endLoc) n elist)
+    )
+    <|> try
+      ( do
+          (e, endLoc) <- parens elementValue
+          return (SingleElementAnnotation (startLoc, endLoc) n e)
+      )
+    <|> return (MarkerAnnotation (startLoc, nLoc) n)
 
 evlist :: P [(Ident, ElementValue)]
 evlist = seplist1 elementValuePair comma
@@ -607,11 +595,11 @@ varDecl = do
 varDeclId :: P VarDeclId
 varDeclId = do
   startLoc <- getLocation
-  id <- noLoc ident
-  abls <- list emptyBrackets
-  let endLoc = (snd . last) abls
-  let abs = map fst abls
-  return $ foldl (\f _ -> VarDeclArray (startLoc, endLoc) . f) VarId abs id
+  i <- noLoc ident
+  ebls <- list emptyBrackets
+  let endLoc = (snd . last) ebls
+      ebs = map fst ebls
+  return $ foldl (\f _ -> VarDeclArray (startLoc, endLoc) . f) VarId ebs i
 
 localVarDecl :: P (Location, [Modifier], Type, [VarDecl])
 localVarDecl = do
@@ -629,8 +617,8 @@ varInit =
 arrayInit :: P ArrayInit
 arrayInit = noLoc . braces $ do
   vis <- seplist varInit comma
-  opt comma
-  return $ ArrayInit vis
+  _ <- opt comma
+  return (ArrayInit vis)
 
 ----------------------------------------------------------------------------
 -- Statements
@@ -639,7 +627,7 @@ block :: P (Block, Location)
 block = do
   state <- getState
   case ps_mode state of
-    ParseFull -> braces $ Block <$> list blockStmt
+    ParseFull -> braces $ Block <$> list (noLoc blockStmt)
     ParseShallow -> shallowP
   where
     shallowP = do
@@ -655,32 +643,34 @@ parseNestedCurly :: Int -> P Location
 parseNestedCurly level = do
   loc <- getEndLoc
   newLevel <-
-    javaToken $ \t ->
-      case t of
-        OpenCurly -> Just (level + 1)
-        _ | level < 0 -> Nothing -- need to start with {
-        CloseCurly -> Just (level - 1)
-        _ -> Just level
+    javaToken
+      ( \t ->
+          case t of
+            OpenCurly -> Just (level + 1)
+            _ | level < 0 -> Nothing -- need to start with {
+            CloseCurly -> Just (level - 1)
+            _ -> Just level
+      )
   if newLevel < 0 then return loc else parseNestedCurly newLevel
 
-blockStmt :: P BlockStmt
+blockStmt :: P (BlockStmt, Location)
 blockStmt =
   try
     ( do
         loc <- getLocation
         ms <- list modifier
-        cd <- classDecl
-        return (LocalClass (cd loc ms))
+        (cd, endLoc) <- classDecl
+        return (LocalClass (cd loc ms), endLoc)
     )
     <|> try
       ( do
           ((startLoc, m, t, vds), endLoc) <- endSemi localVarDecl
-          return (LocalVars (startLoc, endLoc) m t vds)
+          return (LocalVars (startLoc, endLoc) m t vds, endLoc)
       )
     <|> do
       startLoc <- getLocation
       (s, endLoc) <- stmt
-      return (BlockStmt (startLoc, endLoc) s)
+      return (BlockStmt (startLoc, endLoc) s, endLoc)
 
 stmt :: P (Stmt, Location)
 stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
@@ -688,7 +678,7 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
     ifStmt = do
       startLoc <- getLocation
       tok KW_If
-      e <- parens (noLoc exp)
+      e <- noLoc $ parens (noLoc exp)
       try
         ( do
             th <- noLoc stmtNSI
@@ -702,29 +692,30 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
             )
     whileStmt = do
       tok KW_While
-      e <- parens (noLoc exp)
+      e <- noLoc $ parens (noLoc exp)
       (s, endLoc) <- stmt
       return (While e s, endLoc)
     forStmt = do
       tok KW_For
       f <-
-        parens $
-          ( try $ do
-              fi <- opt forInit
-              semiColon
-              e <- opt (noLoc exp)
-              semiColon
-              fu <- opt forUp
-              return $ BasicFor fi e fu
-          )
-            <|> ( do
-                    ms <- list modifier
-                    t <- ttype
-                    i <- noLoc ident
-                    colon
-                    e <- (noLoc exp)
-                    return $ EnhancedFor ms t i e
-                )
+        noLoc $
+          parens $
+            try
+              ( do
+                  fi <- opt forInit
+                  semiColon
+                  e <- opt (noLoc exp)
+                  semiColon
+                  fu <- opt forUp
+                  return $ BasicFor fi e fu
+              )
+              <|> ( do
+                      ms <- list modifier
+                      t <- ttype
+                      i <- noLoc ident
+                      colon
+                      EnhancedFor ms t i <$> noLoc exp
+                  )
       (s, endLoc) <- stmt
       return (f s, endLoc)
     labeledStmt = try $ do
@@ -739,36 +730,38 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
     ifStmt = do
       startLoc <- getLocation
       tok KW_If
-      e <- parens (noLoc exp)
+      e <- noLoc $ parens (noLoc exp)
       th <- noLoc stmtNSI
       tok KW_Else
       (el, endLoc) <- stmtNSI
       return (IfThenElse (startLoc, endLoc) e th el, endLoc)
     whileStmt = do
       tok KW_While
-      e <- parens (noLoc exp)
+      e <- noLoc $ parens (noLoc exp)
       (s, endLoc) <- stmtNSI
       return (While e s, endLoc)
     forStmt = do
       tok KW_For
       f <-
-        parens $
-          ( try $ do
-              fi <- opt forInit
-              semiColon
-              e <- opt (noLoc exp)
-              semiColon
-              fu <- opt forUp
-              return $ BasicFor fi e fu
-          )
-            <|> ( do
-                    ms <- list modifier
-                    t <- ttype
-                    i <- noLoc ident
-                    colon
-                    e <- noLoc exp
-                    return $ EnhancedFor ms t i e
-                )
+        noLoc $
+          parens $
+            try
+              ( do
+                  fi <- opt forInit
+                  semiColon
+                  e <- opt (noLoc exp)
+                  semiColon
+                  fu <- opt forUp
+                  return $ BasicFor fi e fu
+              )
+              <|> ( do
+                      ms <- list modifier
+                      t <- ttype
+                      i <- noLoc ident
+                      colon
+                      e <- noLoc exp
+                      return $ EnhancedFor ms t i e
+                  )
       (s, endLoc) <- stmtNSI
       return (f s, endLoc)
     labeledStmt = try $ do
@@ -781,73 +774,78 @@ stmtNoTrail :: P (Stmt, Location)
 stmtNoTrail =
   -- empty statement
   do
-    semiColon
-    endLoc <- getLocation
+    (_, endLoc) <- tokWithEndLoc SemiColon
     return (Empty, endLoc)
     <|>
     -- inner block
     mapFst StmtBlock <$> block
     <|>
     -- assertions
-    ( endSemi $ do
-        tok KW_Assert
-        e <- noLoc exp
-        me2 <- opt $ colon >> noLoc exp
-        return (Assert e me2)
-    )
+    endSemi
+      ( do
+          tok KW_Assert
+          e <- noLoc exp
+          me2 <- opt $ colon >> noLoc exp
+          return (Assert e me2)
+      )
     <|>
     -- switch stmts
     ( do
         tok KW_Switch
-        e <- parens (noLoc exp)
+        e <- noLoc $ parens (noLoc exp)
         ((style, sb), endLoc) <- switchBlock
         return (Switch style e sb, endLoc)
     )
     <|>
     -- do-while loops
-    ( endSemi $ do
-        tok KW_Do
-        s <- noLoc stmt
-        tok KW_While
-        e <- parens (noLoc exp)
-        return $ Do s e
-    )
+    endSemi
+      ( do
+          tok KW_Do
+          s <- noLoc stmt
+          tok KW_While
+          e <- noLoc $ parens (noLoc exp)
+          return $ Do s e
+      )
     <|>
     -- break
-    ( endSemi $ do
-        tok KW_Break
-        mi <- opt (noLoc ident)
-        return $ Break mi
-    )
+    endSemi
+      ( do
+          tok KW_Break
+          mi <- opt (noLoc ident)
+          return $ Break mi
+      )
     <|>
     -- continue
-    ( endSemi $ do
-        tok KW_Continue
-        mi <- opt (noLoc ident)
-        return $ Continue mi
-    )
+    endSemi
+      ( do
+          tok KW_Continue
+          mi <- opt (noLoc ident)
+          return $ Continue mi
+      )
     <|>
     -- return
-    ( endSemi $ do
-        tok KW_Return
-        me <- opt (noLoc exp)
-        return $ Return me
-    )
+    endSemi
+      ( do
+          tok KW_Return
+          me <- opt (noLoc exp)
+          return $ Return me
+      )
     <|>
     -- synchronized
     ( do
         tok KW_Synchronized
-        e <- parens (noLoc exp)
+        e <- noLoc $ parens (noLoc exp)
         (b, endLoc) <- block
         return (Synchronized e b, endLoc)
     )
     <|>
     -- throw
-    ( endSemi $ do
-        tok KW_Throw
-        e <- noLoc exp
-        return $ Throw e
-    )
+    endSemi
+      ( do
+          tok KW_Throw
+          e <- noLoc exp
+          return $ Throw e
+      )
     <|>
     -- try-catch, both with and without a finally clause
     ( do
@@ -886,10 +884,10 @@ forInit =
       try
         ( do
             (_, m, t, vds) <- localVarDecl
-            return $ ForLocalVars m t vds
+            return (ForLocalVars m t vds)
         )
   )
-    <|> (seplist1 stmtExp comma >>= return . ForInitExps)
+    <|> (seplist1 stmtExp comma <&> ForInitExps)
 
 forUp :: P [Exp]
 forUp = seplist1 stmtExp comma
@@ -909,8 +907,8 @@ switchBlock = braces (try old <|> new)
 switchStmtOld :: P SwitchBlock
 switchStmtOld = do
   lbl <- switchLabelOld
-  bss <- list blockStmt
-  return $ SwitchBlock lbl bss
+  bss <- list (noLoc blockStmt)
+  return (SwitchBlock lbl bss)
 
 switchLabelOld :: P SwitchLabel
 switchLabelOld =
@@ -925,7 +923,7 @@ switchLabelOld =
 switchStmtNew :: P SwitchBlock
 switchStmtNew = do
   lbl <- switchLabelNew
-  bss <- noLoc (braces (list blockStmt)) <|> (blockStmt >>= \s -> return [s])
+  bss <- noLoc (braces (list (noLoc blockStmt))) <|> (blockStmt >>= \s -> return [fst s])
   return $ SwitchBlock lbl bss
 
 switchLabelNew :: P SwitchLabel
@@ -941,16 +939,16 @@ switchLabelNew =
 switchExp :: P (Exp, Location)
 switchExp = do
   tok KW_Switch
-  e <- parens (noLoc exp)
+  e <- noLoc $ parens (noLoc exp)
   (branches, loc) <- braces switchExpBody
-  return $ (SwitchExp e branches, loc)
+  return (SwitchExp e branches, loc)
   where
     switchExpBody = many switchExpBodyBranch
     switchExpBodyBranch = do
       lbl <- switchLabelNew
       body <-
-        (SwitchExpBranchBlock <$> noLoc (braces (list blockStmt)))
-          <|> (SwitchExpBranchBlock <$> try (blockStmt >>= \s -> return [s]))
+        (SwitchExpBranchBlock <$> noLoc (braces (list (noLoc blockStmt))))
+          <|> (SwitchExpBranchBlock <$> try (blockStmt >>= \s -> return [fst s]))
           <|> (SwitchExpBranchExp <$> branchExp)
       return $ SwitchExpBranch lbl body
     branchExp = do
@@ -963,17 +961,21 @@ switchExp = do
 catch :: P Catch
 catch = do
   tok KW_Catch
-  fp <- parens formalParam
+  fp <- noLoc (parens formalParam)
   b <- noLoc block
   return (Catch fp b)
 
 tryResourceList :: P [TryResource]
 tryResourceList = do
-  l <- opt $
-    parens $ do
-      l <- seplist tryResource semiColon
-      _ <- opt semiColon
-      return l
+  l <-
+    opt
+      ( noLoc
+          ( parens $ do
+              l <- seplist tryResource semiColon
+              _ <- opt semiColon
+              return l
+          )
+      )
   case l of
     Just xs -> return xs
     Nothing -> return []
@@ -989,8 +991,7 @@ resourceDecl = do
   typ <- ttype
   vid <- varDeclId
   tok Op_Equal
-  val <- varInit
-  return $ ResourceDecl ms typ vid val
+  ResourceDecl ms typ vid <$> varInit
 
 ----------------------------------------------------------------------------
 -- Expressions
@@ -1009,8 +1010,7 @@ stmtExp =
 preIncDec :: P Exp
 preIncDec = do
   op <- preIncDecOp
-  e <- unaryExp
-  return $ op e
+  op <$> unaryExp
 
 postIncDec :: P Exp
 postIncDec = do
@@ -1023,7 +1023,7 @@ assignment = do
   startLoc <- getLocation
   lh <- lhs
   op <- assignOp
-  (e,loc) <- assignExp
+  (e, loc) <- assignExp
   return (Assign (startLoc, loc) lh op e, loc)
 
 lhs :: P Lhs
@@ -1052,8 +1052,8 @@ condExpSuffix startLoc = do
   tok Op_Query
   th <- noLoc exp
   colon
-  (el,endLoc) <- condExp
-  return  (\ce -> Cond (startLoc, endLoc) ce th el,endLoc)
+  (el, endLoc) <- condExp
+  return (\ce -> Cond (startLoc, endLoc) ce th el, endLoc)
 
 infixExp :: P Exp
 infixExp = do
@@ -1086,14 +1086,12 @@ unaryExp =
     <|> try
       ( do
           op <- prefixOp
-          ue <- unaryExp
-          return $ op ue
+          op <$> unaryExp
       )
     <|> try
       ( do
-          t <- parens ttype
-          e <- unaryExp
-          return $ Cast t e
+          t <- noLoc (parens ttype)
+          Cast t <$> unaryExp
       )
     <|> postfixExp
 
@@ -1115,25 +1113,28 @@ primary = primaryNPS |>> primarySuffix
 primaryNPS :: P Exp
 primaryNPS = try arrayCreation <|> primaryNoNewArrayNPS
 
-primaryNoNewArray = startSuff primaryNoNewArrayNPS primarySuffix
+-- unused
+-- primaryNoNewArray = startSuff primaryNoNewArrayNPS primarySuffix
 
 primaryNoNewArrayNPS :: P Exp
 primaryNoNewArrayNPS =
   Lit <$> literal
-    <|> const This <$> tok KW_This
-    <|> parens (noLoc exp)
+    <|> This <$ tok KW_This
+    <|> noLoc (parens (noLoc exp))
     <|>
     -- TODO: These two following should probably be merged more
-    ( try $ do
-        rt <- resultType
-        period >> tok KW_Class
-        return $ ClassLit rt
-    )
-    <|> ( try $ do
-            n <- noLoc name
-            period >> tok KW_This
-            return $ ThisClass n
-        )
+    try
+      ( do
+          rt <- resultType
+          period >> tok KW_Class
+          return $ ClassLit rt
+      )
+    <|> try
+      ( do
+          n <- noLoc name
+          period >> tok KW_This
+          return $ ThisClass n
+      )
     <|> try instanceCreationNPS
     <|> try (MethodInv <$> methodInvocationNPS)
     <|> try (FieldAccess <$> fieldAccessNPS)
@@ -1158,24 +1159,23 @@ instanceCreationNPS =
 
 typeDeclSpecifier :: P TypeDeclSpecifier
 typeDeclSpecifier =
-  ( try $ do
-      ct <- classType
-      period
-      i <- noLoc ident
-      tok Op_LThan
-      tok Op_GThan
-      return $ TypeDeclSpecifierWithDiamond ct i Diamond
-  )
-    <|> ( try $ do
-            i <- noLoc ident
-            tok Op_LThan
-            tok Op_GThan
-            return $ TypeDeclSpecifierUnqualifiedWithDiamond i Diamond
-        )
-    <|> ( do
-            ct <- classType
-            return $ TypeDeclSpecifier ct
-        )
+  try
+    ( do
+        ct <- classType
+        period
+        i <- noLoc ident
+        tok Op_LThan
+        tok Op_GThan
+        return $ TypeDeclSpecifierWithDiamond ct i Diamond
+    )
+    <|> try
+      ( do
+          i <- noLoc ident
+          tok Op_LThan
+          tok Op_GThan
+          return $ TypeDeclSpecifierUnqualifiedWithDiamond i Diamond
+      )
+    <|> TypeDeclSpecifier <$> classType
 
 instanceCreationSuffix :: P (Exp -> Exp)
 instanceCreationSuffix =
@@ -1200,40 +1200,37 @@ instanceCreation =
 lambdaParams :: P LambdaParams
 lambdaParams =
   try (LambdaSingleParam <$> noLoc ident)
-    <|> try (parens $ LambdaFormalParams <$> (seplist formalParam comma))
-    <|> (parens $ LambdaInferredParams <$> (seplist (noLoc ident) comma))
+    <|> try (noLoc (parens (LambdaFormalParams <$> seplist formalParam comma)))
+    <|> noLoc (parens (LambdaInferredParams <$> seplist (noLoc ident) comma))
 
 lambdaExp :: P (Exp, Location)
 lambdaExp = do
   params <- lambdaParams
   tok LambdaArrow
-  (e, loc) <- 
-    (
-      do
+  (e, loc) <-
+    ( do
         (b, loc) <- try block
         return (LambdaBlock b, loc)
-    )
-    <|>
-    (
-      do
-        (e, loc) <- exp
-        return (LambdaExpression e, loc)
-    )
+      )
+      <|> ( do
+              (e, loc) <- exp
+              return (LambdaExpression e, loc)
+          )
   return (Lambda params e, loc)
- 
+
 methodRef :: P (Exp, Location)
 methodRef = do
   n <- noLoc name
   tok MethodRefSep
   (target, loc) <-
-    (do 
-      (_,loc) <- tokWithEndLoc KW_New  
-      return (MethodRefConstructor, loc)
+    ( do
+        (_, loc) <- tokWithEndLoc KW_New
+        return (MethodRefConstructor, loc)
       )
       <|> ( do
-            (id, loc) <- ident
-            return (MethodRefIdent id,loc)
-            )
+              (i, loc) <- ident
+              return (MethodRefIdent i, loc)
+          )
   return (MethodRef n target, loc)
 
 {-
@@ -1314,15 +1311,14 @@ methodInvocationNPS =
       tok KW_Super >> period
       rts <- lopt refTypeArgs
       i <- noLoc ident
-      as <- args
-      return $ SuperMethodCall rts i as
+      SuperMethodCall rts i <$> args
   )
     <|> ( do
             n <- noLoc name
             f <-
               ( do
                   as <- args
-                  return $ \n -> MethodCall n as
+                  return (\n -> MethodCall n as)
                 )
                 <|> ( period >> do
                         msp <- opt (tok KW_Super >> period)
@@ -1338,10 +1334,10 @@ methodInvocationNPS =
 methodInvocationSuffix :: P (Exp -> MethodInvocation)
 methodInvocationSuffix = do
   period
-  rts <- lopt refTypeArgs
+  _ <- lopt refTypeArgs
   i <- noLoc ident
   as <- args
-  return $ \p -> PrimaryMethodCall p [] i as
+  return (\p -> PrimaryMethodCall p [] i as)
 
 methodInvocationExp :: P Exp
 methodInvocationExp =
@@ -1384,7 +1380,7 @@ methodInvocation =
 -}
 
 args :: P [Argument]
-args = parens $ seplist (noLoc exp) comma
+args = noLoc (parens (seplist (noLoc exp) comma))
 
 -- Arrays
 
@@ -1424,30 +1420,33 @@ arrayCreation = do
   tok KW_New
   t <- nonArrayType
   f <-
-    ( try $ do
-        ds <- list1 $ brackets empty
-        ai <- arrayInit
-        return $ \t -> ArrayCreateInit t (length ds) ai
+    try
+      ( do
+          ds <- list1 $ brackets empty
+          ai <- arrayInit
+          return (\t -> ArrayCreateInit t (length ds) ai)
       )
       <|> ( do
               des <- list1 $ try $ brackets (noLoc exp)
               ds <- list $ brackets empty
-              return $ \t -> ArrayCreate t des (length ds)
+              return (\t -> ArrayCreate t des (length ds))
           )
-  return $ f t
+  return (f t)
 
 literal :: P Literal
 literal =
-  javaToken $ \t -> case t of
-    IntTok i -> Just (Int i)
-    LongTok l -> Just (Word l)
-    DoubleTok d -> Just (Double d)
-    FloatTok f -> Just (Float f)
-    CharTok c -> Just (Char c)
-    StringTok s -> Just (String s)
-    BoolTok b -> Just (Boolean b)
-    NullTok -> Just Null
-    _ -> Nothing
+  javaToken
+    ( \t -> case t of
+        IntTok i -> Just (Int i)
+        LongTok l -> Just (Word l)
+        DoubleTok d -> Just (Double d)
+        FloatTok f -> Just (Float f)
+        CharTok c -> Just (Char c)
+        StringTok s -> Just (String s)
+        BoolTok b -> Just (Boolean b)
+        NullTok -> Just Null
+        _ -> Nothing
+    )
 
 -- Operators
 
@@ -1502,17 +1501,19 @@ infixOp =
     <|> (tok Op_Minus >> return Sub)
     <|> (tok Op_LShift >> return LShift)
     <|> (tok Op_LThan >> return LThan)
-    <|> ( try $ do
-            tok Op_GThan
-            tok Op_GThan
-            tok Op_GThan
-            return RRShift
-        )
-    <|> ( try $ do
-            tok Op_GThan
-            tok Op_GThan
-            return RShift
-        )
+    <|> try
+      ( do
+          tok Op_GThan
+          tok Op_GThan
+          tok Op_GThan
+          return RRShift
+      )
+    <|> try
+      ( do
+          tok Op_GThan
+          tok Op_GThan
+          return RShift
+      )
     <|> (tok Op_GThan >> return GThan)
     <|> (tok Op_LThanE >> return LThanE)
     <|> (tok Op_GThanE >> return GThanE)
@@ -1571,7 +1572,7 @@ refType =
 nonArrayType :: P Type
 nonArrayType =
   PrimType <$> primType
-    <|> RefType <$> ClassRefType <$> classType
+    <|> RefType . ClassRefType <$> classType
 
 classType :: P ClassType
 classType = ClassType <$> seplist1 classTypeSpec period
@@ -1644,9 +1645,12 @@ ident = do
   return (i, loc)
 
 fixedIdent :: String -> a -> P a
-fixedIdent fixed result = javaToken $ \t -> case t of
-  IdentTok s | s == fixed -> Just result
-  _ -> Nothing
+fixedIdent fixed result =
+  javaToken
+    ( \t -> case t of
+        IdentTok s | s == fixed -> Just result
+        _ -> Nothing
+    )
 
 ------------------------------------------------------------
 
@@ -1689,7 +1693,7 @@ seplist1 p sep =
   p >>= \a ->
     try
       ( do
-          sep
+          _ <- sep
           as <- seplist1 p sep
           return (a : as)
       )
@@ -1726,23 +1730,27 @@ pos2sourcePos (l, c) = newPos "" l c
 
 type Mod a = Location -> [Modifier] -> a
 
-parens, brackets, angles :: P a -> P a
-parens = between (tok OpenParen) (tok CloseParen)
+brackets, angles :: P a -> P a
 brackets = between (tok OpenSquare) (tok CloseSquare)
 angles = between (tok Op_LThan) (tok Op_GThan)
 
-braces :: P a -> P (a, Location)
+braces, parens :: P a -> P (a, Location)
 braces p = do
   _ <- tok OpenCurly
   x <- p
   (_, endLoc) <- tokWithEndLoc CloseCurly
-  pure (x, endLoc)
+  return (x, endLoc)
+parens p = do
+  _ <- tok OpenParen
+  x <- p
+  (_, endLoc) <- tokWithEndLoc CloseParen
+  return (x, endLoc)
 
 emptyBrackets :: P ((), Location)
 emptyBrackets = do
   _ <- tok OpenSquare
   (_, endLoc) <- tokWithEndLoc CloseSquare
-  pure ((), endLoc)
+  return ((), endLoc)
 
 endSemi :: P a -> P (a, Location)
 endSemi p = do
