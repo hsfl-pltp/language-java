@@ -59,7 +59,7 @@ module Language.Java.Parser
 where
 
 import Data.Functor ((<&>))
-import Data.Maybe (catMaybes, isJust)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Language.Java.Lexer (L1 (..), Token (..), lexer)
 import Language.Java.Syntax
 import Text.Parsec
@@ -311,7 +311,7 @@ enumBody = braces $ do
 enumConst :: P EnumConstant
 enumConst = do
   i <- noLoc ident
-  as <- lopt args
+  as <- lopt (noLoc args)
   mcb <- opt (noLoc classBody)
   return $ EnumConstant i as mcb
 
@@ -352,7 +352,7 @@ classBodyStatement :: P (Maybe Decl)
 classBodyStatement =
   try
     ( do
-        _ <- list1 semiColon
+        _ <- list1 (tokWithEndLoc SemiColon)
         return Nothing
     )
     <|> try
@@ -421,12 +421,13 @@ constrDecl = do
   return $ \loc ms -> ConstructorDecl (loc, endLoc) ms tps i fps thr bod
 
 constrBody :: P (ConstructorBody, Location)
-constrBody = noLoc . braces $ do
-  mec <- opt (try explConstrInv)
-  bssWithLoc <- list blockStmt
-  let bss = map fst bssWithLoc
-      loc = (snd . last) bssWithLoc
-  return (ConstructorBody mec bss, loc)
+constrBody =
+  braces
+    ( do
+        mec <- opt (try explConstrInv)
+        bss <- list (noLoc blockStmt)
+        return (ConstructorBody mec bss)
+    )
 
 explConstrInv :: P ExplConstrInv
 explConstrInv =
@@ -435,20 +436,20 @@ explConstrInv =
       ( do
           tas <- lopt refTypeArgs
           tok KW_This
-          ThisInvoke tas <$> args
+          ThisInvoke tas <$> noLoc args
       )
       <|> try
         ( do
             tas <- lopt refTypeArgs
             tok KW_Super
-            SuperInvoke tas <$> args
+            SuperInvoke tas <$> noLoc args
         )
       <|> ( do
-              pri <- primary
+              pri <- noLoc primary
               period
               tas <- lopt refTypeArgs
               tok KW_Super
-              PrimarySuperInvoke pri tas <$> args
+              PrimarySuperInvoke pri tas <$> noLoc args
           )
 
 -- TODO: This should be parsed like class bodies, and post-checked.
@@ -574,7 +575,7 @@ elementValuePair = (,) <$> noLoc ident <* tok Op_Equal <*> elementValue
 elementValue :: P ElementValue
 elementValue =
   EVVal
-    <$> ( InitArray <$> arrayInit
+    <$> ( InitArray <$> noLoc arrayInit
             <|> InitExp <$> noLoc condExp
         )
     <|> EVAnn
@@ -596,10 +597,8 @@ varDeclId :: P VarDeclId
 varDeclId = do
   startLoc <- getLocation
   i <- noLoc ident
-  ebls <- list emptyBrackets
-  let endLoc = (snd . last) ebls
-      ebs = map fst ebls
-  return $ foldl (\f _ -> VarDeclArray (startLoc, endLoc) . f) VarId ebs i
+  ebs <- list emptyBrackets
+  return (foldl (\f (_, loc) -> VarDeclArray (startLoc, loc) . f) VarId ebs i)
 
 localVarDecl :: P (Location, [Modifier], Type, [VarDecl])
 localVarDecl = do
@@ -611,11 +610,11 @@ localVarDecl = do
 
 varInit :: P VarInit
 varInit =
-  InitArray <$> arrayInit
+  InitArray <$> noLoc arrayInit
     <|> InitExp <$> noLoc exp
 
-arrayInit :: P ArrayInit
-arrayInit = noLoc . braces $ do
+arrayInit :: P (ArrayInit, Location)
+arrayInit = braces $ do
   vis <- seplist varInit comma
   _ <- opt comma
   return (ArrayInit vis)
@@ -998,7 +997,7 @@ resourceDecl = do
 
 stmtExp :: P Exp
 stmtExp =
-  try preIncDec
+  try (noLoc preIncDec)
     <|> try postIncDec
     <|> try (noLoc assignment)
     -- There are sharing gains to be made by unifying these two
@@ -1007,16 +1006,16 @@ stmtExp =
     <|> try (noLoc methodRef)
     <|> instanceCreation
 
-preIncDec :: P Exp
+preIncDec :: P (Exp, Location)
 preIncDec = do
-  op <- preIncDecOp
-  op <$> unaryExp
+  op <- noLoc preIncDecOp
+  mapFst op <$> unaryExp
 
 postIncDec :: P Exp
 postIncDec = do
-  e <- postfixExpNES
-  ops <- list1 postfixOp
-  return $ foldl (\a s -> s a) e ops
+  e <- noLoc postfixExpNES
+  ops <- noLoc $ list1 postfixOp
+  return (foldl (\a s -> s a) e ops)
 
 assignment :: P (Exp, Location)
 assignment = do
@@ -1029,7 +1028,7 @@ assignment = do
 lhs :: P Lhs
 lhs =
   try (FieldLhs <$> fieldAccess)
-    <|> try (ArrayLhs <$> arrayAccess)
+    <|> try (ArrayLhs <$> noLoc arrayAccess)
     <|> NameLhs <$> noLoc name
 
 exp :: P (Exp, Location)
@@ -1041,11 +1040,7 @@ assignExp = try switchExp <|> try methodRef <|> try lambdaExp <|> try assignment
 condExp :: P (Exp, Location)
 condExp = do
   startLoc <- getLocation
-  ie <- infixExp
-  cesWithLoc <- list (condExpSuffix startLoc)
-  let ces = map fst cesWithLoc
-      loc = snd (last cesWithLoc)
-  return (foldl (\a s -> s a) ie ces, loc)
+  infixExp |>> condExpSuffix startLoc
 
 condExpSuffix :: Location -> P (Exp -> Exp, Location)
 condExpSuffix startLoc = do
@@ -1055,113 +1050,115 @@ condExpSuffix startLoc = do
   (el, endLoc) <- condExp
   return (\ce -> Cond (startLoc, endLoc) ce th el, endLoc)
 
-infixExp :: P Exp
-infixExp = do
-  ue <- unaryExp
-  ies <- list infixExpSuffix
-  return $ foldl (\a s -> s a) ue ies
+infixExp :: P (Exp, Location)
+infixExp = unaryExp |>> infixExpSuffix
 
-infixExpSuffix :: P (Exp -> Exp)
+infixExpSuffix :: P (Exp -> Exp, Location)
 infixExpSuffix =
   ( do
       op <- infixCombineOp
-      ie2 <- infixExp
-      return $ \ie1 -> BinOp ie1 op ie2
+      (ie2, loc) <- infixExp
+      return (\ie1 -> BinOp ie1 op ie2, loc)
   )
     <|> ( do
             op <- infixOp
-            e2 <- unaryExp
-            return $ \e1 -> BinOp e1 op e2
+            (e2, loc) <- unaryExp
+            return (\e1 -> BinOp e1 op e2, loc)
         )
     <|> ( do
             tok KW_Instanceof
-            t <- refType
-            mName <- opt (noLoc name)
-            return $ \e1 -> InstanceOf e1 t mName
+            (t, refLoc) <- refType
+            mNameLoc <- opt name
+            let (mName, loc) =
+                  case mNameLoc of
+                    Just (n, l) -> (Just n, l)
+                    Nothing -> (Nothing, refLoc)
+            return (\e1 -> InstanceOf e1 t mName, loc)
         )
 
-unaryExp :: P Exp
+unaryExp :: P (Exp, Location)
 unaryExp =
   try preIncDec
     <|> try
       ( do
-          op <- prefixOp
-          op <$> unaryExp
+          op <- noLoc prefixOp
+          mapFst op <$> unaryExp
       )
     <|> try
       ( do
           t <- noLoc (parens ttype)
-          Cast t <$> unaryExp
+          mapFst (Cast t) <$> unaryExp
       )
     <|> postfixExp
 
-postfixExpNES :: P Exp
+postfixExpNES :: P (Exp, Location)
 postfixExpNES =
   -- try postIncDec <|>
   try primary
-    <|> ExpName <$> noLoc name
+    <|> mapFst ExpName <$> name
 
-postfixExp :: P Exp
-postfixExp = do
-  pe <- postfixExpNES
-  ops <- list postfixOp
-  return $ foldl (\a s -> s a) pe ops
+postfixExp :: P (Exp, Location)
+postfixExp = postfixExpNES |>> postfixOp
 
-primary :: P Exp
+primary :: P (Exp, Location)
 primary = primaryNPS |>> primarySuffix
 
-primaryNPS :: P Exp
+primaryNPS :: P (Exp, Location)
 primaryNPS = try arrayCreation <|> primaryNoNewArrayNPS
 
 -- unused
 -- primaryNoNewArray = startSuff primaryNoNewArrayNPS primarySuffix
 
-primaryNoNewArrayNPS :: P Exp
+primaryNoNewArrayNPS :: P (Exp, Location)
 primaryNoNewArrayNPS =
-  Lit <$> literal
-    <|> This <$ tok KW_This
-    <|> noLoc (parens (noLoc exp))
+  mapFst Lit <$> literal
+    <|> attrTok KW_This This
+    <|> parens (noLoc exp)
     <|>
     -- TODO: These two following should probably be merged more
     try
       ( do
           rt <- resultType
-          period >> tok KW_Class
-          return $ ClassLit rt
+          _ <- period
+          attrTok KW_Class (ClassLit rt)
       )
     <|> try
       ( do
           n <- noLoc name
-          period >> tok KW_This
-          return $ ThisClass n
+          _ <- period
+          attrTok KW_This (ThisClass n)
       )
     <|> try instanceCreationNPS
-    <|> try (MethodInv <$> methodInvocationNPS)
-    <|> try (FieldAccess <$> fieldAccessNPS)
-    <|> ArrayAccess <$> arrayAccessNPS
+    <|> try (mapFst MethodInv <$> methodInvocationNPS)
+    <|> try (mapFst FieldAccess <$> fieldAccessNPS)
+    <|> mapFst ArrayAccess <$> arrayAccessNPS
 
-primarySuffix :: P (Exp -> Exp)
+primarySuffix :: P (Exp -> Exp, Location)
 primarySuffix =
   try instanceCreationSuffix
-    <|> try ((ArrayAccess .) <$> arrayAccessSuffix)
-    <|> try ((MethodInv .) <$> methodInvocationSuffix)
-    <|> (FieldAccess .) <$> fieldAccessSuffix
+    <|> try (mapFst (ArrayAccess .) <$> arrayAccessSuffix)
+    <|> try (mapFst (MethodInv .) <$> methodInvocationSuffix)
+    <|> mapFst (FieldAccess .) <$> fieldAccessSuffix
 
-instanceCreationNPS :: P Exp
+instanceCreationNPS :: P (Exp, Location)
 instanceCreationNPS =
   do
     tok KW_New
-    tas <- lopt typeArgs
+    tas <- lopt (noLoc typeArgs)
     tds <- typeDeclSpecifier
-    as <- args
-    mcb <- opt (noLoc classBody)
-    return $ InstanceCreation tas tds as mcb
+    (as, argsLoc) <- args
+    mcbLoc <- opt classBody
+    let (mcb, loc) =
+          case mcbLoc of
+            Just (cb, l) -> (Just cb, l)
+            Nothing -> (Nothing, argsLoc)
+    return (InstanceCreation tas tds as mcb, loc)
 
 typeDeclSpecifier :: P TypeDeclSpecifier
 typeDeclSpecifier =
   try
     ( do
-        ct <- classType
+        ct <- noLoc classType
         period
         i <- noLoc ident
         tok Op_LThan
@@ -1175,27 +1172,34 @@ typeDeclSpecifier =
           tok Op_GThan
           return $ TypeDeclSpecifierUnqualifiedWithDiamond i Diamond
       )
-    <|> TypeDeclSpecifier <$> classType
+    <|> TypeDeclSpecifier <$> noLoc classType
 
-instanceCreationSuffix :: P (Exp -> Exp)
+instanceCreationSuffix :: P (Exp -> Exp, Location)
 instanceCreationSuffix =
   do
     period >> tok KW_New
-    tas <- lopt typeArgs
+    tas <- lopt (noLoc typeArgs)
     i <- noLoc ident
-    as <- args
-    mcb <- opt (noLoc classBody)
-    return $ \p -> QualInstanceCreation p tas i as mcb
+    (as, argsLoc) <- args
+    mcbLoc <- opt classBody
+    let (mcb, loc) =
+          case mcbLoc of
+            Just (cb, l) -> (Just cb, l)
+            Nothing -> (Nothing, argsLoc)
+    return (\p -> QualInstanceCreation p tas i as mcb, loc)
 
 instanceCreation :: P Exp
 instanceCreation =
-  try instanceCreationNPS <|> do
-    p <- primaryNPS
-    ss <- list primarySuffix
-    let icp = foldl (\a s -> s a) p ss
-    case icp of
-      QualInstanceCreation {} -> return icp
-      _ -> fail ""
+  try
+    ( noLoc instanceCreationNPS
+    )
+    <|> do
+      p <- noLoc primaryNPS
+      ss <- list (noLoc primarySuffix)
+      let icp = foldl (\a s -> s a) p ss
+      case icp of
+        QualInstanceCreation {} -> return icp
+        _ -> fail ""
 
 lambdaParams :: P LambdaParams
 lambdaParams =
@@ -1250,35 +1254,34 @@ instanceCreation =
         return $ QualInstanceCreation p tas i as mcb)
 -}
 
-fieldAccessNPS :: P FieldAccess
+fieldAccessNPS :: P (FieldAccess, Location)
 fieldAccessNPS =
   ( do
       tok KW_Super >> period
-      i <- noLoc ident
-      return $ SuperFieldAccess i
+      mapFst SuperFieldAccess <$> ident
   )
     <|> ( do
             n <- noLoc name
             period >> tok KW_Super >> period
-            i <- noLoc ident
-            return $ ClassFieldAccess n i
+            mapFst (ClassFieldAccess n) <$> ident
         )
 
-fieldAccessSuffix :: P (Exp -> FieldAccess)
+fieldAccessSuffix :: P (Exp -> FieldAccess, Location)
 fieldAccessSuffix = do
   period
-  i <- noLoc ident
-  return $ \p -> PrimaryFieldAccess p i
+  (i, loc) <- ident
+  return (\p -> PrimaryFieldAccess p i, loc)
 
 fieldAccess :: P FieldAccess
 fieldAccess =
-  try fieldAccessNPS <|> do
-    p <- primaryNPS
-    ss <- list primarySuffix
-    let fap = foldl (\a s -> s a) p ss
-    case fap of
-      FieldAccess fa -> return fa
-      _ -> fail ""
+  try (noLoc fieldAccessNPS)
+    <|> do
+      p <- noLoc primaryNPS
+      ss <- list (noLoc primarySuffix)
+      let fap = foldl (\a s -> s a) p ss
+      case fap of
+        FieldAccess fa -> return fa
+        _ -> fail ""
 
 {-
 fieldAccess :: P FieldAccess
@@ -1305,52 +1308,47 @@ fieldAccess =
         return $ PrimaryFieldAccess p i)
 -}
 
-methodInvocationNPS :: P MethodInvocation
+methodInvocationNPS :: P (MethodInvocation, Location)
 methodInvocationNPS =
   ( do
       tok KW_Super >> period
       rts <- lopt refTypeArgs
       i <- noLoc ident
-      SuperMethodCall rts i <$> args
+      mapFst (SuperMethodCall rts i) <$> args
   )
     <|> ( do
             n <- noLoc name
-            f <-
-              ( do
-                  as <- args
-                  return (\n -> MethodCall n as)
-                )
-                <|> ( period >> do
-                        msp <- opt (tok KW_Super >> period)
-                        rts <- lopt refTypeArgs
-                        i <- noLoc ident
-                        as <- args
-                        let mc = maybe TypeMethodCall (const ClassMethodCall) msp
-                        return $ \n -> mc n rts i as
-                    )
-            return $ f n
+            mapFst (MethodCall n) <$> args
+              <|> ( do
+                      period
+                      msp <- opt (tok KW_Super >> period)
+                      rts <- lopt refTypeArgs
+                      i <- noLoc ident
+                      let constr = maybe TypeMethodCall (const ClassMethodCall) msp
+                      mapFst (constr n rts i) <$> args
+                  )
         )
 
-methodInvocationSuffix :: P (Exp -> MethodInvocation)
+methodInvocationSuffix :: P (Exp -> MethodInvocation, Location)
 methodInvocationSuffix = do
   period
   _ <- lopt refTypeArgs
   i <- noLoc ident
-  as <- args
-  return (\p -> PrimaryMethodCall p [] i as)
+  (as, loc) <- args
+  return (\p -> PrimaryMethodCall p [] i as, loc)
 
 methodInvocationExp :: P Exp
 methodInvocationExp =
   try
     ( do
-        p <- primaryNPS
-        ss <- list primarySuffix
+        p <- noLoc primaryNPS
+        ss <- list (noLoc primarySuffix)
         let mip = foldl (\a s -> s a) p ss
         case mip of
           MethodInv _ -> return mip
           _ -> fail ""
     )
-    <|> (MethodInv <$> methodInvocationNPS)
+    <|> (MethodInv <$> noLoc methodInvocationNPS)
 
 {-
 methodInvocation :: P MethodInvocation
@@ -1379,29 +1377,28 @@ methodInvocation =
         return $ f n)
 -}
 
-args :: P [Argument]
-args = noLoc (parens (seplist (noLoc exp) comma))
+args :: P ([Argument], Location)
+args = parens (seplist (noLoc exp) comma)
 
 -- Arrays
 
-arrayAccessNPS :: P ArrayIndex
+arrayAccessNPS :: P (ArrayIndex, Location)
 arrayAccessNPS = do
   n <- noLoc name
-  e <- list1 $ brackets (noLoc exp)
-  return $ ArrayIndex (ExpName n) e
+  (e, loc) <- list1 (brackets (noLoc exp))
+  return (ArrayIndex (ExpName n) e, loc)
 
-arrayAccessSuffix :: P (Exp -> ArrayIndex)
+arrayAccessSuffix :: P (Exp -> ArrayIndex, Location)
 arrayAccessSuffix = do
-  e <- list1 $ brackets (noLoc exp)
-  return $ \ref -> ArrayIndex ref e
+  (e, loc) <- list1 (brackets (noLoc exp))
+  return (\ref -> ArrayIndex ref e, loc)
 
+arrayAccess :: P (ArrayIndex, Location)
 arrayAccess =
   try arrayAccessNPS <|> do
-    p <- primaryNoNewArrayNPS
-    ss <- list primarySuffix
-    let aap = foldl (\a s -> s a) p ss
+    aap <- primaryNoNewArrayNPS |>> primarySuffix
     case aap of
-      ArrayAccess ain -> return ain
+      (ArrayAccess ain, loc) -> return (ain, loc)
       _ -> fail ""
 
 {-
@@ -1415,55 +1412,57 @@ arrayRef :: P Exp
 arrayRef = ExpName <$> name <|> primaryNoNewArray
 -}
 
-arrayCreation :: P Exp
+arrayCreation :: P (Exp, Location)
 arrayCreation = do
   tok KW_New
   t <- nonArrayType
-  f <-
-    try
-      ( do
-          ds <- list1 $ brackets empty
-          ai <- arrayInit
-          return (\t -> ArrayCreateInit t (length ds) ai)
-      )
-      <|> ( do
-              des <- list1 $ try $ brackets (noLoc exp)
-              ds <- list $ brackets empty
-              return (\t -> ArrayCreate t des (length ds))
-          )
-  return (f t)
-
-literal :: P Literal
-literal =
-  javaToken
-    ( \t -> case t of
-        IntTok i -> Just (Int i)
-        LongTok l -> Just (Word l)
-        DoubleTok d -> Just (Double d)
-        FloatTok f -> Just (Float f)
-        CharTok c -> Just (Char c)
-        StringTok s -> Just (String s)
-        BoolTok b -> Just (Boolean b)
-        NullTok -> Just Null
-        _ -> Nothing
+  try
+    ( do
+        ds <- noLoc $ list1 emptyBrackets
+        mapFst (ArrayCreateInit t (length ds)) <$> arrayInit
     )
+    <|> ( do
+            (des, desLoc) <- list1 $ try $ brackets (noLoc exp)
+            ds <- list emptyBrackets
+            let len = length ds
+                loc =
+                  if len < 1
+                    then desLoc
+                    else (snd . last) ds
+            return (ArrayCreate t des len, loc)
+        )
+
+literal :: P (Literal, Location)
+literal = do
+  loc <- getEndLoc
+  lit <-
+    javaToken
+      ( \t -> case t of
+          IntTok i -> Just (Int i)
+          LongTok l -> Just (Word l)
+          DoubleTok d -> Just (Double d)
+          FloatTok f -> Just (Float f)
+          CharTok c -> Just (Char c)
+          StringTok s -> Just (String s)
+          BoolTok b -> Just (Boolean b)
+          NullTok -> Just Null
+          _ -> Nothing
+      )
+  return (lit, loc)
 
 -- Operators
 
-preIncDecOp, prefixOp, postfixOp :: P (Exp -> Exp)
+preIncDecOp, prefixOp, postfixOp :: P (Exp -> Exp, Location)
 preIncDecOp = do
   startLoc <- getLocation
   (constr, endLoc) <- attrTok Op_PPlus PreIncrement <|> attrTok Op_MMinus PreDecrement
-  return (constr (startLoc, endLoc))
+  return (constr (startLoc, endLoc), endLoc)
 prefixOp =
-  (tok Op_Bang >> return PreNot)
-    <|> (tok Op_Tilde >> return PreBitCompl)
-    <|> (tok Op_Plus >> return PrePlus)
-    <|> (tok Op_Minus >> return PreMinus)
+  attrTok Op_Bang PreNot <|> attrTok Op_Tilde PreBitCompl <|> attrTok Op_Plus PrePlus <|> attrTok Op_Minus PreMinus
 postfixOp = do
   startLoc <- getLocation
   (constr, endLoc) <- attrTok Op_PPlus PostIncrement <|> attrTok Op_MMinus PostDecrement
-  return (constr (startLoc, endLoc))
+  return (constr (startLoc, endLoc), endLoc)
 
 attrTok :: Token -> b -> P (b, Location)
 attrTok token constr =
@@ -1524,7 +1523,7 @@ infixOp =
 -- Types
 
 ttype :: P Type
-ttype = try (RefType <$> refType) <|> PrimType <$> primType
+ttype = try (RefType <$> noLoc refType) <|> PrimType <$> primType
 
 primType :: P PrimType
 primType =
@@ -1545,55 +1544,65 @@ primType =
       <|> tok KW_Double
     >> return DoubleT
 
-refType :: P RefType
+refType :: P (RefType, Location)
 refType =
   ( do
       pt <- primType
-      (_ : bs) <- list1 emptyBrackets
-      return $
-        foldl
-          (\f _ -> ArrayType . RefType . f)
-          (ArrayType . PrimType)
-          bs
-          pt
+      (_ : bs, loc) <- list1 emptyBrackets
+      return
+        ( foldl
+            (\f _ -> ArrayType . RefType . f)
+            (ArrayType . PrimType)
+            bs
+            pt,
+          loc
+        )
   )
     <|> ( do
-            ct <- classType
+            (ct, ctLoc) <- classType
             bs <- list emptyBrackets
-            return $
-              foldl
-                (\f _ -> ArrayType . RefType . f)
-                ClassRefType
-                bs
-                ct
+            return
+              ( mapFst
+                  (\a -> a ct)
+                  ( foldl
+                      (\(f, _) (_, loc) -> (ArrayType . RefType . f, loc))
+                      (ClassRefType, ctLoc)
+                      bs
+                  )
+              )
         )
     <?> "refType"
 
 nonArrayType :: P Type
 nonArrayType =
   PrimType <$> primType
-    <|> RefType . ClassRefType <$> classType
+    <|> RefType . ClassRefType <$> noLoc classType
 
-classType :: P ClassType
-classType = ClassType <$> seplist1 classTypeSpec period
+classType :: P (ClassType, Location)
+classType = do
+  ctss <- seplist1 classTypeSpec period
+  let cts = map fst ctss
+      loc = (snd . last) ctss
+  return (ClassType cts, loc)
 
-classTypeSpec :: P (Ident, [TypeArgument])
+classTypeSpec :: P ((Ident, [TypeArgument]), Location)
 classTypeSpec = do
-  i <- noLoc ident
-  tas <- lopt typeArgs
-  return (i, tas)
+  (i, iLoc) <- ident
+  mtas <- opt typeArgs
+  let (tas, loc) = fromMaybe ([], iLoc) mtas
+  return ((i, tas), loc)
 
 resultType :: P (Maybe Type)
 resultType = tok KW_Void >> return Nothing <|> Just <$> ttype <?> "resultType"
 
 refTypeList :: P [RefType]
-refTypeList = seplist1 refType comma
+refTypeList = seplist1 (noLoc refType) comma
 
 ----------------------------------------------------------------------------
 -- Type parameters and arguments
 
 typeParams :: P [TypeParam]
-typeParams = angles $ seplist1 typeParam comma
+typeParams = noLoc $ angles (seplist1 typeParam comma)
 
 typeParam :: P TypeParam
 typeParam = do
@@ -1602,26 +1611,26 @@ typeParam = do
   return $ TypeParam i bs
 
 bounds :: P [RefType]
-bounds = tok KW_Extends >> seplist1 refType (tok Op_And)
+bounds = tok KW_Extends >> seplist1 (noLoc refType) (tok Op_And)
 
-typeArgs :: P [TypeArgument]
-typeArgs = angles $ seplist1 typeArg comma
+typeArgs :: P ([TypeArgument], Location)
+typeArgs = angles (seplist1 typeArg comma)
 
 typeArg :: P TypeArgument
 typeArg =
   tok Op_Query
     >> Wildcard <$> opt wildcardBound
-      <|> ActualType <$> refType
+      <|> ActualType <$> noLoc refType
 
 wildcardBound :: P WildcardBound
 wildcardBound =
   tok KW_Extends
-    >> ExtendsBound <$> refType
+    >> ExtendsBound <$> noLoc refType
       <|> tok KW_Super
-    >> SuperBound <$> refType
+    >> SuperBound <$> noLoc refType
 
 refTypeArgs :: P [RefType]
-refTypeArgs = angles refTypeList
+refTypeArgs = noLoc $ angles refTypeList
 
 ----------------------------------------------------------------------------
 -- Names
@@ -1678,10 +1687,14 @@ lopt p = do
     Just as -> return as
 
 list :: P a -> P [a]
-list = option [] . list1
+list = option [] . many1
 
-list1 :: P a -> P [a]
-list1 = many1
+list1 :: P (a, Location) -> P ([a], Location)
+list1 p = do
+  ll <- many1 p
+  let l = map fst ll
+      loc = (snd . last) ll
+  return (l, loc)
 
 seplist :: P a -> P sep -> P [a]
 -- seplist = sepBy
@@ -1699,12 +1712,11 @@ seplist1 p sep =
       )
       <|> return [a]
 
-startSuff, (|>>) :: P a -> P (a -> a) -> P a
-startSuff start suffix = do
+(|>>) :: P (a, Location) -> P (a -> a, Location) -> P (a, Location)
+start |>> suffix = do
   x <- start
   ss <- list suffix
-  return $ foldl (\a s -> s a) x ss
-(|>>) = startSuff
+  return (foldl (\(a, _) (s, loc) -> (s a, loc)) x ss)
 
 ------------------------------------------------------------
 
@@ -1730,15 +1742,21 @@ pos2sourcePos (l, c) = newPos "" l c
 
 type Mod a = Location -> [Modifier] -> a
 
-brackets, angles :: P a -> P a
-brackets = between (tok OpenSquare) (tok CloseSquare)
-angles = between (tok Op_LThan) (tok Op_GThan)
-
-braces, parens :: P a -> P (a, Location)
+angles, braces, brackets, parens :: P a -> P (a, Location)
+angles p = do
+  _ <- tok Op_LThan
+  x <- p
+  (_, endLoc) <- tokWithEndLoc Op_GThan
+  return (x, endLoc)
 braces p = do
   _ <- tok OpenCurly
   x <- p
   (_, endLoc) <- tokWithEndLoc CloseCurly
+  return (x, endLoc)
+brackets p = do
+  _ <- tok OpenSquare
+  x <- p
+  (_, endLoc) <- tokWithEndLoc CloseSquare
   return (x, endLoc)
 parens p = do
   _ <- tok OpenParen
