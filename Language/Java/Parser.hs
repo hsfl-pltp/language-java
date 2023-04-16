@@ -852,20 +852,17 @@ stmtNoTrail =
         startLoc <- getLocation
         tok KW_Try
         resources <- tryResourceList
-        b <- noLoc block
-        blockEndLoc <- getLocation
-        c <- list catch
-        catchEndLoc <- getLocation
-        mf <- opt (tok KW_Finally >> noLoc block)
-        finallyEndLoc <- getLocation
+        (b, blockEndLoc) <- block
+        cs <- list catch
+        mfLoc <- opt (tok KW_Finally >> block)
         -- TODO: here we should check that there exists at
         -- least one catch or finally clause
-        let endLoc = case (mf, c) of
-              (Nothing, []) -> blockEndLoc
-              (Nothing, _) -> catchEndLoc
-              (Just _, _) -> finallyEndLoc
+        let (mf, endLoc) = case (mfLoc, cs) of
+              (Nothing, []) -> (Nothing, blockEndLoc)
+              (Nothing, c) -> (Nothing, snd (last c))
+              (Just (fb, l), _) -> (Just fb, l)
         return
-          ( Try (startLoc, endLoc) resources b c mf,
+          ( Try (startLoc, endLoc) resources b (map fst cs) mf,
             endLoc
           )
     )
@@ -958,12 +955,12 @@ switchExp = do
 
 -- Try-catch clauses
 
-catch :: P Catch
+catch :: P (Catch, Location)
 catch = do
   tok KW_Catch
   fp <- noLoc (parens formalParam)
-  b <- noLoc block
-  return (Catch fp b)
+  (b, loc) <- block
+  return (Catch fp b, loc)
 
 tryResourceList :: P [TryResource]
 tryResourceList = do
