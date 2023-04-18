@@ -274,8 +274,10 @@ lexicalError p s = L (mkPos p) (Left ("lexical error: " ++ s))
 data L a = L Pos a
   deriving (Show, Eq)
 
--- we need to know the length of a token to find its end location in the parser,
--- so we can create sourcespans that end at the end of a token instead of the start of the following token
+{-|
+  The 'L1' datatype takes the position of a token 'Pos' and the length of that token as Int.
+  Unlike using 'L' the length can be used to calculate the end location of the token in the parser.
+ -}
 data L1 a = L1 Pos Int a
   deriving (Show, Eq)
 
