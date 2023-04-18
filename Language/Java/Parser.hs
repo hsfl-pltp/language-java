@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Language.Java.Parser
   ( JavaParser,
@@ -642,14 +644,11 @@ parseNestedCurly :: Int -> P Location
 parseNestedCurly level = do
   loc <- getEndLoc
   newLevel <-
-    javaToken
-      ( \t ->
-          case t of
-            OpenCurly -> Just (level + 1)
-            _ | level < 0 -> Nothing -- need to start with {
-            CloseCurly -> Just (level - 1)
-            _ -> Just level
-      )
+    javaToken $ \case
+      OpenCurly -> Just (level + 1)
+      _ | level < 0 -> Nothing -- need to start with {
+      CloseCurly -> Just (level - 1)
+      _ -> Just level
   if newLevel < 0 then return loc else parseNestedCurly newLevel
 
 blockStmt :: P (BlockStmt, Location)
@@ -1425,7 +1424,7 @@ arrayCreation = do
                 loc =
                   if len < 1
                     then desLoc
-                    else (snd . last) ds
+                    else snd (last ds)
             return (ArrayCreate t des len, loc)
         )
 
@@ -1433,18 +1432,16 @@ literal :: P (Literal, Location)
 literal = do
   loc <- getEndLoc
   lit <-
-    javaToken
-      ( \t -> case t of
-          IntTok i -> Just (Int i)
-          LongTok l -> Just (Word l)
-          DoubleTok d -> Just (Double d)
-          FloatTok f -> Just (Float f)
-          CharTok c -> Just (Char c)
-          StringTok s -> Just (String s)
-          BoolTok b -> Just (Boolean b)
-          NullTok -> Just Null
-          _ -> Nothing
-      )
+    javaToken $ \case
+      IntTok i -> Just (Int i)
+      LongTok l -> Just (Word l)
+      DoubleTok d -> Just (Double d)
+      FloatTok f -> Just (Float f)
+      CharTok c -> Just (Char c)
+      StringTok s -> Just (String s)
+      BoolTok b -> Just (Boolean b)
+      NullTok -> Just Null
+      _ -> Nothing
   return (lit, loc)
 
 -- Operators
@@ -1462,8 +1459,8 @@ postfixOp = do
   return (constr (startLoc, endLoc), endLoc)
 
 attrTok :: Token -> b -> P (b, Location)
-attrTok token constr =
-  fmap (\(_, endLoc) -> (constr, endLoc)) (tokWithEndLoc token)
+attrTok t constr =
+  fmap (\(_, endLoc) -> (constr, endLoc)) (tokWithEndLoc t)
 
 assignOp :: P AssignOp
 assignOp =
@@ -1579,7 +1576,7 @@ classType :: P (ClassType, Location)
 classType = do
   ctss <- seplist1 classTypeSpec period
   let cts = map fst ctss
-      loc = (snd . last) ctss
+      loc = snd (last ctss)
   return (ClassType cts, loc)
 
 classTypeSpec :: P ((Ident, [TypeArgument]), Location)
@@ -1636,27 +1633,22 @@ name :: P (Name, Location)
 name = do
   n <- seplist1 ident period
   let idents = map fst n
-      endLoc = (snd . last) n
+      endLoc = snd (last n)
   return (Name idents, endLoc)
 
 ident :: P (Ident, Location)
 ident = do
   loc <- getEndLoc
-  i <-
-    javaToken
-      ( \t -> case t of
-          IdentTok s -> Just (Ident s)
-          _ -> Nothing
-      )
+  i <- javaToken $ \case
+    IdentTok s -> Just (Ident s)
+    _ -> Nothing
   return (i, loc)
 
 fixedIdent :: String -> a -> P a
 fixedIdent fixed result =
-  javaToken
-    ( \t -> case t of
-        IdentTok s | s == fixed -> Just result
-        _ -> Nothing
-    )
+  javaToken $ \case
+    IdentTok s | s == fixed -> Just result
+    _ -> Nothing
 
 ------------------------------------------------------------
 
@@ -1690,7 +1682,7 @@ list1 :: P (a, Location) -> P ([a], Location)
 list1 p = do
   ll <- many1 p
   let l = map fst ll
-      loc = (snd . last) ll
+      loc = snd (last ll)
   return (l, loc)
 
 seplist :: P a -> P sep -> P [a]
