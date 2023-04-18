@@ -18,3 +18,10 @@ Simple compilation unit parser:
 or from a file:
 
     ast <- parser compilationUnit `fmap` readFile "myClass.java"
+
+Used Configs
+---------
+
+Rationales can be found in corresponding config files.
+
+- `.hlint.yaml`

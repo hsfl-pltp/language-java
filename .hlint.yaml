@@ -57,6 +57,7 @@
 # - ignore: {name: Use let}
 # - ignore: {name: Use const, within: SpecialModule} # Only within certain modules
 
+# We dont want that hint for syntax constructors in a few cases, no cases otherwise
 - ignore: {name: "Avoid lambda using `infix`"}
 
 
