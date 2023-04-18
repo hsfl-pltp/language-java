@@ -1,7 +1,7 @@
 {
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-tabs -fno-warn-unused-binds #-}
-module Language.Java.Lexer (L(..), Token(..), lexer) where
+module Language.Java.Lexer (L1(..), Token(..), lexer) where
 
 import Numeric
 import Data.Char
@@ -274,6 +274,13 @@ lexicalError p s = L (mkPos p) (Left ("lexical error: " ++ s))
 data L a = L Pos a
   deriving (Show, Eq)
 
+{-|
+  The 'L1' datatype takes the position of a token 'Pos' and the length of that token as Int.
+  Unlike using 'L' the length can be used to calculate the end location of the token in the parser.
+ -}
+data L1 a = L1 Pos Int a
+  deriving (Show, Eq)
+
 -- (line, column)
 type Pos = (Int, Int)
 
@@ -400,10 +407,10 @@ data Token
     | Op_AtSign
   deriving (Show, Eq)
 
-lexer :: String -> Either (Int, Int, String) [L Token]
+lexer :: String -> Either (Int, Int, String) [L1 Token]
 lexer str = go (alexStartPos, '\n', [], str) []
   where
-    go :: AlexInput -> [L Token] -> Either (Int, Int, String) [L Token]
+    go :: AlexInput -> [L1 Token] -> Either (Int, Int, String) [L1 Token]
     go inp@(p, _, _, str) acc =
       case alexScan inp 0 of
         AlexEOF -> Right (reverse acc)
@@ -411,7 +418,7 @@ lexer str = go (alexStartPos, '\n', [], str) []
         AlexToken inp' len act ->
             case act p (take len str) of
               L (line, col) (Left err) -> Left (line, col, err)
-              L pos (Right x) -> go inp' (L pos x : acc)
+              L pos (Right x) -> go inp' (L1 pos len x : acc)
         AlexError (p, _, _, _) ->
           let (line, col) = mkPos p
           in Left (line, col, "lexical error")
