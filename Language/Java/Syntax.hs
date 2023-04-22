@@ -51,12 +51,6 @@ module Language.Java.Syntax
     ArrayInit (..),
     MethodInvocation (..),
     MethodRefTarget (..),
-    Location (..),
-    SourceSpan,
-    dummyLocation,
-    dummySourceSpan,
-    locationEof,
-    isEof,
     module Language.Java.Syntax.Exp,
     module Language.Java.Syntax.Types,
   )
@@ -64,6 +58,7 @@ where
 
 import Data.Data
 import GHC.Generics (Generic)
+import Language.Java.SourceSpan
 import Language.Java.Syntax.Exp
 import Language.Java.Syntax.Types
 
@@ -94,27 +89,6 @@ data TypeDecl
   = ClassTypeDecl ClassDecl
   | InterfaceTypeDecl InterfaceDecl
   deriving (Eq, Show, Read, Typeable, Generic, Data)
-
-type SourceSpan = (Location, Location)
-
-data Location = Location
-  { loc_file :: FilePath,
-    loc_line :: Int,
-    loc_column :: Int
-  }
-  deriving (Eq, Show, Read, Typeable, Generic, Data)
-
-dummyLocation :: Location
-dummyLocation = Location "<input>" 1 1
-
-dummySourceSpan :: SourceSpan
-dummySourceSpan = (dummyLocation, dummyLocation)
-
-locationEof :: Location
-locationEof = Location "" 0 0
-
-isEof :: Location -> Bool
-isEof loc = loc == locationEof
 
 -- | A class declaration specifies a new named reference type.
 data ClassDecl
@@ -280,11 +254,13 @@ data Annotation
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 desugarAnnotation (MarkerAnnotation span n) = (span, n, [])
-desugarAnnotation (SingleElementAnnotation span n e) = (span, n, [(Ident "value", e)])
+-- TODO: check span for ident
+desugarAnnotation (SingleElementAnnotation span n e) = (span, n, [(Ident span "value", e)])
 desugarAnnotation (NormalAnnotation span n kv) = (span, n, kv)
 
 desugarAnnotation' (MarkerAnnotation span n) = NormalAnnotation span n []
-desugarAnnotation' (SingleElementAnnotation span n e) = NormalAnnotation span n [(Ident "value", e)]
+-- TODO: check span for ident
+desugarAnnotation' (SingleElementAnnotation span n e) = NormalAnnotation span n [(Ident span "value", e)]
 desugarAnnotation' normal = normal
 
 -- | Annotations may contain  annotations or (loosely) expressions
