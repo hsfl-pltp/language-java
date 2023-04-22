@@ -204,7 +204,7 @@ data VarInit
 -- | A formal parameter in method declaration. The last parameter
 --   for a given declaration may be marked as variable arity,
 --   indicated by the boolean argument.
-data FormalParam = FormalParam [Modifier] Type Bool VarDeclId
+data FormalParam = FormalParam SourceSpan [Modifier] Type Bool VarDeclId
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 -- | A method body is either a block of code that implements the method or simply a

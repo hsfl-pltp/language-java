@@ -155,7 +155,7 @@ instance Pretty VarInit where
     text "{" <+> hsep (punctuate comma (map (prettyPrec p) ai)) <+> text "}"
 
 instance Pretty FormalParam where
-  prettyPrec p (FormalParam mods t b vId) =
+  prettyPrec p (FormalParam _ mods t b vId) =
     hsep
       [ hsep (map (prettyPrec p) mods),
         prettyPrec p t <> opt b (text "..."),
