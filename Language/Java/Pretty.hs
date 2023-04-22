@@ -141,8 +141,8 @@ instance Pretty MemberDecl where
   prettyPrec p (MemberInterfaceDecl id) = prettyPrec p id
 
 instance Pretty VarDecl where
-  prettyPrec p (VarDecl vdId Nothing) = prettyPrec p vdId
-  prettyPrec p (VarDecl vdId (Just ie)) =
+  prettyPrec p (VarDecl _ vdId Nothing) = prettyPrec p vdId
+  prettyPrec p (VarDecl _ vdId (Just ie)) =
     (prettyPrec p vdId <+> char '=') <+> prettyPrec p ie
 
 instance Pretty VarDeclId where

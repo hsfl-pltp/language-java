@@ -185,7 +185,7 @@ data RecordFieldDecl
 
 -- | A declaration of a variable, which may be explicitly initialized.
 data VarDecl
-  = VarDecl VarDeclId (Maybe VarInit)
+  = VarDecl SourceSpan VarDeclId (Maybe VarInit)
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 -- | The name of a variable in a declaration, which may be an array.
