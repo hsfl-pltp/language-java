@@ -8,6 +8,7 @@ import Control.Monad
 import Data.List (isSuffixOf)
 import Language.Java.Parser
 import Language.Java.Pretty
+import Language.Java.SourceSpan
 import Language.Java.Syntax
 import System.Directory
 import System.FilePath
@@ -34,10 +35,10 @@ instance Arbitrary ClassBody where
   arbitrary = ClassBody <$> pure []
 
 instance Arbitrary Name where
-  arbitrary = Name <$> (choose (1, 3) >>= \len -> replicateM len arbitrary)
+  arbitrary = Name dummySourceSpan <$> (choose (1, 3) >>= \len -> replicateM len arbitrary)
 
 instance Arbitrary Ident where
-  arbitrary = Ident . unkeyword <$> (choose (1, 15) >>= \len -> replicateM len (elements (['a' .. 'z'] ++ ['A' .. 'Z'])))
+  arbitrary = Ident dummySourceSpan . unkeyword <$> (choose (1, 15) >>= \len -> replicateM len (elements (['a' .. 'z'] ++ ['A' .. 'Z'])))
     where
       unkeyword k
         | k `elem` ["if", "do", "then", "else"] = "x" ++ k
