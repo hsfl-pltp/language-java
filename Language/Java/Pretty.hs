@@ -219,9 +219,9 @@ instance Pretty Stmt where
     text "if" <+> parens (prettyPrec 0 c) $+$ prettyNestedStmt 0 th
   prettyPrec p (IfThenElse _ c th el) =
     text "if" <+> parens (prettyPrec p c) $+$ prettyNestedStmt 0 th $+$ text "else" $+$ prettyNestedStmt 0 el
-  prettyPrec p (While c stmt) =
+  prettyPrec p (While _ c stmt) =
     text "while" <+> parens (prettyPrec p c) $+$ prettyNestedStmt 0 stmt
-  prettyPrec p (BasicFor mInit mE mUp stmt) =
+  prettyPrec p (BasicFor _ mInit mE mUp stmt) =
     text "for"
       <+> ( parens $
               hsep
@@ -233,7 +233,7 @@ instance Pretty Stmt where
                 ]
           )
       $+$ prettyNestedStmt p stmt
-  prettyPrec p (EnhancedFor mods t ident e stmt) =
+  prettyPrec p (EnhancedFor _ mods t ident e stmt) =
     hsep
       [ text "for",
         parens $
@@ -256,13 +256,13 @@ instance Pretty Stmt where
     text "switch"
       <+> parens (prettyPrec p e)
       $$ braceBlock (map (prettyPrec p) sBlocks)
-  prettyPrec p (Do stmt e) =
+  prettyPrec p (Do _ stmt e) =
     text "do" $+$ prettyPrec p stmt <+> text "while" <+> parens (prettyPrec p e) <> semi
-  prettyPrec p (Break mIdent) =
+  prettyPrec p (Break _ mIdent) =
     text "break" <+> maybePP p mIdent <> semi
   prettyPrec p (Continue mIdent) =
     text "continue" <+> maybePP p mIdent <> semi
-  prettyPrec p (Return mE) =
+  prettyPrec p (Return _ mE) =
     text "return" <+> maybePP p mE <> semi
   prettyPrec p (Synchronized e block) =
     text "synchronized" <+> parens (prettyPrec p e) $$ prettyPrec p block
