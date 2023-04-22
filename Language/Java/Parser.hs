@@ -591,9 +591,13 @@ varDecls = seplist1 varDecl comma
 
 varDecl :: P VarDecl
 varDecl = do
-  vid <- noLoc varDeclId
-  mvi <- opt $ tok Op_Equal >> varInit
-  return (VarDecl vid mvi)
+  startLoc <- getLocation
+  (vid, vidLoc) <- varDeclId
+  mviLoc <- opt (tok Op_Equal >> varInit)
+  let (mvi, endLoc) = case mviLoc of
+        Nothing -> (Nothing, vidLoc)
+        Just (vi, loc) -> (Just vi, loc)
+  return (VarDecl (startLoc, endLoc) vid mvi)
 
 varDeclId :: P (VarDeclId, Location)
 varDeclId = do
@@ -613,14 +617,14 @@ localVarDecl = do
   vds <- varDecls
   return (startLoc, ms, typ, vds)
 
-varInit :: P VarInit
+varInit :: P (VarInit, Location)
 varInit =
-  InitArray <$> noLoc arrayInit
-    <|> InitExp <$> noLoc exp
+  mapFst InitArray <$> arrayInit
+    <|> mapFst InitExp <$> exp
 
 arrayInit :: P (ArrayInit, Location)
 arrayInit = braces $ do
-  vis <- seplist varInit comma
+  vis <- seplist (noLoc varInit) comma
   _ <- opt comma
   return (ArrayInit vis)
 
@@ -992,7 +996,7 @@ resourceDecl = do
   typ <- ttype
   vid <- noLoc varDeclId
   tok Op_Equal
-  ResourceDecl ms typ vid <$> varInit
+  ResourceDecl ms typ vid <$> noLoc varInit
 
 ----------------------------------------------------------------------------
 -- Expressions
