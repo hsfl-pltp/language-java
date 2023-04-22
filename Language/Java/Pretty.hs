@@ -284,7 +284,7 @@ instance Pretty Catch where
     hsep [text "catch", parens (prettyPrec p fParam)] $$ prettyPrec p block
 
 instance Pretty SwitchBlock where
-  prettyPrec p (SwitchBlock lbl stmts) =
+  prettyPrec p (SwitchBlock _ lbl stmts) =
     vcat (prettyPrec p lbl : map (nest 2 . prettyPrec p) stmts)
 
 instance Pretty SwitchLabel where

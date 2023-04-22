@@ -375,7 +375,7 @@ data ResourceDecl
 
 -- | A block of code labelled with a @case@ or @default@ within a @switch@ statement.
 data SwitchBlock
-  = SwitchBlock SwitchLabel [BlockStmt]
+  = SwitchBlock SourceSpan SwitchLabel [BlockStmt]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
 data SwitchStyle

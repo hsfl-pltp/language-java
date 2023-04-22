@@ -406,9 +406,7 @@ methodDecl = do
 methodBody :: P (MethodBody, Location)
 methodBody = onlySemi <|> fullBody
   where
-    onlySemi = do
-      (_, loc) <- tokWithEndLoc SemiColon
-      return (MethodBody Nothing, loc)
+    onlySemi = attrTok SemiColon (MethodBody Nothing)
     fullBody = do
       (b, loc) <- block
       return (MethodBody (Just b), loc)
@@ -776,9 +774,7 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
 stmtNoTrail :: P (Stmt, Location)
 stmtNoTrail =
   -- empty statement
-  do
-    (_, endLoc) <- tokWithEndLoc SemiColon
-    return (Empty, endLoc)
+  attrTok SemiColon Empty
     <|>
     -- inner block
     mapFst StmtBlock <$> block
@@ -906,25 +902,30 @@ switchBlock = braces (try old <|> new)
 
 switchStmtOld :: P SwitchBlock
 switchStmtOld = do
-  lbl <- switchLabelOld
-  bss <- list (noLoc blockStmt)
-  return (SwitchBlock lbl bss)
+  startLoc <- getLocation
+  (lbl, lblLoc) <- switchLabelOld
+  bswithLocs <- list blockStmt
+  let bss = map fst bswithLocs
+      loc = case bswithLocs of
+        [] -> lblLoc
+        _ -> snd (last bswithLocs)
+  return (SwitchBlock (startLoc, loc) lbl bss)
 
-switchLabelOld :: P SwitchLabel
+switchLabelOld :: P (SwitchLabel, Location)
 switchLabelOld =
-  (tok KW_Default >> colon >> return Default)
+  (tok KW_Default >> attrTok Op_Colon Default)
     <|> ( do
             tok KW_Case
             es <- seplist (noLoc condExp) comma
-            colon
-            return $ SwitchCase es
+            attrTok Op_Colon (SwitchCase es)
         )
 
 switchStmtNew :: P SwitchBlock
 switchStmtNew = do
+  startLoc <- getLocation
   lbl <- switchLabelNew
-  bss <- noLoc (braces (list (noLoc blockStmt))) <|> (blockStmt >>= \s -> return [fst s])
-  return $ SwitchBlock lbl bss
+  (bss, loc) <- braces (list (noLoc blockStmt)) <|> blockStmt >>= \s -> return ([fst s], snd s)
+  return (SwitchBlock (startLoc, loc) lbl bss)
 
 switchLabelNew :: P SwitchLabel
 switchLabelNew =
@@ -1227,16 +1228,9 @@ methodRef :: P (Exp, Location)
 methodRef = do
   n <- noLoc name
   tok MethodRefSep
-  (target, loc) <-
-    ( do
-        (_, loc) <- tokWithEndLoc KW_New
-        return (MethodRefConstructor, loc)
-      )
-      <|> ( do
-              (i, loc) <- ident
-              return (MethodRefIdent i, loc)
-          )
-  return (MethodRef n target, loc)
+  mapFst (MethodRef n) <$>
+    (attrTok KW_New MethodRefConstructor
+      <|> (mapFst MethodRefIdent <$> ident))
 
 {-
 instanceCreation =
@@ -1737,32 +1731,20 @@ pos2sourcePos (l, c) = newPos "" l c
 type Mod a = Location -> [Modifier] -> a
 
 angles, braces, brackets, parens :: P a -> P (a, Location)
-angles p = do
-  _ <- tok Op_LThan
+angles = betweenWithEndLoc Op_LThan Op_GThan
+braces = betweenWithEndLoc OpenCurly CloseCurly
+brackets = betweenWithEndLoc OpenSquare CloseSquare
+parens = betweenWithEndLoc OpenParen CloseParen
+
+betweenWithEndLoc :: Token -> Token -> P a -> P (a, Location)
+betweenWithEndLoc open close p = do
+  _ <- tok open
   x <- p
-  (_, endLoc) <- tokWithEndLoc Op_GThan
-  return (x, endLoc)
-braces p = do
-  _ <- tok OpenCurly
-  x <- p
-  (_, endLoc) <- tokWithEndLoc CloseCurly
-  return (x, endLoc)
-brackets p = do
-  _ <- tok OpenSquare
-  x <- p
-  (_, endLoc) <- tokWithEndLoc CloseSquare
-  return (x, endLoc)
-parens p = do
-  _ <- tok OpenParen
-  x <- p
-  (_, endLoc) <- tokWithEndLoc CloseParen
+  (_, endLoc) <- tokWithEndLoc close
   return (x, endLoc)
 
 emptyBrackets :: P ((), Location)
-emptyBrackets = do
-  _ <- tok OpenSquare
-  (_, endLoc) <- tokWithEndLoc CloseSquare
-  return ((), endLoc)
+emptyBrackets = brackets (pure ())
 
 endSemi :: P a -> P (a, Location)
 endSemi p = do
