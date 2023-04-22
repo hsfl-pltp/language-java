@@ -509,14 +509,16 @@ formalParams = noLoc $ parens $ do
     validateFPs :: [FormalParam] -> Bool
     validateFPs [] = True
     validateFPs [_] = True
-    validateFPs (FormalParam _ _ b _ : _) = not b
+    validateFPs (FormalParam _ _ _ b _ : _) = not b
 
 formalParam :: P FormalParam
 formalParam = do
+  startLoc <- getLocation
   ms <- list modifier
   typ <- ttype
   var <- bopt ellipsis
-  FormalParam ms typ var <$> varDeclId
+  (vdi, loc) <- varDeclId
+  return (FormalParam (startLoc, loc) ms typ var vdi)
 
 ellipsis :: P ()
 ellipsis = period >> period >> period
@@ -591,16 +593,19 @@ varDecls = seplist1 varDecl comma
 
 varDecl :: P VarDecl
 varDecl = do
-  vid <- varDeclId
+  vid <- noLoc varDeclId
   mvi <- opt $ tok Op_Equal >> varInit
-  return $ VarDecl vid mvi
+  return (VarDecl vid mvi)
 
-varDeclId :: P VarDeclId
+varDeclId :: P (VarDeclId, Location)
 varDeclId = do
   startLoc <- getLocation
-  i <- noLoc ident
+  (i, noArrLoc) <- ident
   ebs <- list emptyBrackets
-  return (foldl (\f (_, loc) -> VarDeclArray (startLoc, loc) . f) VarId ebs i)
+  let endLoc = case ebs of
+        [] -> noArrLoc
+        _ -> snd (last ebs)
+  return (foldl (\f (_, loc) -> VarDeclArray (startLoc, loc) . f) VarId ebs i, endLoc)
 
 localVarDecl :: P (Location, [Modifier], Type, [VarDecl])
 localVarDecl = do
@@ -984,7 +989,7 @@ resourceDecl :: P ResourceDecl
 resourceDecl = do
   ms <- list modifier
   typ <- ttype
-  vid <- varDeclId
+  vid <- noLoc varDeclId
   tok Op_Equal
   ResourceDecl ms typ vid <$> varInit
 
