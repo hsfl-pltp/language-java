@@ -72,14 +72,14 @@ data TypeParam = TypeParam Ident [RefType]
 
 -- | A single identifier.
 data Ident = Ident SourceSpan String
-  deriving (Eq, Show, Read, Typeable, Generic, Data)
+  deriving (Ord, Show, Read, Typeable, Generic, Data)
 
-instance Ord Ident where
-  Ident _ s1 <= Ident _ s2 = s1 <= s2 
+instance Eq Ident where
+  Ident _ s1 == Ident _ s2 = s1 == s2
 
 -- | A name, i.e. a period-separated list of identifiers.
 data Name = Name SourceSpan [Ident]
-  deriving (Eq, Show, Read, Typeable, Generic, Data)
+  deriving (Ord, Show, Read, Typeable, Generic, Data)
 
-instance Ord Name where
-  Name _ l1 <= Name _ l2 = l1 <= l2
+instance Eq Name where
+  Name _ l1 == Name _ l2 = l1 == l2

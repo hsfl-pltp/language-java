@@ -255,12 +255,12 @@ data Annotation
 
 desugarAnnotation (MarkerAnnotation span n) = (span, n, [])
 -- TODO: check span for ident
-desugarAnnotation (SingleElementAnnotation span n e) = (span, n, [(Ident span "value", e)])
+desugarAnnotation (SingleElementAnnotation span n e) = (span, n, [(Ident dummySourceSpan "value", e)])
 desugarAnnotation (NormalAnnotation span n kv) = (span, n, kv)
 
 desugarAnnotation' (MarkerAnnotation span n) = NormalAnnotation span n []
 -- TODO: check span for ident
-desugarAnnotation' (SingleElementAnnotation span n e) = NormalAnnotation span n [(Ident span "value", e)]
+desugarAnnotation' (SingleElementAnnotation span n e) = NormalAnnotation span n [(Ident dummySourceSpan "value", e)]
 desugarAnnotation' normal = normal
 
 -- | Annotations may contain  annotations or (loosely) expressions
