@@ -697,11 +697,13 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                 return (IfThen (startLoc, endLoc) e th, endLoc)
             )
     whileStmt = do
+      startLoc <- getLocation
       tok KW_While
       e <- noLoc $ parens (noLoc exp)
       (s, endLoc) <- stmt
-      return (While e s, endLoc)
+      return (While (startLoc, endLoc) e s, endLoc)
     forStmt = do
+      startLoc <- getLocation
       tok KW_For
       f <-
         noLoc $
@@ -713,17 +715,18 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                   e <- opt (noLoc exp)
                   semiColon
                   fu <- opt forUp
-                  return $ BasicFor fi e fu
+                  return (\loc -> BasicFor (startLoc, loc) fi e fu)
               )
               <|> ( do
                       ms <- list modifier
                       t <- ttype
                       i <- noLoc ident
                       colon
-                      EnhancedFor ms t i <$> noLoc exp
+                      e <- noLoc exp
+                      return (\loc -> EnhancedFor (startLoc, loc) ms t i e)
                   )
       (s, endLoc) <- stmt
-      return (f s, endLoc)
+      return (f endLoc s, endLoc)
     labeledStmt = try $ do
       lbl <- noLoc ident
       colon
@@ -742,11 +745,13 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
       (el, endLoc) <- stmtNSI
       return (IfThenElse (startLoc, endLoc) e th el, endLoc)
     whileStmt = do
+      startLoc <- getLocation
       tok KW_While
       e <- noLoc $ parens (noLoc exp)
       (s, endLoc) <- stmtNSI
-      return (While e s, endLoc)
+      return (While (startLoc, endLoc) e s, endLoc)
     forStmt = do
+      startLoc <- getLocation
       tok KW_For
       f <-
         noLoc $
@@ -758,7 +763,7 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                   e <- opt (noLoc exp)
                   semiColon
                   fu <- opt forUp
-                  return $ BasicFor fi e fu
+                  return (\loc -> BasicFor (startLoc, loc) fi e fu)
               )
               <|> ( do
                       ms <- list modifier
@@ -766,10 +771,10 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                       i <- noLoc ident
                       colon
                       e <- noLoc exp
-                      return $ EnhancedFor ms t i e
+                      return (\loc -> EnhancedFor (startLoc, loc) ms t i e)
                   )
       (s, endLoc) <- stmtNSI
-      return (f s, endLoc)
+      return (f endLoc s, endLoc)
     labeledStmt = try $ do
       i <- noLoc ident
       colon
@@ -802,22 +807,24 @@ stmtNoTrail =
     )
     <|>
     -- do-while loops
-    endSemi
-      ( do
-          tok KW_Do
-          s <- noLoc stmt
-          tok KW_While
-          e <- noLoc $ parens (noLoc exp)
-          return $ Do s e
-      )
+    ( do
+        startLoc <- getLocation
+        tok KW_Do
+        s <- noLoc stmt
+        tok KW_While
+        e <- noLoc $ parens (noLoc exp)
+        (_, endLoc) <- tokWithEndLoc SemiColon
+        return (Do (startLoc, endLoc) s e, endLoc)
+    )
     <|>
     -- break
-    endSemi
-      ( do
-          tok KW_Break
-          mi <- opt (noLoc ident)
-          return $ Break mi
-      )
+    ( do
+        startLoc <- getLocation
+        tok KW_Break
+        mi <- opt (noLoc ident)
+        (_, endLoc) <- tokWithEndLoc SemiColon
+        return (Break (startLoc, endLoc) mi, endLoc)
+    )
     <|>
     -- continue
     endSemi
@@ -828,12 +835,13 @@ stmtNoTrail =
       )
     <|>
     -- return
-    endSemi
-      ( do
-          tok KW_Return
-          me <- opt (noLoc exp)
-          return $ Return me
-      )
+    ( do
+        startLoc <- getLocation
+        tok KW_Return
+        me <- opt (noLoc exp)
+        (_, endLoc) <- tokWithEndLoc SemiColon
+        return (Return (startLoc, endLoc) me, endLoc)
+    )
     <|>
     -- synchronized
     ( do

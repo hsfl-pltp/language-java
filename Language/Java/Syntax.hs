@@ -294,12 +294,12 @@ data Stmt
   | -- | The @if-then-else@ statement allows conditional choice of two statements, executing one or the other but not both.
     IfThenElse SourceSpan Exp Stmt Stmt
   | -- | The @while@ statement executes an expression and a statement repeatedly until the value of the expression is false.
-    While Exp Stmt
+    While SourceSpan Exp Stmt
   | -- | The basic @for@ statement executes some initialization code, then executes an expression, a statement, and some
     --   update code repeatedly until the value of the expression is false.
-    BasicFor (Maybe ForInit) (Maybe Exp) (Maybe [Exp]) Stmt
+    BasicFor SourceSpan (Maybe ForInit) (Maybe Exp) (Maybe [Exp]) Stmt
   | -- | The enhanced @for@ statement iterates over an array or a value of a class that implements the @iterator@ interface.
-    EnhancedFor [Modifier] Type Ident Exp Stmt
+    EnhancedFor SourceSpan [Modifier] Type Ident Exp Stmt
   | -- | An empty statement does nothing.
     Empty
   | -- | Certain kinds of expressions may be used as statements by following them with semicolons:
@@ -312,14 +312,14 @@ data Stmt
   | -- | The switch statement transfers control to one of several statements depending on the value of an expression.
     Switch SwitchStyle Exp [SwitchBlock]
   | -- | The @do@ statement executes a statement and an expression repeatedly until the value of the expression is false.
-    Do Stmt Exp
+    Do SourceSpan Stmt Exp
   | -- | A @break@ statement transfers control out of an enclosing statement.
-    Break (Maybe Ident)
+    Break SourceSpan (Maybe Ident)
   | -- | A @continue@ statement may occur only in a while, do, or for statement. Control passes to the loop-continuation
     --   point of that statement.
     Continue (Maybe Ident)
   | -- A @return@ statement returns control to the invoker of a method or constructor.
-    Return (Maybe Exp)
+    Return SourceSpan (Maybe Exp)
   | -- | A @synchronized@ statement acquires a mutual-exclusion lock on behalf of the executing thread, executes a block,
     --   then releases the lock. While the executing thread owns the lock, no other thread may acquire the lock.
     Synchronized Exp Block
