@@ -63,7 +63,7 @@ where
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Language.Java.Lexer (L1 (..), Token (..), lexer)
-import Language.Java.SourceSpan ( Location(..), dummyLocation, locationEof )
+import Language.Java.SourceSpan (Location (..), dummyLocation, locationEof)
 import Language.Java.Syntax
 import Text.Parsec
   ( ParseError,
@@ -1241,9 +1241,10 @@ methodRef :: P (Exp, Location)
 methodRef = do
   n <- noLoc name
   tok MethodRefSep
-  mapFst (MethodRef n) <$>
-    (attrTok KW_New MethodRefConstructor
-      <|> (mapFst MethodRefIdent <$> ident))
+  mapFst (MethodRef n)
+    <$> ( attrTok KW_New MethodRefConstructor
+            <|> (mapFst MethodRefIdent <$> ident)
+        )
 
 {-
 instanceCreation =

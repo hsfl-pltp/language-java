@@ -1,16 +1,16 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Language.Java.SourceSpan 
+module Language.Java.SourceSpan
   ( Location (..),
     SourceSpan,
     dummyLocation,
     dummySourceSpan,
     locationEof,
-    isEof
-  ) 
+    isEof,
+  )
 where
-    
+
 import Data.Data
 import GHC.Generics (Generic)
 
@@ -21,7 +21,7 @@ data Location = Location
     loc_line :: Int,
     loc_column :: Int
   }
-  deriving (Eq, Show, Read, Typeable, Generic, Data)
+  deriving (Eq, Ord, Show, Read, Typeable, Generic, Data)
 
 dummyLocation :: Location
 dummyLocation = Location "<input>" 1 1
