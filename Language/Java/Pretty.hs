@@ -591,11 +591,11 @@ ppResultType p (Just a) = prettyPrec p a
 -- Names and identifiers
 
 instance Pretty Name where
-  prettyPrec p (Name is) =
+  prettyPrec p (Name _ is) =
     hcat (punctuate (char '.') $ map (prettyPrec p) is)
 
 instance Pretty Ident where
-  prettyPrec p (Ident s) = text s
+  prettyPrec p (Ident _ s) = text s
 
 -----------------------------------------------------------------------
 -- Help functionality

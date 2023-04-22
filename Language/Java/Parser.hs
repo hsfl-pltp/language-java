@@ -63,6 +63,7 @@ where
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Language.Java.Lexer (L1 (..), Token (..), lexer)
+import Language.Java.SourceSpan ( Location(..), dummyLocation, locationEof )
 import Language.Java.Syntax
 import Text.Parsec
   ( ParseError,
@@ -1634,16 +1635,18 @@ refTypeArgs = noLoc $ angles refTypeList
 
 name :: P (Name, Location)
 name = do
+  startLoc <- getLocation
   n <- seplist1 ident period
   let idents = map fst n
       endLoc = snd (last n)
-  return (Name idents, endLoc)
+  return (Name (startLoc, endLoc) idents, endLoc)
 
 ident :: P (Ident, Location)
 ident = do
+  startLoc <- getLocation
   loc <- getEndLoc
   i <- javaToken $ \case
-    IdentTok s -> Just (Ident s)
+    IdentTok s -> Just (Ident (startLoc, loc) s)
     _ -> Nothing
   return (i, loc)
 

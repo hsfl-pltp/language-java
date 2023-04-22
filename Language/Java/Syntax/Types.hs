@@ -5,6 +5,7 @@ module Language.Java.Syntax.Types where
 
 import Data.Data
 import GHC.Generics (Generic)
+import Language.Java.SourceSpan (SourceSpan)
 
 -- | There are two kinds of types in the Java programming language: primitive types and reference types.
 data Type
@@ -70,9 +71,15 @@ data TypeParam = TypeParam Ident [RefType]
 -- Names and identifiers
 
 -- | A single identifier.
-data Ident = Ident String
-  deriving (Eq, Ord, Show, Read, Typeable, Generic, Data)
+data Ident = Ident SourceSpan String
+  deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Ord Ident where
+  Ident _ s1 <= Ident _ s2 = s1 <= s2 
 
 -- | A name, i.e. a period-separated list of identifiers.
-data Name = Name [Ident]
-  deriving (Eq, Ord, Show, Read, Typeable, Generic, Data)
+data Name = Name SourceSpan [Ident]
+  deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Ord Name where
+  Name _ l1 <= Name _ l2 = l1 <= l2
