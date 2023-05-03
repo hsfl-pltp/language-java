@@ -83,3 +83,9 @@ data Name = Name SourceSpan [Ident]
 
 instance Eq Name where
   Name _ l1 == Name _ l2 = l1 == l2
+
+data ClassifiedName
+  = ExpressionName Name
+  | TypeName Name
+  | PackageName Name
+  deriving (Eq, Ord, Show, Read, Typeable, Generic, Data)
