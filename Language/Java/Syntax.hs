@@ -59,12 +59,14 @@ module Language.Java.Syntax
     module Language.Java.Syntax.Types,
     Parsed,
     Analyzed,
+    Equality (eq, eqList),
   )
 where
 
 import Data.Data
 import GHC.Generics (Generic)
 import Language.Java.SourceSpan
+import Language.Java.Syntax.Equality
 import Language.Java.Syntax.Exp
 import Language.Java.Syntax.Types
 
@@ -523,39 +525,13 @@ data Modifier p
   | Sealed
   deriving (Typeable, Generic)
 
-instance Show (Modifier Analyzed) where
-  show (Public _) = "public"
-  show Private = "private"
-  show Protected = "protected"
-  show (Abstract _) = "abstract"
-  show Final = "final"
-  show Static = "static"
-  show StrictFP = "strictfp"
-  show Transient = "transient"
-  show Volatile = "volatile"
-  show Native = "native"
-  show (Annotation a) = show a
-  show Synchronized_ = "synchronized"
-  show Sealed = "sealed"
-
-instance Show (Modifier Parsed) where
-  show (Public _) = "public"
-  show Private = "private"
-  show Protected = "protected"
-  show (Abstract _) = "abstract"
-  show Final = "final"
-  show Static = "static"
-  show StrictFP = "strictfp"
-  show Transient = "transient"
-  show Volatile = "volatile"
-  show Native = "native"
-  show (Annotation a) = show a
-  show Synchronized_ = "synchronized"
-  show Sealed = "sealed"
-
 deriving instance Eq (Modifier Analyzed)
 
 deriving instance Eq (Modifier Parsed)
+
+deriving instance Show (Modifier Analyzed)
+
+deriving instance Show (Modifier Parsed)
 
 deriving instance Read (Modifier Analyzed)
 

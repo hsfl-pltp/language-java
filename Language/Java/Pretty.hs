@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 
 module Language.Java.Pretty where
@@ -185,7 +186,18 @@ instance Pretty (ExplConstrInv p) where
 
 instance Pretty (Modifier p) where
   prettyPrec p (Annotation ann) = prettyPrec p ann $+$ nest (-1) (text "")
-  prettyPrec p mod = text . map toLower $ show mod
+  prettyPrec p (Public _) = text "public"
+  prettyPrec p Private = text "private"
+  prettyPrec p Protected = text "protected"
+  prettyPrec p (Abstract _) = text "abstract"
+  prettyPrec p Final = text "final"
+  prettyPrec p Static = text "static"
+  prettyPrec p StrictFP = text "strictfp"
+  prettyPrec p Transient = text "transient"
+  prettyPrec p Volatile = text "volatile"
+  prettyPrec p Native = text "native"
+  prettyPrec p Synchronized_ = text "synchronized"
+  prettyPrec p Sealed = text "sealed"
 
 instance Pretty (Annotation p) where
   prettyPrec p x =
@@ -453,7 +465,7 @@ instance Pretty (FieldAccess p) where
   prettyPrec p (ClassFieldAccess name ident) =
     prettyPrec p name <> text "." <> prettyPrec p ident
 
-instance Pretty (MethodInvocation p) where
+instance Pretty (MethodInvocation Parsed) where
   prettyPrec :: Int -> MethodInvocation p -> Doc
   prettyPrec p (MethodCall mName methodId args) =
     case mName of
