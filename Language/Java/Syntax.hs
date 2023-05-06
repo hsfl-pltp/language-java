@@ -53,6 +53,7 @@ module Language.Java.Syntax
     MethodRefTarget (..),
     module Language.Java.Syntax.Exp,
     module Language.Java.Syntax.Types,
+    module Language.Java.Syntax.Equality,
   )
 where
 
