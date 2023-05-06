@@ -69,9 +69,13 @@ import Language.Java.Syntax.Types
 data CompilationUnit = CompilationUnit (Maybe PackageDecl) [ImportDecl] [TypeDecl]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located CompilationUnit
+
 -- | A package declaration appears within a compilation unit to indicate the package to which the compilation unit belongs.
 newtype PackageDecl = PackageDecl Name
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located PackageDecl
 
 -- | An import declaration allows a static member or a named type to be referred to by a single unqualified identifier.
 --   The first argument signals whether the declaration only imports static members.
@@ -80,6 +84,9 @@ newtype PackageDecl = PackageDecl Name
 data ImportDecl
   = ImportDecl SourceSpan Bool {- static? -} Name Bool {- .*? -}
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located ImportDecl where
+  sourceSpan (ImportDecl s _ _ _) = s
 
 -----------------------------------------------------------------------
 -- Declarations
@@ -90,12 +97,19 @@ data TypeDecl
   | InterfaceTypeDecl InterfaceDecl
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located TypeDecl
+
 -- | A class declaration specifies a new named reference type.
 data ClassDecl
   = ClassDecl SourceSpan [Modifier] Ident [TypeParam] (Maybe RefType) [RefType] ClassBody
   | RecordDecl SourceSpan [Modifier] Ident [TypeParam] [RecordFieldDecl] [RefType] ClassBody
   | EnumDecl SourceSpan [Modifier] Ident [RefType] EnumBody
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located ClassDecl where
+  sourceSpan (ClassDecl s _ _ _ _ _ _) = s
+  sourceSpan (RecordDecl s _ _ _ _ _ _) = s
+  sourceSpan (EnumDecl s _ _ _ _) = s
 
 -- | A class body may contain declarations of members of the class, that is,
 --   fields, classes, interfaces and methods.
@@ -104,13 +118,19 @@ data ClassDecl
 newtype ClassBody = ClassBody [Decl]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located ClassBody
+
 -- | The body of an enum type may contain enum constants.
 data EnumBody = EnumBody [EnumConstant] [Decl]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located EnumBody
+
 -- | An enum constant defines an instance of the enum type.
 data EnumConstant = EnumConstant Ident [Argument] (Maybe ClassBody)
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located EnumConstant
 
 -- | An interface declaration introduces a new reference type whose members
 --   are classes, interfaces, constants and abstract methods. This type has
@@ -120,14 +140,21 @@ data InterfaceDecl
   = InterfaceDecl SourceSpan InterfaceKind [Modifier] Ident [TypeParam] [RefType {- extends -}] [RefType {- permits -}] InterfaceBody
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located InterfaceDecl where
+  sourceSpan (InterfaceDecl s _ _ _ _ _ _ _) = s
+
 -- | Interface can declare either a normal interface or an annotation
 data InterfaceKind = InterfaceNormal | InterfaceAnnotation
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located InterfaceKind
 
 -- | The body of an interface may declare members of the interface.
 newtype InterfaceBody
   = InterfaceBody [MemberDecl]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located InterfaceBody
 
 -- | A declaration is either a member declaration, or a declaration of an
 --   initializer, which may be static.
@@ -135,6 +162,8 @@ data Decl
   = MemberDecl MemberDecl
   | InitDecl Bool Block
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located Decl
 
 -- | A class or interface member can be an inner class or interface, a field or
 --   constant, or a method or constructor. An interface may only have as members
@@ -152,15 +181,26 @@ data MemberDecl
     MemberInterfaceDecl InterfaceDecl
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located MemberDecl where
+  sourceSpan (FieldDecl s _ _ _) = s
+  sourceSpan (MethodDecl s _ _ _ _ _ _ _ _) = s
+  sourceSpan (ConstructorDecl s _ _ _ _ _ _) = s
+  sourceSpan _ = dummySourceSpan
+
 -- | A field declaration of a record
 data RecordFieldDecl
   = RecordFieldDecl Type Ident
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located RecordFieldDecl
+
 -- | A declaration of a variable, which may be explicitly initialized.
 data VarDecl
   = VarDecl SourceSpan VarDeclId (Maybe VarInit)
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located VarDecl where
+  sourceSpan (VarDecl s _ _) = s
 
 -- | The name of a variable in a declaration, which may be an array.
 data VarDeclId
@@ -169,11 +209,17 @@ data VarDeclId
     VarDeclArray SourceSpan VarDeclId
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located VarDeclId where
+  sourceSpan (VarDeclArray s _) = s
+  sourceSpan _ = dummySourceSpan
+
 -- | Explicit initializer for a variable declaration.
 data VarInit
   = InitExp Exp
   | InitArray ArrayInit
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located VarInit
 
 -- | A formal parameter in method declaration. The last parameter
 --   for a given declaration may be marked as variable arity,
@@ -181,15 +227,22 @@ data VarInit
 data FormalParam = FormalParam SourceSpan [Modifier] Type Bool VarDeclId
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located FormalParam where
+  sourceSpan (FormalParam s _ _ _ _) = s
+
 -- | A method body is either a block of code that implements the method or simply a
 --   semicolon, indicating the lack of an implementation (modelled by 'Nothing').
 newtype MethodBody = MethodBody (Maybe Block)
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located MethodBody
+
 -- | The first statement of a constructor body may be an explicit invocation of
 --   another constructor of the same class or of the direct superclass.
 data ConstructorBody = ConstructorBody (Maybe ExplConstrInv) [BlockStmt]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located ConstructorBody
 
 -- | An explicit constructor invocation invokes another constructor of the
 --   same class, or a constructor of the direct superclass, which may
@@ -200,6 +253,8 @@ data ExplConstrInv
   | SuperInvoke [RefType] [Argument]
   | PrimarySuperInvoke Exp [RefType] [Argument]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located ExplConstrInv
 
 -- | A modifier specifying properties of a given declaration. In general only
 --   a few of these modifiers are allowed for each declaration type, for instance
@@ -235,6 +290,11 @@ instance Show Modifier where
   show Synchronized_ = "synchronized"
   show Sealed = "sealed"
 
+instance Located Modifier where
+  sourceSpan (Public s) = s
+  sourceSpan (Abstract s) = s
+  sourceSpan _ = dummySourceSpan
+
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation
   = NormalAnnotation
@@ -253,14 +313,19 @@ data Annotation
       }
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
-desugarAnnotation (MarkerAnnotation span n) = (span, n, [])
--- TODO: check span for ident
-desugarAnnotation (SingleElementAnnotation span n e) = (span, n, [(Ident dummySourceSpan "value", e)])
-desugarAnnotation (NormalAnnotation span n kv) = (span, n, kv)
+instance Located Annotation where
+  sourceSpan (NormalAnnotation s _ _) = s
+  sourceSpan (SingleElementAnnotation s _ _) = s
+  sourceSpan (MarkerAnnotation s _) = s
 
-desugarAnnotation' (MarkerAnnotation span n) = NormalAnnotation span n []
+desugarAnnotation (MarkerAnnotation s n) = (s, n, [])
 -- TODO: check span for ident
-desugarAnnotation' (SingleElementAnnotation span n e) = NormalAnnotation span n [(Ident dummySourceSpan "value", e)]
+desugarAnnotation (SingleElementAnnotation s n e) = (s, n, [(Ident dummySourceSpan "value", e)])
+desugarAnnotation (NormalAnnotation s n kv) = (s, n, kv)
+
+desugarAnnotation' (MarkerAnnotation s n) = NormalAnnotation s n []
+-- TODO: check span for ident
+desugarAnnotation' (SingleElementAnnotation s n e) = NormalAnnotation s n [(Ident dummySourceSpan "value", e)]
 desugarAnnotation' normal = normal
 
 -- | Annotations may contain  annotations or (loosely) expressions
@@ -269,13 +334,17 @@ data ElementValue
   | EVAnn Annotation
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located ElementValue
+
 -----------------------------------------------------------------------
 -- Statements
 
 -- | A block is a sequence of statements, local class declarations
 --   and local variable declaration statements within braces.
-data Block = Block [BlockStmt]
+newtype Block = Block [BlockStmt]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located Block
 
 -- | A block statement is either a normal statement, a local
 --   class declaration or a local variable declaration.
@@ -284,6 +353,11 @@ data BlockStmt
   | LocalClass ClassDecl
   | LocalVars SourceSpan [Modifier] Type [VarDecl]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located BlockStmt where
+  sourceSpan (BlockStmt s _) = s
+  sourceSpan (LocalVars s _ _ _) = s
+  sourceSpan _ = dummySourceSpan
 
 -- | A Java statement.
 data Stmt
@@ -334,10 +408,25 @@ data Stmt
     Labeled Ident Stmt
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located Stmt where
+  sourceSpan (IfThen s _ _) = s
+  sourceSpan (IfThenElse s _ _ _) = s
+  sourceSpan (While s _ _) = s
+  sourceSpan (BasicFor s _ _ _ _) = s
+  sourceSpan (EnhancedFor s _ _ _ _ _) = s
+  sourceSpan (ExpStmt s _) = s
+  sourceSpan (Do s _ _) = s
+  sourceSpan (Break s _) = s
+  sourceSpan (Return s _) = s
+  sourceSpan (Try s _ _ _ _) = s
+  sourceSpan _ = dummySourceSpan
+
 -- | If a value is thrown and the try statement has one or more catch clauses that can catch it, then control will be
 --   transferred to the first such catch clause.
 data Catch = Catch FormalParam Block
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located Catch
 
 data TryResource
   = TryResourceVarDecl ResourceDecl
@@ -345,14 +434,21 @@ data TryResource
   | TryResourceQualAccess FieldAccess
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located TryResource
+
 data ResourceDecl
   = ResourceDecl [Modifier] Type VarDeclId VarInit
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located ResourceDecl
 
 -- | A block of code labelled with a @case@ or @default@ within a @switch@ statement.
 data SwitchBlock
   = SwitchBlock SourceSpan SwitchLabel [BlockStmt]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located SwitchBlock where
+  sourceSpan (SwitchBlock s _ _) = s
 
 data SwitchStyle
   = SwitchOldStyle
@@ -367,20 +463,28 @@ data SwitchLabel
   | Default
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located SwitchLabel
+
 data SwitchExpBranch
   = SwitchExpBranch SwitchLabel SwitchExpBranchBody
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located SwitchExpBranch
 
 data SwitchExpBranchBody
   = SwitchExpBranchExp Exp
   | SwitchExpBranchBlock [BlockStmt]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located SwitchExpBranchBody
+
 -- | Initialization code for a basic @for@ statement.
 data ForInit
   = ForLocalVars [Modifier] Type [VarDecl]
   | ForInitExps [Exp]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located ForInit
 
 -- | An exception type has to be a class type or a type variable.
 type ExceptionType = RefType -- restricted to ClassType or TypeVariable
@@ -462,6 +566,15 @@ data Exp
     SwitchExp Exp [SwitchExpBranch]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located Exp where
+  sourceSpan (PostIncrement s _) = s
+  sourceSpan (PostDecrement s _) = s
+  sourceSpan (PreIncrement s _) = s
+  sourceSpan (PreDecrement s _) = s
+  sourceSpan (Cond s _ _ _) = s
+  sourceSpan (Assign s _ _ _) = s
+  sourceSpan _ = dummySourceSpan
+
 -- | The left-hand side of an assignment expression. This operand may be a named variable, such as a local
 --   variable or a field of the current object or class, or it may be a computed variable, as can result from
 --   a field access or an array access.
@@ -474,11 +587,15 @@ data Lhs
     ArrayLhs ArrayIndex
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located Lhs
+
 -- | Array access
 data ArrayIndex
   = -- | Index into an array
     ArrayIndex Exp [Exp]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located ArrayIndex
 
 -- | A field access expression may access a field of an object or array, a reference to which is the value
 --   of either an expression or the special keyword super.
@@ -491,6 +608,8 @@ data FieldAccess
     ClassFieldAccess Name Ident
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located FieldAccess
+
 -- ¦ A lambda parameter can be a single parameter, or mulitple formal or mulitple inferred parameters
 data LambdaParams
   = LambdaSingleParam Ident
@@ -498,11 +617,15 @@ data LambdaParams
   | LambdaInferredParams [Ident]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located LambdaParams
+
 -- | Lambda expression, starting from java 8
 data LambdaExpression
   = LambdaExpression Exp
   | LambdaBlock Block
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located LambdaExpression
 
 -- | A method invocation expression is used to invoke a class or instance method.
 data MethodInvocation
@@ -518,13 +641,19 @@ data MethodInvocation
     TypeMethodCall Name [RefType] Ident [Argument]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
 
+instance Located MethodInvocation
+
 -- | An array initializer may be specified in a declaration, or as part of an array creation expression, creating an
 --   array and providing some initial values
-data ArrayInit
+newtype ArrayInit
   = ArrayInit [VarInit]
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located ArrayInit
 
 data MethodRefTarget
   = MethodRefIdent Ident
   | MethodRefConstructor
   deriving (Eq, Show, Read, Typeable, Generic, Data)
+
+instance Located MethodRefTarget
