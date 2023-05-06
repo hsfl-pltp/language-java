@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Language.Java.SourceSpan
   ( Location (..),
     SourceSpan,
-    Localized (..),
+    Located (..),
     dummyLocation,
     dummySourceSpan,
     locationEof,
@@ -14,6 +15,7 @@ where
 
 import Data.Data
 import GHC.Generics (Generic)
+import Language.Java.Syntax.Equality (EqOptions (..), Equality (..))
 
 type SourceSpan = (Location, Location)
 
@@ -36,5 +38,9 @@ locationEof = Location "" 0 0
 isEof :: Location -> Bool
 isEof loc = loc == locationEof
 
-class Localized a where
-  sourcespan :: a -> SourceSpan
+class Located a where
+  sourceSpan :: a -> SourceSpan
+
+instance Equality SourceSpan where
+  eq IgnoreSourceSpan _ _ = True
+  eq IncludeSourceSpan s1 s2 = s1 == s2
