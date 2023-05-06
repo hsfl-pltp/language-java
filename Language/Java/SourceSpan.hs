@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 module Language.Java.SourceSpan
   ( Location (..),
@@ -37,6 +36,6 @@ locationEof = Location "" 0 0
 isEof :: Location -> Bool
 isEof loc = loc == locationEof
 
-instance Equality SourceSpan where
+instance Equality Location where
   eq IgnoreSourceSpan _ _ = True
-  eq IncludeSourceSpan s1 s2 = s1 == s2
+  eq IncludeSourceSpan l1 l2 = l1 == l2
