@@ -5,7 +5,6 @@
 module Language.Java.SourceSpan
   ( Location (..),
     SourceSpan,
-    Located (..),
     dummyLocation,
     dummySourceSpan,
     locationEof,
@@ -37,9 +36,6 @@ locationEof = Location "" 0 0
 
 isEof :: Location -> Bool
 isEof loc = loc == locationEof
-
-class Located a where
-  sourceSpan :: a -> SourceSpan
 
 instance Equality SourceSpan where
   eq IgnoreSourceSpan _ _ = True
