@@ -32,6 +32,10 @@ class Pretty a where
 
 class Pretty (XNameClassification x) => PrettyExtension x
 
+instance PrettyExtension Parsed
+
+instance PrettyExtension Analyzed
+
 -----------------------------------------------------------------------
 -- Packages
 
@@ -620,6 +624,11 @@ ppResultType p (Just a) = prettyPrec p a
 instance Pretty Name where
   prettyPrec p (Name _ is) =
     hcat (punctuate (char '.') $ map (prettyPrec p) is)
+
+instance Pretty ClassifiedName where
+  prettyPrec p (ExpressionName name) = prettyPrec p name
+  prettyPrec p (TypeName name) = prettyPrec p name
+  prettyPrec p (PackageName name) = prettyPrec p name
 
 instance Pretty Ident where
   prettyPrec p (Ident _ s) = text s

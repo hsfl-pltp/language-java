@@ -81,13 +81,31 @@ data Parsed
 data Analyzed
   deriving (Data)
 
+-- type family classes
+
 class Show (XNameClassification x) => ShowExtension x
+
+instance ShowExtension Parsed
+
+instance ShowExtension Analyzed
 
 class Read (XNameClassification x) => ReadExtension x
 
+instance ReadExtension Parsed
+
+instance ReadExtension Analyzed
+
 class (Data x, Data (XNameClassification x)) => DataExtension x
 
+instance DataExtension Parsed
+
+instance DataExtension Analyzed
+
 class Equality (XNameClassification x) => EqualityExtension x
+
+instance EqualityExtension Parsed
+
+instance EqualityExtension Analyzed
 
 -----------------------------------------------------------------------
 -- Packages
