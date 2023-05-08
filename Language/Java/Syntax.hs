@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -59,6 +60,7 @@ module Language.Java.Syntax
     module Language.Java.Syntax.Types,
     Parsed,
     Analyzed,
+    XNameClassification,
   )
 where
 
@@ -77,6 +79,14 @@ data Parsed
 data Analyzed
   deriving (Data)
 
+class Eq (XNameClassification x) => EqExtension x
+
+class Show (XNameClassification x) => ShowExtension x
+
+class Read (XNameClassification x) => ReadExtension x
+
+class (Data x, Data (XNameClassification x)) => DataExtension x
+
 -----------------------------------------------------------------------
 -- Packages
 
@@ -84,41 +94,25 @@ data Analyzed
 data CompilationUnit p = CompilationUnit (Maybe (PackageDecl p)) [ImportDecl p] [TypeDecl p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (CompilationUnit Analyzed)
+deriving instance EqExtension p => Eq (CompilationUnit p)
 
-deriving instance Eq (CompilationUnit Parsed)
+deriving instance ShowExtension p => Show (CompilationUnit p)
 
-deriving instance Show (CompilationUnit Analyzed)
+deriving instance ReadExtension p => Read (CompilationUnit p)
 
-deriving instance Show (CompilationUnit Parsed)
-
-deriving instance Read (CompilationUnit Analyzed)
-
-deriving instance Read (CompilationUnit Parsed)
-
-deriving instance Data (CompilationUnit Analyzed)
-
-deriving instance Data (CompilationUnit Parsed)
+deriving instance DataExtension p => Data (CompilationUnit p)
 
 -- | A package declaration appears within a compilation unit to indicate the package to which the compilation unit belongs.
 newtype PackageDecl p = PackageDecl Name
   deriving (Typeable, Generic)
 
-deriving instance Eq (PackageDecl Analyzed)
+deriving instance EqExtension p => Eq (PackageDecl p)
 
-deriving instance Eq (PackageDecl Parsed)
+deriving instance ShowExtension p => Show (PackageDecl p)
 
-deriving instance Show (PackageDecl Analyzed)
+deriving instance ReadExtension p => Read (PackageDecl p)
 
-deriving instance Show (PackageDecl Parsed)
-
-deriving instance Read (PackageDecl Analyzed)
-
-deriving instance Read (PackageDecl Parsed)
-
-deriving instance Data (PackageDecl Analyzed)
-
-deriving instance Data (PackageDecl Parsed)
+deriving instance DataExtension p => Data (PackageDecl p)
 
 -- | An import declaration allows a static member or a named type to be referred to by a single unqualified identifier.
 --   The first argument signals whether the declaration only imports static members.
@@ -128,21 +122,13 @@ data ImportDecl p
   = ImportDecl SourceSpan Bool {- static? -} Name Bool {- .*? -}
   deriving (Typeable, Generic)
 
-deriving instance Eq (ImportDecl Analyzed)
+deriving instance EqExtension p => Eq (ImportDecl p)
 
-deriving instance Eq (ImportDecl Parsed)
+deriving instance ShowExtension p => Show (ImportDecl p)
 
-deriving instance Show (ImportDecl Analyzed)
+deriving instance ReadExtension p => Read (ImportDecl p)
 
-deriving instance Show (ImportDecl Parsed)
-
-deriving instance Read (ImportDecl Analyzed)
-
-deriving instance Read (ImportDecl Parsed)
-
-deriving instance Data (ImportDecl Analyzed)
-
-deriving instance Data (ImportDecl Parsed)
+deriving instance DataExtension p => Data (ImportDecl p)
 
 -----------------------------------------------------------------------
 -- Declarations
@@ -153,21 +139,13 @@ data TypeDecl p
   | InterfaceTypeDecl (InterfaceDecl p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (TypeDecl Analyzed)
+deriving instance EqExtension p => Eq (TypeDecl p)
 
-deriving instance Eq (TypeDecl Parsed)
+deriving instance ShowExtension p => Show (TypeDecl p)
 
-deriving instance Show (TypeDecl Analyzed)
+deriving instance ReadExtension p => Read (TypeDecl p)
 
-deriving instance Show (TypeDecl Parsed)
-
-deriving instance Read (TypeDecl Analyzed)
-
-deriving instance Read (TypeDecl Parsed)
-
-deriving instance Data (TypeDecl Analyzed)
-
-deriving instance Data (TypeDecl Parsed)
+deriving instance DataExtension p => Data (TypeDecl p)
 
 -- | A class declaration specifies a new named reference type.
 data ClassDecl p
@@ -176,21 +154,13 @@ data ClassDecl p
   | EnumDecl SourceSpan [Modifier p] Ident [RefType] (EnumBody p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (ClassDecl Analyzed)
+deriving instance EqExtension p => Eq (ClassDecl p)
 
-deriving instance Eq (ClassDecl Parsed)
+deriving instance ShowExtension p => Show (ClassDecl p)
 
-deriving instance Show (ClassDecl Analyzed)
+deriving instance ReadExtension p => Read (ClassDecl p)
 
-deriving instance Show (ClassDecl Parsed)
-
-deriving instance Read (ClassDecl Analyzed)
-
-deriving instance Read (ClassDecl Parsed)
-
-deriving instance Data (ClassDecl Analyzed)
-
-deriving instance Data (ClassDecl Parsed)
+deriving instance DataExtension p => Data (ClassDecl p)
 
 -- | A class body may contain declarations of members of the class, that is,
 --   fields, classes, interfaces and methods.
@@ -199,61 +169,37 @@ deriving instance Data (ClassDecl Parsed)
 newtype ClassBody p = ClassBody [Decl p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (ClassBody Analyzed)
+deriving instance EqExtension p => Eq (ClassBody p)
 
-deriving instance Eq (ClassBody Parsed)
+deriving instance ShowExtension p => Show (ClassBody p)
 
-deriving instance Show (ClassBody Analyzed)
+deriving instance ReadExtension p => Read (ClassBody p)
 
-deriving instance Show (ClassBody Parsed)
-
-deriving instance Read (ClassBody Analyzed)
-
-deriving instance Read (ClassBody Parsed)
-
-deriving instance Data (ClassBody Analyzed)
-
-deriving instance Data (ClassBody Parsed)
+deriving instance DataExtension p => Data (ClassBody p)
 
 -- | The body of an enum type may contain enum constants.
 data EnumBody p = EnumBody [EnumConstant p] [Decl p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (EnumBody Analyzed)
+deriving instance EqExtension p => Eq (EnumBody p)
 
-deriving instance Eq (EnumBody Parsed)
+deriving instance ShowExtension p => Show (EnumBody p)
 
-deriving instance Show (EnumBody Analyzed)
+deriving instance ReadExtension p => Read (EnumBody p)
 
-deriving instance Show (EnumBody Parsed)
-
-deriving instance Read (EnumBody Analyzed)
-
-deriving instance Read (EnumBody Parsed)
-
-deriving instance Data (EnumBody Analyzed)
-
-deriving instance Data (EnumBody Parsed)
+deriving instance DataExtension p => Data (EnumBody p)
 
 -- | An enum constant defines an instance of the enum type.
 data EnumConstant p = EnumConstant Ident [Argument p] (Maybe (ClassBody p))
   deriving (Typeable, Generic)
 
-deriving instance Eq (EnumConstant Analyzed)
+deriving instance EqExtension p => Eq (EnumConstant p)
 
-deriving instance Eq (EnumConstant Parsed)
+deriving instance ShowExtension p => Show (EnumConstant p)
 
-deriving instance Show (EnumConstant Analyzed)
+deriving instance ReadExtension p => Read (EnumConstant p)
 
-deriving instance Show (EnumConstant Parsed)
-
-deriving instance Read (EnumConstant Analyzed)
-
-deriving instance Read (EnumConstant Parsed)
-
-deriving instance Data (EnumConstant Analyzed)
-
-deriving instance Data (EnumConstant Parsed)
+deriving instance DataExtension p => Data (EnumConstant p)
 
 -- | An interface declaration introduces a new reference type whose members
 --   are classes, interfaces, constants and abstract methods. This type has
@@ -263,21 +209,13 @@ data InterfaceDecl p
   = InterfaceDecl SourceSpan InterfaceKind [Modifier p] Ident [TypeParam] [RefType {- extends -}] [RefType {- permits -}] (InterfaceBody p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (InterfaceDecl Analyzed)
+deriving instance EqExtension p => Eq (InterfaceDecl p)
 
-deriving instance Eq (InterfaceDecl Parsed)
+deriving instance ShowExtension p => Show (InterfaceDecl p)
 
-deriving instance Show (InterfaceDecl Analyzed)
+deriving instance ReadExtension p => Read (InterfaceDecl p)
 
-deriving instance Show (InterfaceDecl Parsed)
-
-deriving instance Read (InterfaceDecl Analyzed)
-
-deriving instance Read (InterfaceDecl Parsed)
-
-deriving instance Data (InterfaceDecl Analyzed)
-
-deriving instance Data (InterfaceDecl Parsed)
+deriving instance DataExtension p => Data (InterfaceDecl p)
 
 -- | Interface can declare either a normal interface or an annotation
 data InterfaceKind = InterfaceNormal | InterfaceAnnotation
@@ -288,21 +226,13 @@ newtype InterfaceBody p
   = InterfaceBody [MemberDecl p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (InterfaceBody Analyzed)
+deriving instance EqExtension p => Eq (InterfaceBody p)
 
-deriving instance Eq (InterfaceBody Parsed)
+deriving instance ShowExtension p => Show (InterfaceBody p)
 
-deriving instance Show (InterfaceBody Analyzed)
+deriving instance ReadExtension p => Read (InterfaceBody p)
 
-deriving instance Show (InterfaceBody Parsed)
-
-deriving instance Read (InterfaceBody Analyzed)
-
-deriving instance Read (InterfaceBody Parsed)
-
-deriving instance Data (InterfaceBody Analyzed)
-
-deriving instance Data (InterfaceBody Parsed)
+deriving instance DataExtension p => Data (InterfaceBody p)
 
 -- | A declaration is either a member declaration, or a declaration of an
 --   initializer, which may be static.
@@ -311,21 +241,13 @@ data Decl p
   | InitDecl Bool (Block p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (Decl Analyzed)
+deriving instance EqExtension p => Eq (Decl p)
 
-deriving instance Eq (Decl Parsed)
+deriving instance ShowExtension p => Show (Decl p)
 
-deriving instance Show (Decl Analyzed)
+deriving instance ReadExtension p => Read (Decl p)
 
-deriving instance Show (Decl Parsed)
-
-deriving instance Read (Decl Analyzed)
-
-deriving instance Read (Decl Parsed)
-
-deriving instance Data (Decl Analyzed)
-
-deriving instance Data (Decl Parsed)
+deriving instance DataExtension p => Data (Decl p)
 
 -- | A class or interface member can be an inner class or interface, a field or
 --   constant, or a method or constructor. An interface may only have as members
@@ -343,21 +265,13 @@ data MemberDecl p
     MemberInterfaceDecl (InterfaceDecl p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (MemberDecl Analyzed)
+deriving instance EqExtension p => Eq (MemberDecl p)
 
-deriving instance Eq (MemberDecl Parsed)
+deriving instance ShowExtension p => Show (MemberDecl p)
 
-deriving instance Show (MemberDecl Analyzed)
+deriving instance ReadExtension p => Read (MemberDecl p)
 
-deriving instance Show (MemberDecl Parsed)
-
-deriving instance Read (MemberDecl Analyzed)
-
-deriving instance Read (MemberDecl Parsed)
-
-deriving instance Data (MemberDecl Analyzed)
-
-deriving instance Data (MemberDecl Parsed)
+deriving instance DataExtension p => Data (MemberDecl p)
 
 -- | A field declaration of a record
 data RecordFieldDecl
@@ -369,21 +283,13 @@ data VarDecl p
   = VarDecl SourceSpan VarDeclId (Maybe (VarInit p))
   deriving (Typeable, Generic)
 
-deriving instance Eq (VarDecl Analyzed)
+deriving instance EqExtension p => Eq (VarDecl p)
 
-deriving instance Eq (VarDecl Parsed)
+deriving instance ShowExtension p => Show (VarDecl p)
 
-deriving instance Show (VarDecl Analyzed)
+deriving instance ReadExtension p => Read (VarDecl p)
 
-deriving instance Show (VarDecl Parsed)
-
-deriving instance Read (VarDecl Analyzed)
-
-deriving instance Read (VarDecl Parsed)
-
-deriving instance Data (VarDecl Analyzed)
-
-deriving instance Data (VarDecl Parsed)
+deriving instance DataExtension p => Data (VarDecl p)
 
 -- | The name of a variable in a declaration, which may be an array.
 data VarDeclId
@@ -398,21 +304,13 @@ data VarInit p
   | InitArray (ArrayInit p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (VarInit Analyzed)
+deriving instance EqExtension p => Eq (VarInit p)
 
-deriving instance Eq (VarInit Parsed)
+deriving instance ShowExtension p => Show (VarInit p)
 
-deriving instance Show (VarInit Analyzed)
+deriving instance ReadExtension p => Read (VarInit p)
 
-deriving instance Show (VarInit Parsed)
-
-deriving instance Read (VarInit Analyzed)
-
-deriving instance Read (VarInit Parsed)
-
-deriving instance Data (VarInit Analyzed)
-
-deriving instance Data (VarInit Parsed)
+deriving instance DataExtension p => Data (VarInit p)
 
 -- | A formal parameter in method declaration. The last parameter
 --   for a given declaration may be marked as variable arity,
@@ -420,63 +318,39 @@ deriving instance Data (VarInit Parsed)
 data FormalParam p = FormalParam SourceSpan [Modifier p] Type Bool VarDeclId
   deriving (Typeable, Generic)
 
-deriving instance Eq (FormalParam Analyzed)
+deriving instance EqExtension p => Eq (FormalParam p)
 
-deriving instance Eq (FormalParam Parsed)
+deriving instance ShowExtension p => Show (FormalParam p)
 
-deriving instance Show (FormalParam Analyzed)
+deriving instance ReadExtension p => Read (FormalParam p)
 
-deriving instance Show (FormalParam Parsed)
-
-deriving instance Read (FormalParam Analyzed)
-
-deriving instance Read (FormalParam Parsed)
-
-deriving instance Data (FormalParam Analyzed)
-
-deriving instance Data (FormalParam Parsed)
+deriving instance DataExtension p => Data (FormalParam p)
 
 -- | A method body is either a block of code that implements the method or simply a
 --   semicolon, indicating the lack of an implementation (modelled by 'Nothing').
 newtype MethodBody p = MethodBody (Maybe (Block p))
   deriving (Typeable, Generic)
 
-deriving instance Eq (MethodBody Analyzed)
+deriving instance EqExtension p => Eq (MethodBody p)
 
-deriving instance Eq (MethodBody Parsed)
+deriving instance ShowExtension p => Show (MethodBody p)
 
-deriving instance Show (MethodBody Analyzed)
+deriving instance ReadExtension p => Read (MethodBody p)
 
-deriving instance Show (MethodBody Parsed)
-
-deriving instance Read (MethodBody Analyzed)
-
-deriving instance Read (MethodBody Parsed)
-
-deriving instance Data (MethodBody Analyzed)
-
-deriving instance Data (MethodBody Parsed)
+deriving instance DataExtension p => Data (MethodBody p)
 
 -- | The first statement of a constructor body may be an explicit invocation of
 --   another constructor of the same class or of the direct superclass.
 data ConstructorBody p = ConstructorBody (Maybe (ExplConstrInv p)) [BlockStmt p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (ConstructorBody Analyzed)
+deriving instance EqExtension p => Eq (ConstructorBody p)
 
-deriving instance Eq (ConstructorBody Parsed)
+deriving instance ShowExtension p => Show (ConstructorBody p)
 
-deriving instance Show (ConstructorBody Analyzed)
+deriving instance ReadExtension p => Read (ConstructorBody p)
 
-deriving instance Show (ConstructorBody Parsed)
-
-deriving instance Read (ConstructorBody Analyzed)
-
-deriving instance Read (ConstructorBody Parsed)
-
-deriving instance Data (ConstructorBody Analyzed)
-
-deriving instance Data (ConstructorBody Parsed)
+deriving instance DataExtension p => Data (ConstructorBody p)
 
 -- | An explicit constructor invocation invokes another constructor of the
 --   same class, or a constructor of the direct superclass, which may
@@ -488,21 +362,13 @@ data ExplConstrInv p
   | PrimarySuperInvoke (Exp p) [RefType] [Argument p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (ExplConstrInv Analyzed)
+deriving instance EqExtension p => Eq (ExplConstrInv p)
 
-deriving instance Eq (ExplConstrInv Parsed)
+deriving instance ShowExtension p => Show (ExplConstrInv p)
 
-deriving instance Show (ExplConstrInv Analyzed)
+deriving instance ReadExtension p => Read (ExplConstrInv p)
 
-deriving instance Show (ExplConstrInv Parsed)
-
-deriving instance Read (ExplConstrInv Analyzed)
-
-deriving instance Read (ExplConstrInv Parsed)
-
-deriving instance Data (ExplConstrInv Analyzed)
-
-deriving instance Data (ExplConstrInv Parsed)
+deriving instance DataExtension p => Data (ExplConstrInv p)
 
 -- | A modifier specifying properties of a given declaration. In general only
 --   a few of these modifiers are allowed for each declaration type, for instance
@@ -523,21 +389,13 @@ data Modifier p
   | Sealed
   deriving (Typeable, Generic)
 
-deriving instance Eq (Modifier Analyzed)
+deriving instance EqExtension p => Eq (Modifier p)
 
-deriving instance Eq (Modifier Parsed)
+deriving instance ShowExtension p => Show (Modifier p)
 
-deriving instance Show (Modifier Analyzed)
+deriving instance ReadExtension p => Read (Modifier p)
 
-deriving instance Show (Modifier Parsed)
-
-deriving instance Read (Modifier Analyzed)
-
-deriving instance Read (Modifier Parsed)
-
-deriving instance Data (Modifier Analyzed)
-
-deriving instance Data (Modifier Parsed)
+deriving instance DataExtension p => Data (Modifier p)
 
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation p
@@ -557,21 +415,13 @@ data Annotation p
       }
   deriving (Typeable, Generic)
 
-deriving instance Eq (Annotation Analyzed)
+deriving instance EqExtension p => Eq (Annotation p)
 
-deriving instance Eq (Annotation Parsed)
+deriving instance ShowExtension p => Show (Annotation p)
 
-deriving instance Show (Annotation Analyzed)
+deriving instance ReadExtension p => Read (Annotation p)
 
-deriving instance Show (Annotation Parsed)
-
-deriving instance Read (Annotation Analyzed)
-
-deriving instance Read (Annotation Parsed)
-
-deriving instance Data (Annotation Analyzed)
-
-deriving instance Data (Annotation Parsed)
+deriving instance DataExtension p => Data (Annotation p)
 
 desugarAnnotation (MarkerAnnotation span n) = (span, n, [])
 -- TODO: check span for ident
@@ -589,21 +439,13 @@ data ElementValue p
   | EVAnn (Annotation p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (ElementValue Analyzed)
+deriving instance EqExtension p => Eq (ElementValue p)
 
-deriving instance Eq (ElementValue Parsed)
+deriving instance ShowExtension p => Show (ElementValue p)
 
-deriving instance Show (ElementValue Analyzed)
+deriving instance ReadExtension p => Read (ElementValue p)
 
-deriving instance Show (ElementValue Parsed)
-
-deriving instance Read (ElementValue Analyzed)
-
-deriving instance Read (ElementValue Parsed)
-
-deriving instance Data (ElementValue Analyzed)
-
-deriving instance Data (ElementValue Parsed)
+deriving instance DataExtension p => Data (ElementValue p)
 
 -----------------------------------------------------------------------
 -- Statements
@@ -613,21 +455,13 @@ deriving instance Data (ElementValue Parsed)
 newtype Block p = Block [BlockStmt p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (Block Analyzed)
+deriving instance EqExtension p => Eq (Block p)
 
-deriving instance Eq (Block Parsed)
+deriving instance ShowExtension p => Show (Block p)
 
-deriving instance Show (Block Analyzed)
+deriving instance ReadExtension p => Read (Block p)
 
-deriving instance Show (Block Parsed)
-
-deriving instance Read (Block Analyzed)
-
-deriving instance Read (Block Parsed)
-
-deriving instance Data (Block Analyzed)
-
-deriving instance Data (Block Parsed)
+deriving instance DataExtension p => Data (Block p)
 
 -- | A block statement is either a normal statement, a local
 --   class declaration or a local variable declaration.
@@ -637,21 +471,13 @@ data BlockStmt p
   | LocalVars SourceSpan [Modifier p] Type [VarDecl p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (BlockStmt Analyzed)
+deriving instance EqExtension p => Eq (BlockStmt p)
 
-deriving instance Eq (BlockStmt Parsed)
+deriving instance ShowExtension p => Show (BlockStmt p)
 
-deriving instance Show (BlockStmt Analyzed)
+deriving instance ReadExtension p => Read (BlockStmt p)
 
-deriving instance Show (BlockStmt Parsed)
-
-deriving instance Read (BlockStmt Analyzed)
-
-deriving instance Read (BlockStmt Parsed)
-
-deriving instance Data (BlockStmt Analyzed)
-
-deriving instance Data (BlockStmt Parsed)
+deriving instance DataExtension p => Data (BlockStmt p)
 
 -- | A Java statement.
 data Stmt p
@@ -702,42 +528,26 @@ data Stmt p
     Labeled Ident (Stmt p)
   deriving (Generic, Typeable)
 
-deriving instance Eq (Stmt Analyzed)
+deriving instance EqExtension p => Eq (Stmt p)
 
-deriving instance Eq (Stmt Parsed)
+deriving instance ShowExtension p => Show (Stmt p)
 
-deriving instance Show (Stmt Analyzed)
+deriving instance ReadExtension p => Read (Stmt p)
 
-deriving instance Show (Stmt Parsed)
-
-deriving instance Read (Stmt Analyzed)
-
-deriving instance Read (Stmt Parsed)
-
-deriving instance Data (Stmt Analyzed)
-
-deriving instance Data (Stmt Parsed)
+deriving instance DataExtension p => Data (Stmt p)
 
 -- | If a value is thrown and the try statement has one or more catch clauses that can catch it, then control will be
 --   transferred to the first such catch clause.
 data Catch p = Catch (FormalParam p) (Block p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (Catch Analyzed)
+deriving instance EqExtension p => Eq (Catch p)
 
-deriving instance Eq (Catch Parsed)
+deriving instance ShowExtension p => Show (Catch p)
 
-deriving instance Show (Catch Analyzed)
+deriving instance ReadExtension p => Read (Catch p)
 
-deriving instance Show (Catch Parsed)
-
-deriving instance Read (Catch Analyzed)
-
-deriving instance Read (Catch Parsed)
-
-deriving instance Data (Catch Analyzed)
-
-deriving instance Data (Catch Parsed)
+deriving instance DataExtension p => Data (Catch p)
 
 data TryResource p
   = TryResourceVarDecl (ResourceDecl p)
@@ -745,62 +555,38 @@ data TryResource p
   | TryResourceQualAccess (FieldAccess p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (TryResource Analyzed)
+deriving instance EqExtension p => Eq (TryResource p)
 
-deriving instance Eq (TryResource Parsed)
+deriving instance ShowExtension p => Show (TryResource p)
 
-deriving instance Show (TryResource Analyzed)
+deriving instance ReadExtension p => Read (TryResource p)
 
-deriving instance Show (TryResource Parsed)
-
-deriving instance Read (TryResource Analyzed)
-
-deriving instance Read (TryResource Parsed)
-
-deriving instance Data (TryResource Analyzed)
-
-deriving instance Data (TryResource Parsed)
+deriving instance DataExtension p => Data (TryResource p)
 
 data ResourceDecl p
   = ResourceDecl [Modifier p] Type VarDeclId (VarInit p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (ResourceDecl Analyzed)
+deriving instance EqExtension p => Eq (ResourceDecl p)
 
-deriving instance Eq (ResourceDecl Parsed)
+deriving instance ShowExtension p => Show (ResourceDecl p)
 
-deriving instance Show (ResourceDecl Analyzed)
+deriving instance ReadExtension p => Read (ResourceDecl p)
 
-deriving instance Show (ResourceDecl Parsed)
-
-deriving instance Read (ResourceDecl Analyzed)
-
-deriving instance Read (ResourceDecl Parsed)
-
-deriving instance Data (ResourceDecl Analyzed)
-
-deriving instance Data (ResourceDecl Parsed)
+deriving instance DataExtension p => Data (ResourceDecl p)
 
 -- | A block of code labelled with a @case@ or @default@ within a @switch@ statement.
 data SwitchBlock p
   = SwitchBlock SourceSpan (SwitchLabel p) [BlockStmt p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (SwitchBlock Analyzed)
+deriving instance EqExtension p => Eq (SwitchBlock p)
 
-deriving instance Eq (SwitchBlock Parsed)
+deriving instance ShowExtension p => Show (SwitchBlock p)
 
-deriving instance Show (SwitchBlock Analyzed)
+deriving instance ReadExtension p => Read (SwitchBlock p)
 
-deriving instance Show (SwitchBlock Parsed)
-
-deriving instance Read (SwitchBlock Analyzed)
-
-deriving instance Read (SwitchBlock Parsed)
-
-deriving instance Data (SwitchBlock Analyzed)
-
-deriving instance Data (SwitchBlock Parsed)
+deriving instance DataExtension p => Data (SwitchBlock p)
 
 data SwitchStyle
   = SwitchOldStyle
@@ -815,62 +601,38 @@ data SwitchLabel p
   | Default
   deriving (Typeable, Generic)
 
-deriving instance Eq (SwitchLabel Analyzed)
+deriving instance EqExtension p => Eq (SwitchLabel p)
 
-deriving instance Eq (SwitchLabel Parsed)
+deriving instance ShowExtension p => Show (SwitchLabel p)
 
-deriving instance Show (SwitchLabel Analyzed)
+deriving instance ReadExtension p => Read (SwitchLabel p)
 
-deriving instance Show (SwitchLabel Parsed)
-
-deriving instance Read (SwitchLabel Analyzed)
-
-deriving instance Read (SwitchLabel Parsed)
-
-deriving instance Data (SwitchLabel Analyzed)
-
-deriving instance Data (SwitchLabel Parsed)
+deriving instance DataExtension p => Data (SwitchLabel p)
 
 data SwitchExpBranch p
   = SwitchExpBranch (SwitchLabel p) (SwitchExpBranchBody p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (SwitchExpBranch Analyzed)
+deriving instance EqExtension p => Eq (SwitchExpBranch p)
 
-deriving instance Eq (SwitchExpBranch Parsed)
+deriving instance ShowExtension p => Show (SwitchExpBranch p)
 
-deriving instance Show (SwitchExpBranch Analyzed)
+deriving instance ReadExtension p => Read (SwitchExpBranch p)
 
-deriving instance Show (SwitchExpBranch Parsed)
-
-deriving instance Read (SwitchExpBranch Analyzed)
-
-deriving instance Read (SwitchExpBranch Parsed)
-
-deriving instance Data (SwitchExpBranch Analyzed)
-
-deriving instance Data (SwitchExpBranch Parsed)
+deriving instance DataExtension p => Data (SwitchExpBranch p)
 
 data SwitchExpBranchBody p
   = SwitchExpBranchExp (Exp p)
   | SwitchExpBranchBlock [BlockStmt p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (SwitchExpBranchBody Analyzed)
+deriving instance EqExtension p => Eq (SwitchExpBranchBody p)
 
-deriving instance Eq (SwitchExpBranchBody Parsed)
+deriving instance ShowExtension p => Show (SwitchExpBranchBody p)
 
-deriving instance Show (SwitchExpBranchBody Analyzed)
+deriving instance ReadExtension p => Read (SwitchExpBranchBody p)
 
-deriving instance Show (SwitchExpBranchBody Parsed)
-
-deriving instance Read (SwitchExpBranchBody Analyzed)
-
-deriving instance Read (SwitchExpBranchBody Parsed)
-
-deriving instance Data (SwitchExpBranchBody Analyzed)
-
-deriving instance Data (SwitchExpBranchBody Parsed)
+deriving instance DataExtension p => Data (SwitchExpBranchBody p)
 
 -- | Initialization code for a basic @for@ statement.
 data ForInit p
@@ -878,21 +640,13 @@ data ForInit p
   | ForInitExps [Exp p]
   deriving (Generic, Typeable)
 
-deriving instance Eq (ForInit Analyzed)
+deriving instance EqExtension p => Eq (ForInit p)
 
-deriving instance Eq (ForInit Parsed)
+deriving instance ShowExtension p => Show (ForInit p)
 
-deriving instance Show (ForInit Analyzed)
+deriving instance ReadExtension p => Read (ForInit p)
 
-deriving instance Show (ForInit Parsed)
-
-deriving instance Read (ForInit Analyzed)
-
-deriving instance Read (ForInit Parsed)
-
-deriving instance Data (ForInit Analyzed)
-
-deriving instance Data (ForInit Parsed)
+deriving instance DataExtension p => Data (ForInit p)
 
 -- | An exception type has to be a class type or a type variable.
 type ExceptionType = RefType -- restricted to ClassType or TypeVariable
@@ -974,21 +728,13 @@ data Exp p
     SwitchExp (Exp p) [SwitchExpBranch p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (Exp Analyzed)
+deriving instance EqExtension p => Eq (Exp p)
 
-deriving instance Eq (Exp Parsed)
+deriving instance ShowExtension p => Show (Exp p)
 
-deriving instance Show (Exp Analyzed)
+deriving instance ReadExtension p => Read (Exp p)
 
-deriving instance Show (Exp Parsed)
-
-deriving instance Read (Exp Analyzed)
-
-deriving instance Read (Exp Parsed)
-
-deriving instance Data (Exp Analyzed)
-
-deriving instance Data (Exp Parsed)
+deriving instance DataExtension p => Data (Exp p)
 
 -- | The left-hand side of an assignment expression. This operand may be a named variable, such as a local
 --   variable or a field of the current object or class, or it may be a computed variable, as can result from
@@ -1002,21 +748,13 @@ data Lhs p
     ArrayLhs (ArrayIndex p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (Lhs Analyzed)
+deriving instance EqExtension p => Eq (Lhs p)
 
-deriving instance Eq (Lhs Parsed)
+deriving instance ShowExtension p => Show (Lhs p)
 
-deriving instance Show (Lhs Analyzed)
+deriving instance ReadExtension p => Read (Lhs p)
 
-deriving instance Show (Lhs Parsed)
-
-deriving instance Read (Lhs Analyzed)
-
-deriving instance Read (Lhs Parsed)
-
-deriving instance Data (Lhs Analyzed)
-
-deriving instance Data (Lhs Parsed)
+deriving instance DataExtension p => Data (Lhs p)
 
 -- | Array access
 data ArrayIndex p
@@ -1024,21 +762,13 @@ data ArrayIndex p
     ArrayIndex (Exp p) [Exp p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (ArrayIndex Analyzed)
+deriving instance EqExtension p => Eq (ArrayIndex p)
 
-deriving instance Eq (ArrayIndex Parsed)
+deriving instance ShowExtension p => Show (ArrayIndex p)
 
-deriving instance Show (ArrayIndex Analyzed)
+deriving instance ReadExtension p => Read (ArrayIndex p)
 
-deriving instance Show (ArrayIndex Parsed)
-
-deriving instance Read (ArrayIndex Analyzed)
-
-deriving instance Read (ArrayIndex Parsed)
-
-deriving instance Data (ArrayIndex Analyzed)
-
-deriving instance Data (ArrayIndex Parsed)
+deriving instance DataExtension p => Data (ArrayIndex p)
 
 -- | A field access expression may access a field of an object or array, a reference to which is the value
 --   of either an expression or the special keyword super.
@@ -1051,21 +781,13 @@ data FieldAccess p
     ClassFieldAccess Name Ident
   deriving (Typeable, Generic)
 
-deriving instance Eq (FieldAccess Analyzed)
+deriving instance EqExtension p => Eq (FieldAccess p)
 
-deriving instance Eq (FieldAccess Parsed)
+deriving instance ShowExtension p => Show (FieldAccess p)
 
-deriving instance Show (FieldAccess Analyzed)
+deriving instance ReadExtension p => Read (FieldAccess p)
 
-deriving instance Show (FieldAccess Parsed)
-
-deriving instance Read (FieldAccess Analyzed)
-
-deriving instance Read (FieldAccess Parsed)
-
-deriving instance Data (FieldAccess Analyzed)
-
-deriving instance Data (FieldAccess Parsed)
+deriving instance DataExtension p => Data (FieldAccess p)
 
 -- ¦ A lambda parameter can be a single parameter, or mulitple formal or mulitple inferred parameters
 data LambdaParams p
@@ -1074,21 +796,13 @@ data LambdaParams p
   | LambdaInferredParams [Ident]
   deriving (Typeable, Generic)
 
-deriving instance Eq (LambdaParams Analyzed)
+deriving instance EqExtension p => Eq (LambdaParams p)
 
-deriving instance Eq (LambdaParams Parsed)
+deriving instance ShowExtension p => Show (LambdaParams p)
 
-deriving instance Show (LambdaParams Analyzed)
+deriving instance ReadExtension p => Read (LambdaParams p)
 
-deriving instance Show (LambdaParams Parsed)
-
-deriving instance Read (LambdaParams Analyzed)
-
-deriving instance Read (LambdaParams Parsed)
-
-deriving instance Data (LambdaParams Analyzed)
-
-deriving instance Data (LambdaParams Parsed)
+deriving instance DataExtension p => Data (LambdaParams p)
 
 -- | Lambda expression, starting from java 8
 data LambdaExpression p
@@ -1096,21 +810,13 @@ data LambdaExpression p
   | LambdaBlock (Block p)
   deriving (Typeable, Generic)
 
-deriving instance Eq (LambdaExpression Analyzed)
+deriving instance EqExtension p => Eq (LambdaExpression p)
 
-deriving instance Eq (LambdaExpression Parsed)
+deriving instance ShowExtension p => Show (LambdaExpression p)
 
-deriving instance Show (LambdaExpression Analyzed)
+deriving instance ReadExtension p => Read (LambdaExpression p)
 
-deriving instance Show (LambdaExpression Parsed)
-
-deriving instance Read (LambdaExpression Analyzed)
-
-deriving instance Read (LambdaExpression Parsed)
-
-deriving instance Data (LambdaExpression Analyzed)
-
-deriving instance Data (LambdaExpression Parsed)
+deriving instance DataExtension p => Data (LambdaExpression p)
 
 type family XNameClassification x where
   XNameClassification Analyzed = ClassifiedName
@@ -1130,21 +836,13 @@ data MethodInvocation p
     TypeMethodCall Name [RefType] Ident [Argument p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (MethodInvocation Analyzed)
+deriving instance EqExtension p => Eq (MethodInvocation p)
 
-deriving instance Eq (MethodInvocation Parsed)
+deriving instance ShowExtension p => Show (MethodInvocation p)
 
-deriving instance Show (MethodInvocation Analyzed)
+deriving instance ReadExtension p => Read (MethodInvocation p)
 
-deriving instance Show (MethodInvocation Parsed)
-
-deriving instance Read (MethodInvocation Analyzed)
-
-deriving instance Read (MethodInvocation Parsed)
-
-deriving instance Data (MethodInvocation Analyzed)
-
-deriving instance Data (MethodInvocation Parsed)
+deriving instance DataExtension p => Data (MethodInvocation p)
 
 -- | An array initializer may be specified in a declaration, or as part of an array creation expression, creating an
 --   array and providing some initial values
@@ -1152,21 +850,13 @@ newtype ArrayInit p
   = ArrayInit [VarInit p]
   deriving (Typeable, Generic)
 
-deriving instance Eq (ArrayInit Analyzed)
+deriving instance EqExtension p => Eq (ArrayInit p)
 
-deriving instance Eq (ArrayInit Parsed)
+deriving instance ShowExtension p => Show (ArrayInit p)
 
-deriving instance Show (ArrayInit Analyzed)
+deriving instance ReadExtension p => Read (ArrayInit p)
 
-deriving instance Show (ArrayInit Parsed)
-
-deriving instance Read (ArrayInit Analyzed)
-
-deriving instance Read (ArrayInit Parsed)
-
-deriving instance Data (ArrayInit Analyzed)
-
-deriving instance Data (ArrayInit Parsed)
+deriving instance DataExtension p => Data (ArrayInit p)
 
 data MethodRefTarget
   = MethodRefIdent Ident
