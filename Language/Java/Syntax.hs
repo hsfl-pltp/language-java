@@ -59,14 +59,12 @@ module Language.Java.Syntax
     module Language.Java.Syntax.Types,
     Parsed,
     Analyzed,
-    Equality (eq, eqList),
   )
 where
 
 import Data.Data
 import GHC.Generics (Generic)
 import Language.Java.SourceSpan
-import Language.Java.Syntax.Equality
 import Language.Java.Syntax.Exp
 import Language.Java.Syntax.Types
 

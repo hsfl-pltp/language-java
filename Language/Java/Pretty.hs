@@ -465,8 +465,7 @@ instance Pretty (FieldAccess p) where
   prettyPrec p (ClassFieldAccess name ident) =
     prettyPrec p name <> text "." <> prettyPrec p ident
 
-instance Pretty (MethodInvocation Parsed) where
-  prettyPrec :: Int -> MethodInvocation p -> Doc
+instance Pretty (MethodInvocation Analyzed) where
   prettyPrec p (MethodCall mName methodId args) =
     case mName of
       Nothing -> prettyPrec p methodId <> ppArgs p args
@@ -615,6 +614,11 @@ ppResultType p (Just a) = prettyPrec p a
 instance Pretty Name where
   prettyPrec p (Name _ is) =
     hcat (punctuate (char '.') $ map (prettyPrec p) is)
+
+instance Pretty ClassifiedName where
+  prettyPrec p (ExpressionName name) = prettyPrec p name
+  prettyPrec p (TypeName name) = prettyPrec p name
+  prettyPrec p (PackageName name) = prettyPrec p name
 
 instance Pretty Ident where
   prettyPrec p (Ident _ s) = text s
