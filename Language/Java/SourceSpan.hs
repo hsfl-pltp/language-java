@@ -14,6 +14,7 @@ where
 
 import Data.Data
 import GHC.Generics (Generic)
+import Language.Java.Syntax.Equality (EqOptions (..), Equality (..))
 
 type SourceSpan = (Location, Location)
 
@@ -35,6 +36,10 @@ locationEof = Location "" 0 0
 
 isEof :: Location -> Bool
 isEof loc = loc == locationEof
+
+instance Equality Location where
+  eq IgnoreSourceSpan _ _ = True
+  eq IncludeSourceSpan l1 l2 = l1 == l2
 
 class Located a where
   sourceSpan :: a -> SourceSpan
