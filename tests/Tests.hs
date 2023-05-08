@@ -88,7 +88,7 @@ main = do
         testProperty
           "parsing.generating==id"
           ( \g -> case parserWithState (ParserState ParseFull False) compilationUnit "<input>" (show $ pretty g) of
-              Right g' -> g == g'
+              Right g' -> eq IgnoreSourceSpan g g'
               Left perr -> error (show (pretty g) ++ show perr)
           )
       ]

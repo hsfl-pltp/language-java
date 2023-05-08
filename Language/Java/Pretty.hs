@@ -101,7 +101,11 @@ instance PrettyExtension p => Pretty (InterfaceDecl p) where
   prettyPrec p (InterfaceDecl _ kind mods ident tParams impls permits body) =
     hsep
       [ hsep (map (prettyPrec p) mods),
-        text (if kind == InterfaceNormal then "interface" else "@interface"),
+        text
+          ( case kind of
+              InterfaceNormal -> "interface"
+              InterfaceAnnotation -> "@interface"
+          ),
         prettyPrec p ident,
         ppTypeParams p tParams,
         ppExtends p impls,

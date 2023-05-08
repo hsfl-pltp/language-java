@@ -39,8 +39,9 @@ Library
                         Language.Java.Pretty,
                         Language.Java.SourceSpan
   
-  Other-modules:	    Language.Java.Syntax.Types
-                        Language.Java.Syntax.Exp
+  Other-modules:	      Language.Java.Syntax.Types,
+                        Language.Java.Syntax.Exp,
+                        Language.Java.Syntax.Equality
 
 Test-Suite test-java-parse
   type:              exitcode-stdio-1.0
