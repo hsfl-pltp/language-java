@@ -60,7 +60,7 @@ where
 import Data.Data
 import GHC.Generics (Generic)
 import Language.Java.SourceSpan
-import Language.Java.Syntax.Equality (Equality (..))
+import Language.Java.Syntax.Equality
 import Language.Java.Syntax.Exp
 import Language.Java.Syntax.Types
 
