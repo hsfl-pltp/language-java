@@ -1326,9 +1326,8 @@ methodInvocationNPS =
       mapFst (SuperMethodCall rts i) <$> args
   )
     <|> ( do
-            mq <- opt (noLoc name <* period)
-            i <- noLoc ident
-            mapFst (MethodCall mq i) <$> args
+            (mn, i) <- qualifiedMethodName
+            mapFst (MethodCall mn i) <$> args
         )
     <|> ( do
             n <- noLoc name
@@ -1339,6 +1338,26 @@ methodInvocationNPS =
             let constr = maybe TypeMethodCall (const ClassMethodCall) msp
             mapFst (constr n rts i) <$> args
         )
+
+qualifiedMethodName :: P (Maybe Name, Ident)
+qualifiedMethodName = do
+  startLoc <- getLocation
+  mapFst
+    ( \case
+        ([], _) -> Nothing
+        (is, endLoc) -> Just (Name (startLoc, endLoc) is)
+    )
+    <$> go startLoc []
+  where
+    go :: Location -> [Ident] -> P (([Ident], Location), Ident)
+    go endLoc nids = do
+      (i, loc) <- ident
+      try
+        ( do
+            period
+            go loc (i : nids)
+        )
+        <|> return ((nids, endLoc), i)
 
 methodInvocationSuffix :: P (Exp Parsed -> MethodInvocation Parsed, Location)
 methodInvocationSuffix = do
