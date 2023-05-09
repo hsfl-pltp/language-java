@@ -242,7 +242,7 @@ instance Located MemberDecl where
   sourceSpan (FieldDecl s _ _ _) = s
   sourceSpan (MethodDecl s _ _ _ _ _ _ _ _) = s
   sourceSpan (ConstructorDecl s _ _ _ _ _ _) = s
-  sourceSpan _ = dummySourceSpan
+  sourceSpan memDecl = error ("No So0urceSpan implemented for member declaration: " ++ show memDecl)
 
 -- | A field declaration of a record
 data RecordFieldDecl
@@ -281,7 +281,7 @@ instance Equality VarDeclId where
 
 instance Located VarDeclId where
   sourceSpan (VarDeclArray s _) = s
-  sourceSpan _ = dummySourceSpan
+  sourceSpan vdi = error ("No SourceSpan implemented for variable declaration identifier: " ++ show vdi)
 
 -- | Explicit initializer for a variable declaration.
 data VarInit
@@ -402,7 +402,7 @@ instance Show Modifier where
 instance Located Modifier where
   sourceSpan (Public s) = s
   sourceSpan (Abstract s) = s
-  sourceSpan _ = dummySourceSpan
+  sourceSpan mod = error ("No SourceSpan implemented for Modifier: " ++ show mod)
 
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation
@@ -491,7 +491,7 @@ instance Equality BlockStmt where
 instance Located BlockStmt where
   sourceSpan (BlockStmt s _) = s
   sourceSpan (LocalVars s _ _ _) = s
-  sourceSpan _ = dummySourceSpan
+  sourceSpan blockStmt = error ("No SourceSpan implemented for BlockStatement: " ++ show blockStmt)
 
 -- | A Java statement.
 data Stmt
@@ -591,7 +591,7 @@ instance Located Stmt where
   sourceSpan (Break s _) = s
   sourceSpan (Return s _) = s
   sourceSpan (Try s _ _ _ _) = s
-  sourceSpan _ = dummySourceSpan
+  sourceSpan stmt = error ("No SourceSpan implemented for statement: " ++ show stmt)
 
 -- | If a value is thrown and the try statement has one or more catch clauses that can catch it, then control will be
 --   transferred to the first such catch clause.
@@ -839,7 +839,7 @@ instance Located Exp where
   sourceSpan (PreDecrement s _) = s
   sourceSpan (Cond s _ _ _) = s
   sourceSpan (Assign s _ _ _) = s
-  sourceSpan _ = dummySourceSpan
+  sourceSpan e = error ("No SourceSpan implemented for expression: " ++ show e)
 
 -- | The left-hand side of an assignment expression. This operand may be a named variable, such as a local
 --   variable or a field of the current object or class, or it may be a computed variable, as can result from
