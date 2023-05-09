@@ -75,8 +75,6 @@ instance Equality CompilationUnit where
   eq opt (CompilationUnit mpd1 ids1 tds1) (CompilationUnit mpd2 ids2 tds2) =
     eq opt mpd1 mpd2 && eq opt ids1 ids2 && eq opt tds1 tds2
 
-instance Located CompilationUnit
-
 -- | A package declaration appears within a compilation unit to indicate the package to which the compilation unit belongs.
 newtype PackageDecl = PackageDecl Name
   deriving (Show, Read, Typeable, Generic, Data)
@@ -84,8 +82,6 @@ newtype PackageDecl = PackageDecl Name
 instance Equality PackageDecl where
   eq opt (PackageDecl n1) (PackageDecl n2) =
     eq opt n1 n2
-
-instance Located PackageDecl
 
 -- | An import declaration allows a static member or a named type to be referred to by a single unqualified identifier.
 --   The first argument signals whether the declaration only imports static members.
@@ -117,8 +113,6 @@ instance Equality TypeDecl where
   eq opt (InterfaceTypeDecl id1) (InterfaceTypeDecl id2) =
     eq opt id1 id2
   eq _ _ _ = False
-
-instance Located TypeDecl
 
 -- | A class declaration specifies a new named reference type.
 data ClassDecl
@@ -152,8 +146,6 @@ instance Equality ClassBody where
   eq opt (ClassBody ds1) (ClassBody ds2) =
     eq opt ds1 ds2
 
-instance Located ClassBody
-
 -- | The body of an enum type may contain enum constants.
 data EnumBody = EnumBody [EnumConstant] [Decl]
   deriving (Show, Read, Typeable, Generic, Data)
@@ -162,8 +154,6 @@ instance Equality EnumBody where
   eq opt (EnumBody ecs1 ds1) (EnumBody ecs2 ds2) =
     eq opt ecs1 ecs2 && eq opt ds1 ds2
 
-instance Located EnumBody
-
 -- | An enum constant defines an instance of the enum type.
 data EnumConstant = EnumConstant Ident [Argument] (Maybe ClassBody)
   deriving (Show, Read, Typeable, Generic, Data)
@@ -171,8 +161,6 @@ data EnumConstant = EnumConstant Ident [Argument] (Maybe ClassBody)
 instance Equality EnumConstant where
   eq opt (EnumConstant i1 as1 mcb1) (EnumConstant i2 as2 mcb2) =
     eq opt i1 i2 && eq opt as1 as2 && eq opt mcb1 mcb2
-
-instance Located EnumConstant
 
 -- | An interface declaration introduces a new reference type whose members
 --   are classes, interfaces, constants and abstract methods. This type has
@@ -198,8 +186,6 @@ instance Equality InterfaceKind where
   eq _ InterfaceAnnotation InterfaceAnnotation = True
   eq _ _ _ = False
 
-instance Located InterfaceKind
-
 -- | The body of an interface may declare members of the interface.
 newtype InterfaceBody
   = InterfaceBody [MemberDecl]
@@ -208,8 +194,6 @@ newtype InterfaceBody
 instance Equality InterfaceBody where
   eq opt (InterfaceBody mds1) (InterfaceBody mds2) =
     eq opt mds1 mds2
-
-instance Located InterfaceBody
 
 -- | A declaration is either a member declaration, or a declaration of an
 --   initializer, which may be static.
@@ -224,8 +208,6 @@ instance Equality Decl where
   eq opt (InitDecl b1 bl1) (InitDecl b2 bl2) =
     b1 == b2 && eq opt bl1 bl2
   eq _ _ _ = False
-
-instance Located Decl
 
 -- | A class or interface member can be an inner class or interface, a field or
 --   constant, or a method or constructor. An interface may only have as members
@@ -271,8 +253,6 @@ instance Equality RecordFieldDecl where
   eq opt (RecordFieldDecl t1 i1) (RecordFieldDecl t2 i2) =
     eq opt t1 t2 && eq opt i1 i2
 
-instance Located RecordFieldDecl
-
 -- | A declaration of a variable, which may be explicitly initialized.
 data VarDecl
   = VarDecl SourceSpan VarDeclId (Maybe VarInit)
@@ -316,8 +296,6 @@ instance Equality VarInit where
     eq opt ai1 ai2
   eq _ _ _ = False
 
-instance Located VarInit
-
 -- | A formal parameter in method declaration. The last parameter
 --   for a given declaration may be marked as variable arity,
 --   indicated by the boolean argument.
@@ -340,8 +318,6 @@ instance Equality MethodBody where
   eq opt (MethodBody mb1) (MethodBody mb2) =
     eq opt mb1 mb2
 
-instance Located MethodBody
-
 -- | The first statement of a constructor body may be an explicit invocation of
 --   another constructor of the same class or of the direct superclass.
 data ConstructorBody = ConstructorBody (Maybe ExplConstrInv) [BlockStmt]
@@ -350,8 +326,6 @@ data ConstructorBody = ConstructorBody (Maybe ExplConstrInv) [BlockStmt]
 instance Equality ConstructorBody where
   eq opt (ConstructorBody meci1 bss1) (ConstructorBody meci2 bss2) =
     eq opt meci1 meci2 && eq opt bss1 bss2
-
-instance Located ConstructorBody
 
 -- | An explicit constructor invocation invokes another constructor of the
 --   same class, or a constructor of the direct superclass, which may
@@ -371,8 +345,6 @@ instance Equality ExplConstrInv where
   eq opt (PrimarySuperInvoke e1 rts1 as1) (PrimarySuperInvoke e2 rts2 as2) =
     eq opt e1 e2 && eq opt rts1 rts2 && eq opt as1 as2
   eq _ _ _ = False
-
-instance Located ExplConstrInv
 
 -- | A modifier specifying properties of a given declaration. In general only
 --   a few of these modifiers are allowed for each declaration type, for instance
@@ -487,8 +459,6 @@ instance Equality ElementValue where
     eq opt a1 a2
   eq _ _ _ = False
 
-instance Located ElementValue
-
 -----------------------------------------------------------------------
 -- Statements
 
@@ -500,8 +470,6 @@ newtype Block = Block [BlockStmt]
 instance Equality Block where
   eq opt (Block bss1) (Block bss2) =
     eq opt bss1 bss2
-
-instance Located Block
 
 -- | A block statement is either a normal statement, a local
 --   class declaration or a local variable declaration.
@@ -634,8 +602,6 @@ instance Equality Catch where
   eq opt (Catch fp1 b1) (Catch fp2 b2) =
     eq opt fp1 fp2 && eq opt b1 b2
 
-instance Located Catch
-
 data TryResource
   = TryResourceVarDecl ResourceDecl
   | TryResourceVarAccess Ident
@@ -651,8 +617,6 @@ instance Equality TryResource where
     eq opt fa1 fa2
   eq _ _ _ = False
 
-instance Located TryResource
-
 data ResourceDecl
   = ResourceDecl [Modifier] Type VarDeclId VarInit
   deriving (Show, Read, Typeable, Generic, Data)
@@ -660,8 +624,6 @@ data ResourceDecl
 instance Equality ResourceDecl where
   eq opt (ResourceDecl ms1 t1 vdi1 vi1) (ResourceDecl ms2 t2 vdi2 vi2) =
     eq opt ms1 ms2 && eq opt t1 t2 && eq opt vdi1 vdi2 && eq opt vi1 vi2
-
-instance Located ResourceDecl
 
 -- | A block of code labelled with a @case@ or @default@ within a @switch@ statement.
 data SwitchBlock
@@ -699,8 +661,6 @@ instance Equality SwitchLabel where
   eq _ Default Default = True
   eq _ _ _ = False
 
-instance Located SwitchLabel
-
 data SwitchExpBranch
   = SwitchExpBranch SwitchLabel SwitchExpBranchBody
   deriving (Show, Read, Typeable, Generic, Data)
@@ -708,8 +668,6 @@ data SwitchExpBranch
 instance Equality SwitchExpBranch where
   eq opt (SwitchExpBranch sl1 sebb1) (SwitchExpBranch sl2 sebb2) =
     eq opt sl1 sl2 && eq opt sebb1 sebb2
-
-instance Located SwitchExpBranch
 
 data SwitchExpBranchBody
   = SwitchExpBranchExp Exp
@@ -723,8 +681,6 @@ instance Equality SwitchExpBranchBody where
     eq opt bss1 bss2
   eq _ _ _ = False
 
-instance Located SwitchExpBranchBody
-
 -- | Initialization code for a basic @for@ statement.
 data ForInit
   = ForLocalVars [Modifier] Type [VarDecl]
@@ -737,8 +693,6 @@ instance Equality ForInit where
   eq opt (ForInitExps es1) (ForInitExps es2) =
     eq opt es1 es2
   eq _ _ _ = False
-
-instance Located ForInit
 
 -- | An exception type has to be a class type or a type variable.
 type ExceptionType = RefType -- restricted to ClassType or TypeVariable
@@ -908,8 +862,6 @@ instance Equality Lhs where
     eq opt ai1 ai2
   eq _ _ _ = False
 
-instance Located Lhs
-
 -- | Array access
 data ArrayIndex
   = -- | Index into an array
@@ -919,8 +871,6 @@ data ArrayIndex
 instance Equality ArrayIndex where
   eq opt (ArrayIndex e1 es1) (ArrayIndex e2 es2) =
     eq opt e1 e2 && eq opt es1 es2
-
-instance Located ArrayIndex
 
 -- | A field access expression may access a field of an object or array, a reference to which is the value
 --   of either an expression or the special keyword super.
@@ -942,16 +892,12 @@ instance Equality FieldAccess where
     eq opt n1 n2 && eq opt i1 i2
   eq _ _ _ = False
 
-instance Located FieldAccess
-
 -- ¦ A lambda parameter can be a single parameter, or mulitple formal or mulitple inferred parameters
 data LambdaParams
   = LambdaSingleParam Ident
   | LambdaFormalParams [FormalParam]
   | LambdaInferredParams [Ident]
   deriving (Show, Read, Typeable, Generic, Data)
-
-instance Located LambdaParams
 
 instance Equality LambdaParams where
   eq opt (LambdaSingleParam i1) (LambdaSingleParam i2) =
@@ -974,8 +920,6 @@ instance Equality LambdaExpression where
   eq opt (LambdaBlock b1) (LambdaBlock b2) =
     eq opt b1 b2
   eq _ _ _ = False
-
-instance Located LambdaExpression
 
 -- | A method invocation expression is used to invoke a class or instance method.
 data MethodInvocation
@@ -1004,8 +948,6 @@ instance Equality MethodInvocation where
     eq opt n1 n2 && eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
   eq _ _ _ = False
 
-instance Located MethodInvocation
-
 -- | An array initializer may be specified in a declaration, or as part of an array creation expression, creating an
 --   array and providing some initial values
 newtype ArrayInit
@@ -1015,8 +957,6 @@ newtype ArrayInit
 instance Equality ArrayInit where
   eq opt (ArrayInit vis1) (ArrayInit vis2) =
     eq opt vis1 vis2
-
-instance Located ArrayInit
 
 data MethodRefTarget
   = MethodRefIdent Ident
@@ -1028,5 +968,3 @@ instance Equality MethodRefTarget where
     eq opt i1 i2
   eq _ MethodRefConstructor MethodRefConstructor = True
   eq _ _ _ = False
-
-instance Located MethodRefTarget

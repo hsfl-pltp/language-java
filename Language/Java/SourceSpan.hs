@@ -43,4 +43,3 @@ instance Equality Location where
 
 class Located a where
   sourceSpan :: a -> SourceSpan
-  sourceSpan _ = dummySourceSpan

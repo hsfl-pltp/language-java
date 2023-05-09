@@ -21,8 +21,6 @@ instance Equality Type where
     eq opt rt1 rt2
   eq _ _ _ = False
 
-instance Located Type
-
 -- | There are three kinds of reference types: class types, interface types, and array types.
 --   Reference types may be parameterized with type arguments.
 --   Type variables cannot be syntactically distinguished from class type identifiers,
@@ -40,8 +38,6 @@ instance Equality RefType where
     eq opt t1 t2
   eq _ _ _ = False
 
-instance Located RefType
-
 -- | A class or interface type consists of a type declaration specifier,
 --   optionally followed by type arguments (in which case it is a parameterized type).
 newtype ClassType
@@ -51,8 +47,6 @@ newtype ClassType
 instance Equality ClassType where
   eq opt (ClassType ctss1) (ClassType ctss2) =
     eq opt ctss1 ctss2
-
-instance Located ClassType
 
 -- | Type arguments may be either reference types or wildcards.
 data TypeArgument
@@ -66,8 +60,6 @@ instance Equality TypeArgument where
   eq opt (ActualType rt1) (ActualType rt2) =
     eq opt rt1 rt2
   eq _ _ _ = False
-
-instance Located TypeArgument
 
 data TypeDeclSpecifier
   = TypeDeclSpecifier ClassType
@@ -84,15 +76,11 @@ instance Equality TypeDeclSpecifier where
     eq opt i1 i2 && eq opt d1 d2
   eq _ _ _ = False
 
-instance Located TypeDeclSpecifier
-
 data Diamond = Diamond
   deriving (Show, Read, Typeable, Generic, Data)
 
 instance Equality Diamond where
   eq _ _ _ = True
-
-instance Located Diamond
 
 -- | Wildcards may be given explicit bounds, either upper (@extends@) or lower (@super@) bounds.
 data WildcardBound
@@ -106,8 +94,6 @@ instance Equality WildcardBound where
   eq opt (SuperBound rt1) (SuperBound rt2) =
     eq opt rt1 rt2
   eq _ _ _ = False
-
-instance Located WildcardBound
 
 -- | A primitive type is predefined by the Java programming language and named by its reserved keyword.
 data PrimType
@@ -132,8 +118,6 @@ instance Equality PrimType where
   eq _ DoubleT DoubleT = True
   eq _ _ _ = False
 
-instance Located PrimType
-
 -- | A class is generic if it declares one or more type variables. These type variables are known
 --   as the type parameters of the class.
 data TypeParam = TypeParam Ident [RefType]
@@ -142,8 +126,6 @@ data TypeParam = TypeParam Ident [RefType]
 instance Equality TypeParam where
   eq opt (TypeParam i1 rts1) (TypeParam i2 rts2) =
     eq opt i1 i2 && eq opt rts1 rts2
-
-instance Located TypeParam
 
 -----------------------------------------------------------------------
 -- Names and identifiers
