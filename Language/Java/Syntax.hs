@@ -114,6 +114,10 @@ instance Equality TypeDecl where
     eq opt id1 id2
   eq _ _ _ = False
 
+instance Located TypeDecl where
+  sourceSpan (ClassTypeDecl cd) = sourceSpan cd
+  sourceSpan (InterfaceTypeDecl id) = sourceSpan id
+
 -- | A class declaration specifies a new named reference type.
 data ClassDecl
   = ClassDecl SourceSpan [Modifier] Ident [TypeParam] (Maybe RefType) [RefType] ClassBody
@@ -242,7 +246,8 @@ instance Located MemberDecl where
   sourceSpan (FieldDecl s _ _ _) = s
   sourceSpan (MethodDecl s _ _ _ _ _ _ _ _) = s
   sourceSpan (ConstructorDecl s _ _ _ _ _ _) = s
-  sourceSpan memDecl = error ("No So0urceSpan implemented for member declaration: " ++ show memDecl)
+  sourceSpan (MemberClassDecl mcd) = sourceSpan mcd
+  sourceSpan (MemberInterfaceDecl mid) = sourceSpan mid
 
 -- | A field declaration of a record
 data RecordFieldDecl
@@ -280,8 +285,8 @@ instance Equality VarDeclId where
   eq _ _ _ = False
 
 instance Located VarDeclId where
+  sourceSpan (VarId i) = sourceSpan i
   sourceSpan (VarDeclArray s _) = s
-  sourceSpan vdi = error ("No SourceSpan implemented for variable declaration identifier: " ++ show vdi)
 
 -- | Explicit initializer for a variable declaration.
 data VarInit
@@ -402,6 +407,7 @@ instance Show Modifier where
 instance Located Modifier where
   sourceSpan (Public s) = s
   sourceSpan (Abstract s) = s
+  sourceSpan (Annotation a) = sourceSpan a
   sourceSpan mod = error ("No SourceSpan implemented for Modifier: " ++ show mod)
 
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
@@ -490,8 +496,8 @@ instance Equality BlockStmt where
 
 instance Located BlockStmt where
   sourceSpan (BlockStmt s _) = s
+  sourceSpan (LocalClass cd) = sourceSpan cd
   sourceSpan (LocalVars s _ _ _) = s
-  sourceSpan blockStmt = error ("No SourceSpan implemented for BlockStatement: " ++ show blockStmt)
 
 -- | A Java statement.
 data Stmt
@@ -833,6 +839,7 @@ instance Equality Exp where
   eq _ _ _ = False
 
 instance Located Exp where
+  sourceSpan (ExpName n) = sourceSpan n
   sourceSpan (PostIncrement s _) = s
   sourceSpan (PostDecrement s _) = s
   sourceSpan (PreIncrement s _) = s
