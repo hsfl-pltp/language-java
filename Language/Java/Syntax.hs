@@ -156,6 +156,9 @@ instance Equality (ImportDecl p) where
   eq opt (ImportDecl s1 b11 n1 b12) (ImportDecl s2 b21 n2 b22) =
     eq opt s1 s2 && b11 == b21 && eq opt n1 n2 && b12 == b22
 
+instance Located ImportDecl where
+  sourceSpan (ImportDecl s _ _ _) = s
+
 -----------------------------------------------------------------------
 -- Declarations
 
@@ -178,6 +181,10 @@ instance EqualityExtension p => Equality (TypeDecl p) where
     eq opt id1 id2
   eq _ _ _ = False
 
+instance Located TypeDecl where
+  sourceSpan (ClassTypeDecl cd) = sourceSpan cd
+  sourceSpan (InterfaceTypeDecl id) = sourceSpan id
+
 -- | A class declaration specifies a new named reference type.
 data ClassDecl p
   = ClassDecl SourceSpan [Modifier p] Ident [TypeParam] (Maybe RefType) [RefType] (ClassBody p)
@@ -199,6 +206,11 @@ instance EqualityExtension p => Equality (ClassDecl p) where
   eq opt (EnumDecl s1 ms1 i1 rts1 eb1) (EnumDecl s2 ms2 i2 rts2 eb2) =
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt i1 i2 && eq opt rts1 rts2 && eq opt eb1 eb2
   eq _ _ _ = False
+
+instance Located ClassDecl where
+  sourceSpan (ClassDecl s _ _ _ _ _ _) = s
+  sourceSpan (RecordDecl s _ _ _ _ _ _) = s
+  sourceSpan (EnumDecl s _ _ _ _) = s
 
 -- | A class body may contain declarations of members of the class, that is,
 --   fields, classes, interfaces and methods.
@@ -262,6 +274,9 @@ deriving instance DataExtension p => Data (InterfaceDecl p)
 instance EqualityExtension p => Equality (InterfaceDecl p) where
   eq opt (InterfaceDecl s1 ik1 ms1 i1 tps1 rts11 rts12 ib1) (InterfaceDecl s2 ik2 ms2 i2 tps2 rts21 rts22 ib2) =
     eq opt s1 s2 && eq opt ik1 ik2 && eq opt ms1 ms2 && eq opt i1 i2 && eq opt tps1 tps2 && eq opt rts11 rts21 && eq opt rts12 rts22 && eq opt ib1 ib2
+
+instance Located InterfaceDecl where
+  sourceSpan (InterfaceDecl s _ _ _ _ _ _ _) = s
 
 -- | Interface can declare either a normal interface or an annotation
 data InterfaceKind = InterfaceNormal | InterfaceAnnotation
@@ -342,6 +357,13 @@ instance EqualityExtension p => Equality (MemberDecl p) where
     eq opt id1 id2
   eq _ _ _ = False
 
+instance Located MemberDecl where
+  sourceSpan (FieldDecl s _ _ _) = s
+  sourceSpan (MethodDecl s _ _ _ _ _ _ _ _) = s
+  sourceSpan (ConstructorDecl s _ _ _ _ _ _) = s
+  sourceSpan (MemberClassDecl mcd) = sourceSpan mcd
+  sourceSpan (MemberInterfaceDecl mid) = sourceSpan mid
+
 -- | A field declaration of a record
 data RecordFieldDecl
   = RecordFieldDecl Type Ident
@@ -366,6 +388,9 @@ instance EqualityExtension p => Equality (VarDecl p) where
   eq opt (VarDecl s1 vdi1 mvi1) (VarDecl s2 vdi2 mvi2) =
     eq opt s1 s2 && eq opt vdi1 vdi2 && eq opt mvi1 mvi2
 
+instance Located VarDecl where
+  sourceSpan (VarDecl s _ _) = s
+
 -- | The name of a variable in a declaration, which may be an array.
 data VarDeclId
   = VarId Ident
@@ -379,6 +404,10 @@ instance Equality VarDeclId where
   eq opt (VarDeclArray s1 vdi1) (VarDeclArray s2 vdi2) =
     eq opt s1 s2 && eq opt vdi1 vdi2
   eq _ _ _ = False
+
+instance Located VarDeclId where
+  sourceSpan (VarId i) = sourceSpan i
+  sourceSpan (VarDeclArray s _) = s
 
 -- | Explicit initializer for a variable declaration.
 data VarInit p
@@ -414,6 +443,9 @@ deriving instance DataExtension p => Data (FormalParam p)
 instance EqualityExtension p => Equality (FormalParam p) where
   eq opt (FormalParam s1 ms1 t1 b1 vdi1) (FormalParam s2 ms2 t2 b2 vdi2) =
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt t1 t2 && b1 == b2 && eq opt vdi1 vdi2
+
+instance Located FormalParam where
+  sourceSpan (FormalParam s _ _ _ _) = s
 
 -- | A method body is either a block of code that implements the method or simply a
 --   semicolon, indicating the lack of an implementation (modelled by 'Nothing').
@@ -514,6 +546,12 @@ instance EqualityExtension p => Equality (Modifier p) where
   eq _ Sealed Sealed = True
   eq _ _ _ = False
 
+instance Located Modifier where
+  sourceSpan (Public s) = s
+  sourceSpan (Abstract s) = s
+  sourceSpan (Annotation a) = sourceSpan a
+  sourceSpan mod = error ("No SourceSpan implemented for Modifier: " ++ show mod)
+
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation p
   = NormalAnnotation
@@ -547,14 +585,19 @@ instance EqualityExtension p => Equality (Annotation p) where
     eq opt s1 s2 && eq opt n1 n2
   eq _ _ _ = False
 
-desugarAnnotation (MarkerAnnotation span n) = (span, n, [])
--- TODO: check span for ident
-desugarAnnotation (SingleElementAnnotation span n e) = (span, n, [(Ident dummySourceSpan "value", e)])
-desugarAnnotation (NormalAnnotation span n kv) = (span, n, kv)
+instance Located Annotation where
+  sourceSpan (NormalAnnotation s _ _) = s
+  sourceSpan (SingleElementAnnotation s _ _) = s
+  sourceSpan (MarkerAnnotation s _) = s
 
-desugarAnnotation' (MarkerAnnotation span n) = NormalAnnotation span n []
+desugarAnnotation (MarkerAnnotation s n) = (s, n, [])
 -- TODO: check span for ident
-desugarAnnotation' (SingleElementAnnotation span n e) = NormalAnnotation span n [(Ident dummySourceSpan "value", e)]
+desugarAnnotation (SingleElementAnnotation s n e) = (s, n, [(Ident dummySourceSpan "value", e)])
+desugarAnnotation (NormalAnnotation s n kv) = (s, n, kv)
+
+desugarAnnotation' (MarkerAnnotation s n) = NormalAnnotation s n []
+-- TODO: check span for ident
+desugarAnnotation' (SingleElementAnnotation s n e) = NormalAnnotation s n [(Ident dummySourceSpan "value", e)]
 desugarAnnotation' normal = normal
 
 -- | Annotations may contain  annotations or (loosely) expressions
@@ -616,6 +659,11 @@ instance EqualityExtension p => Equality (BlockStmt p) where
   eq opt (LocalVars s1 ms1 t1 vds1) (LocalVars s2 ms2 t2 vds2) =
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt t1 t2 && eq opt vds1 vds2
   eq _ _ _ = False
+
+instance Located BlockStmt where
+  sourceSpan (BlockStmt s _) = s
+  sourceSpan (LocalClass cd) = sourceSpan cd
+  sourceSpan (LocalVars s _ _ _) = s
 
 -- | A Java statement.
 data Stmt p
@@ -710,6 +758,19 @@ instance EqualityExtension p => Equality (Stmt p) where
     eq opt i1 i2 && eq opt stmt1 stmt2
   eq _ _ _ = False
 
+instance Located Stmt where
+  sourceSpan (IfThen s _ _) = s
+  sourceSpan (IfThenElse s _ _ _) = s
+  sourceSpan (While s _ _) = s
+  sourceSpan (BasicFor s _ _ _ _) = s
+  sourceSpan (EnhancedFor s _ _ _ _ _) = s
+  sourceSpan (ExpStmt s _) = s
+  sourceSpan (Do s _ _) = s
+  sourceSpan (Break s _) = s
+  sourceSpan (Return s _) = s
+  sourceSpan (Try s _ _ _ _) = s
+  sourceSpan stmt = error ("No SourceSpan implemented for statement: " ++ show stmt)
+
 -- | If a value is thrown and the try statement has one or more catch clauses that can catch it, then control will be
 --   transferred to the first such catch clause.
 data Catch p = Catch (FormalParam p) (Block p)
@@ -774,6 +835,9 @@ deriving instance DataExtension p => Data (SwitchBlock p)
 instance EqualityExtension p => Equality (SwitchBlock p) where
   eq opt (SwitchBlock s1 sl1 bss1) (SwitchBlock s2 sl2 bss2) =
     eq opt s1 s2 && eq opt sl1 sl2 && eq opt bss1 bss2
+
+instance Located SwitchBlock where
+  sourceSpan (SwitchBlock s _ _) = s
 
 data SwitchStyle
   = SwitchOldStyle
@@ -999,6 +1063,16 @@ instance EqualityExtension p => Equality (Exp p) where
   eq opt (SwitchExp e1 sebs1) (SwitchExp e2 sebs2) =
     eq opt e1 e2 && eq opt sebs1 sebs2
   eq _ _ _ = False
+
+instance Located Exp where
+  sourceSpan (ExpName n) = sourceSpan n
+  sourceSpan (PostIncrement s _) = s
+  sourceSpan (PostDecrement s _) = s
+  sourceSpan (PreIncrement s _) = s
+  sourceSpan (PreDecrement s _) = s
+  sourceSpan (Cond s _ _ _) = s
+  sourceSpan (Assign s _ _ _) = s
+  sourceSpan e = error ("No SourceSpan implemented for expression: " ++ show e)
 
 -- | The left-hand side of an assignment expression. This operand may be a named variable, such as a local
 --   variable or a field of the current object or class, or it may be a computed variable, as can result from

@@ -27,6 +27,7 @@ Library
                       , array >= 0.1
                       , pretty >= 1.0
                       , parsec >= 3.0
+                      , uniplate >=1.6.11 && <1.7
 
   if impl(ghc < 7.6)
     Build-Depends:      syb
@@ -37,7 +38,8 @@ Library
                         Language.Java.Syntax,
                         Language.Java.Parser,
                         Language.Java.Pretty,
-                        Language.Java.SourceSpan
+                        Language.Java.SourceSpan,
+                        Language.Java.Transformer
   
   Other-modules:	      Language.Java.Syntax.Types,
                         Language.Java.Syntax.Exp,
@@ -55,4 +57,5 @@ Test-Suite test-java-parse
                    , language-java
                    , filepath
                    , directory
+                   , uniplate >=1.6.11 && <1.7
   ghc-options:       -Wall -fno-warn-orphans -fno-warn-missing-signatures

@@ -1,6 +1,10 @@
-module Language.Java.Transformer where
+{-# LANGUAGE LambdaCase #-}
+
+module Language.Java.Transformer (analyze) where
 
 import Data.Bifunctor (Bifunctor (second))
+import Data.Generics.Uniplate.Data (universeBi)
+import Language.Java.Parser (name)
 import Language.Java.Syntax
 
 class Transform a where
@@ -25,31 +29,34 @@ instance Transform TypeDecl where
   analyze scope (InterfaceTypeDecl interfaceDecl) = InterfaceTypeDecl (analyze scope interfaceDecl)
 
 instance Transform ClassDecl where
-  analyze scope (ClassDecl src modifiers ident typeParams mbRefType refTypes classBody) =
-    ClassDecl
-      src
-      (map (analyze scope) modifiers)
-      ident
-      typeParams
-      mbRefType
-      refTypes
-      (analyze scope classBody)
-  analyze scope (RecordDecl src modifiers ident typeParams recordFieldDecls refTypes classBody) =
-    RecordDecl
-      src
-      (map (analyze scope) modifiers)
-      ident
-      typeParams
-      recordFieldDecls
-      refTypes
-      (analyze scope classBody)
-  analyze scope (EnumDecl src modifiers ident refTypes enumBody) =
-    EnumDecl
-      src
-      (map (analyze scope) modifiers)
-      ident
-      refTypes
-      (analyze scope enumBody)
+  analyze scope classDecl@(ClassDecl src modifiers ident typeParams mbRefType refTypes classBody) =
+    let newScope = classFields classDecl ++ scope
+     in ClassDecl
+          src
+          (map (analyze newScope) modifiers)
+          ident
+          typeParams
+          mbRefType
+          refTypes
+          (analyze newScope classBody)
+  analyze scope recordDecl@(RecordDecl src modifiers ident typeParams recordFieldDecls refTypes classBody) =
+    let newScope = classFields recordDecl ++ scope
+     in RecordDecl
+          src
+          (map (analyze newScope) modifiers)
+          ident
+          typeParams
+          recordFieldDecls
+          refTypes
+          (analyze newScope classBody)
+  analyze scope enumDecl@(EnumDecl src modifiers ident refTypes enumBody) =
+    let newScope = classFields enumDecl ++ scope
+     in EnumDecl
+          src
+          (map (analyze newScope) modifiers)
+          ident
+          refTypes
+          (analyze newScope enumBody)
 
 instance Transform InterfaceDecl where
   analyze scope (InterfaceDecl src kind modifiers ident typeParams refTypesExtends refTypesPermits interfaceBody) =
@@ -110,7 +117,7 @@ instance Transform EnumConstant where
 
 instance Transform MemberDecl where
   analyze scope (FieldDecl span modifiers type_ varDecls) = FieldDecl span (map (analyze scope) modifiers) type_ (map (analyze scope) varDecls)
-  analyze scope (MethodDecl span modifiers typeParams mbType ident formalParams exceptionTypes mbExp methodBody) =
+  analyze scope methodDecl@(MethodDecl span modifiers typeParams mbType ident formalParams exceptionTypes mbExp methodBody) =
     MethodDecl
       span
       (map (analyze scope) modifiers)
@@ -120,8 +127,8 @@ instance Transform MemberDecl where
       (map (analyze scope) formalParams)
       exceptionTypes
       (fmap (analyze scope) mbExp)
-      (analyze scope methodBody)
-  analyze scope (ConstructorDecl span modifiers typeParams ident formalParams exceptionTypes constructorBody) =
+      (analyze (methodParams methodDecl ++ scope) methodBody)
+  analyze scope constructorDecl@(ConstructorDecl span modifiers typeParams ident formalParams exceptionTypes constructorBody) =
     ConstructorDecl
       span
       (map (analyze scope) modifiers)
@@ -129,7 +136,7 @@ instance Transform MemberDecl where
       ident
       (map (analyze scope) formalParams)
       exceptionTypes
-      (analyze scope constructorBody)
+      (analyze (methodParams constructorDecl ++ scope) constructorBody)
   analyze scope (MemberClassDecl classDecl) = MemberClassDecl (analyze scope classDecl)
   analyze scope (MemberInterfaceDecl interfaceDecl) = MemberInterfaceDecl (analyze scope interfaceDecl)
 
@@ -245,6 +252,8 @@ instance Transform FieldAccess where
 
 instance Transform MethodInvocation where
   -- Todo : Classify name
+  analyze scope (MethodCall Nothing ident args) = MethodCall Nothing ident (map (analyze scope) args)
+  analyze scope (MethodCall (Just name@(Name _ [singleId])) ident args) = MethodCall (Just (classifyName singleId scope name)) ident (map (analyze scope) args)
   analyze scope (MethodCall mbName ident args) = MethodCall Nothing ident (map (analyze scope) args)
   analyze scope (PrimaryMethodCall exp refTypes ident args) = PrimaryMethodCall (analyze scope exp) refTypes ident (map (analyze scope) args)
   analyze scope (SuperMethodCall refTypes ident args) = SuperMethodCall refTypes ident (map (analyze scope) args)
@@ -301,3 +310,34 @@ instance Transform Catch where
 
 instance Transform ResourceDecl where
   analyze scope (ResourceDecl modifiers type_ varDeclId varInit) = ResourceDecl (map (analyze scope) modifiers) type_ varDeclId (analyze scope varInit)
+
+identsfromDecls :: [Decl p] -> [Ident]
+identsfromDecls decls = do
+  universeBi
+    ( map
+        (\(VarDecl _ id _) -> id)
+        ( concatMap
+            ( \case
+                (MemberDecl (FieldDecl _ _ _ vars)) -> vars
+                _ -> []
+            )
+            decls
+        )
+    )
+
+classFields :: ClassDecl Parsed -> [Ident]
+classFields (ClassDecl _ _ _ _ _ _ (ClassBody decls)) = identsfromDecls decls
+classFields (RecordDecl _ _ _ _ _ _ (ClassBody decls)) = identsfromDecls decls
+classFields (EnumDecl _ _ _ _ (EnumBody _ decls)) = identsfromDecls decls
+
+identsFromParams :: [FormalParam p] -> [Ident]
+identsFromParams params = do
+  universeBi (map (\(FormalParam _ _ _ _ vardeclId) -> vardeclId) params)
+
+methodParams :: MemberDecl Parsed -> [Ident]
+methodParams (MethodDecl _ _ _ _ _ params _ _ _) = identsFromParams params
+methodParams (ConstructorDecl _ _ _ _ params _ _) = identsFromParams params
+methodParams _ = []
+
+classifyName :: Ident -> [Ident] -> Name -> ClassifiedName
+classifyName ident varsInScope = if any (eq IgnoreSourceSpan ident) varsInScope then ExpressionName else TypeName

@@ -5,7 +5,7 @@ module Language.Java.Syntax.Types where
 
 import Data.Data
 import GHC.Generics (Generic)
-import Language.Java.SourceSpan (SourceSpan)
+import Language.Java.SourceSpan (Located (..), SourceSpan)
 import Language.Java.Syntax.Equality (Equality (..))
 
 -- | There are two kinds of types in the Java programming language: primitive types and reference types.
@@ -138,6 +138,9 @@ instance Equality Ident where
   eq opt (Ident s1 str1) (Ident s2 str2) =
     eq opt s1 s2 && str1 == str2
 
+instance Located Ident where
+  sourceSpan (Ident s _) = s
+
 -- | A name, i.e. a period-separated list of identifiers.
 data Name = Name SourceSpan [Ident]
   deriving (Show, Read, Typeable, Generic, Data)
@@ -145,6 +148,9 @@ data Name = Name SourceSpan [Ident]
 instance Equality Name where
   eq opt (Name s1 ids1) (Name s2 ids2) =
     eq opt s1 s2 && eq opt ids1 ids2
+
+instance Located Name where
+  sourceSpan (Name s _) = s
 
 data ClassifiedName
   = ExpressionName Name
