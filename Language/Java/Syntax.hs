@@ -156,7 +156,7 @@ instance Equality (ImportDecl p) where
   eq opt (ImportDecl s1 b11 n1 b12) (ImportDecl s2 b21 n2 b22) =
     eq opt s1 s2 && b11 == b21 && eq opt n1 n2 && b12 == b22
 
-instance Located ImportDecl where
+instance Located (ImportDecl p) where
   sourceSpan (ImportDecl s _ _ _) = s
 
 -----------------------------------------------------------------------
@@ -181,7 +181,7 @@ instance EqualityExtension p => Equality (TypeDecl p) where
     eq opt id1 id2
   eq _ _ _ = False
 
-instance Located TypeDecl where
+instance Located (TypeDecl p) where
   sourceSpan (ClassTypeDecl cd) = sourceSpan cd
   sourceSpan (InterfaceTypeDecl id) = sourceSpan id
 
@@ -207,7 +207,7 @@ instance EqualityExtension p => Equality (ClassDecl p) where
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt i1 i2 && eq opt rts1 rts2 && eq opt eb1 eb2
   eq _ _ _ = False
 
-instance Located ClassDecl where
+instance Located (ClassDecl p) where
   sourceSpan (ClassDecl s _ _ _ _ _ _) = s
   sourceSpan (RecordDecl s _ _ _ _ _ _) = s
   sourceSpan (EnumDecl s _ _ _ _) = s
@@ -275,7 +275,7 @@ instance EqualityExtension p => Equality (InterfaceDecl p) where
   eq opt (InterfaceDecl s1 ik1 ms1 i1 tps1 rts11 rts12 ib1) (InterfaceDecl s2 ik2 ms2 i2 tps2 rts21 rts22 ib2) =
     eq opt s1 s2 && eq opt ik1 ik2 && eq opt ms1 ms2 && eq opt i1 i2 && eq opt tps1 tps2 && eq opt rts11 rts21 && eq opt rts12 rts22 && eq opt ib1 ib2
 
-instance Located InterfaceDecl where
+instance Located (InterfaceDecl p) where
   sourceSpan (InterfaceDecl s _ _ _ _ _ _ _) = s
 
 -- | Interface can declare either a normal interface or an annotation
@@ -357,7 +357,7 @@ instance EqualityExtension p => Equality (MemberDecl p) where
     eq opt id1 id2
   eq _ _ _ = False
 
-instance Located MemberDecl where
+instance Located (MemberDecl p) where
   sourceSpan (FieldDecl s _ _ _) = s
   sourceSpan (MethodDecl s _ _ _ _ _ _ _ _) = s
   sourceSpan (ConstructorDecl s _ _ _ _ _ _) = s
@@ -388,7 +388,7 @@ instance EqualityExtension p => Equality (VarDecl p) where
   eq opt (VarDecl s1 vdi1 mvi1) (VarDecl s2 vdi2 mvi2) =
     eq opt s1 s2 && eq opt vdi1 vdi2 && eq opt mvi1 mvi2
 
-instance Located VarDecl where
+instance Located (VarDecl p) where
   sourceSpan (VarDecl s _ _) = s
 
 -- | The name of a variable in a declaration, which may be an array.
@@ -444,7 +444,7 @@ instance EqualityExtension p => Equality (FormalParam p) where
   eq opt (FormalParam s1 ms1 t1 b1 vdi1) (FormalParam s2 ms2 t2 b2 vdi2) =
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt t1 t2 && b1 == b2 && eq opt vdi1 vdi2
 
-instance Located FormalParam where
+instance Located (FormalParam p) where
   sourceSpan (FormalParam s _ _ _ _) = s
 
 -- | A method body is either a block of code that implements the method or simply a
@@ -546,7 +546,7 @@ instance EqualityExtension p => Equality (Modifier p) where
   eq _ Sealed Sealed = True
   eq _ _ _ = False
 
-instance Located Modifier where
+instance ShowExtension p => Located (Modifier p) where
   sourceSpan (Public s) = s
   sourceSpan (Abstract s) = s
   sourceSpan (Annotation a) = sourceSpan a
@@ -585,7 +585,7 @@ instance EqualityExtension p => Equality (Annotation p) where
     eq opt s1 s2 && eq opt n1 n2
   eq _ _ _ = False
 
-instance Located Annotation where
+instance Located (Annotation p) where
   sourceSpan (NormalAnnotation s _ _) = s
   sourceSpan (SingleElementAnnotation s _ _) = s
   sourceSpan (MarkerAnnotation s _) = s
@@ -660,7 +660,7 @@ instance EqualityExtension p => Equality (BlockStmt p) where
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt t1 t2 && eq opt vds1 vds2
   eq _ _ _ = False
 
-instance Located BlockStmt where
+instance Located (BlockStmt p) where
   sourceSpan (BlockStmt s _) = s
   sourceSpan (LocalClass cd) = sourceSpan cd
   sourceSpan (LocalVars s _ _ _) = s
@@ -758,7 +758,7 @@ instance EqualityExtension p => Equality (Stmt p) where
     eq opt i1 i2 && eq opt stmt1 stmt2
   eq _ _ _ = False
 
-instance Located Stmt where
+instance ShowExtension p => Located (Stmt p) where
   sourceSpan (IfThen s _ _) = s
   sourceSpan (IfThenElse s _ _ _) = s
   sourceSpan (While s _ _) = s
@@ -836,7 +836,7 @@ instance EqualityExtension p => Equality (SwitchBlock p) where
   eq opt (SwitchBlock s1 sl1 bss1) (SwitchBlock s2 sl2 bss2) =
     eq opt s1 s2 && eq opt sl1 sl2 && eq opt bss1 bss2
 
-instance Located SwitchBlock where
+instance Located (SwitchBlock p) where
   sourceSpan (SwitchBlock s _ _) = s
 
 data SwitchStyle
@@ -1064,7 +1064,7 @@ instance EqualityExtension p => Equality (Exp p) where
     eq opt e1 e2 && eq opt sebs1 sebs2
   eq _ _ _ = False
 
-instance Located Exp where
+instance ShowExtension p => Located (Exp p) where
   sourceSpan (ExpName n) = sourceSpan n
   sourceSpan (PostIncrement s _) = s
   sourceSpan (PostDecrement s _) = s

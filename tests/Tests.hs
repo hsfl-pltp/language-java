@@ -2,17 +2,14 @@
 
 module Main where
 
-import Control.Applicative
+import AnalyzerTests (allAnalyzerTests)
 import qualified Control.Exception as E
 import Control.Monad
-import Data.Data (toConstr)
-import Data.Generics.Uniplate.Data (universeBi)
 import Data.List (isSuffixOf)
 import Language.Java.Parser
 import Language.Java.Pretty
 import Language.Java.SourceSpan
 import Language.Java.Syntax
-import Language.Java.Transformer (analyze)
 import System.Directory
 import System.FilePath
 import Test.Tasty
@@ -68,21 +65,6 @@ toTestCase mode expected jFile = testCase (takeBaseName jFile) doTest
 getAllJavaPaths :: FilePath -> IO [FilePath]
 getAllJavaPaths path = map (path </>) . filter isJavaFile <$> getDirectoryContents path
 
-toAnalyzerTestCase :: ClassifiedName -> FilePath -> TestTree
-toAnalyzerTestCase expected jFile = testCase (takeBaseName jFile) doTest
-  where
-    doTest = do
-      r <- parseOne
-      case r of
-        Left _ -> assertFailure "parse error"
-        Right cUnit -> do
-          classifiedNames <- return (universeBi (analyze [] cUnit))
-          assertBool ("not classified Correctly") (all (checkClassifiedNames expected) classifiedNames)
-    parseOne = parser compilationUnit jFile <$> readFile jFile
-
-checkClassifiedNames :: ClassifiedName -> ClassifiedName -> Bool
-checkClassifiedNames expected have = toConstr have == toConstr expected
-
 main :: IO ()
 main = do
   exists <- doesDirectoryExist testJavaDirectory
@@ -90,7 +72,6 @@ main = do
 
   allGoodJavas <- getAllJavaPaths (testJavaDirectory </> "good")
   allBadJavas <- getAllJavaPaths (testJavaDirectory </> "bad")
-  allAnalzyerJavas <- getAllJavaPaths (testJavaDirectory </> "analyzer")
 
   let -- the bad tests that work with shallow parsing
       shallowGoodJavas = [testJavaDirectory </> "bad" </> "DiamondIncorrectPlacement.java"]
@@ -111,5 +92,5 @@ main = do
               Right g' -> eq IgnoreSourceSpan g g'
               Left perr -> error (show (pretty g) ++ show perr)
           ),
-        testGroup "analyzer tests" (map (toAnalyzerTestCase (ExpressionName (Name dummySourceSpan []))) allAnalzyerJavas)
+        testGroup "analyzer tests" allAnalyzerTests
       ]
