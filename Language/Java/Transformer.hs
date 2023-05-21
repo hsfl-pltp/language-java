@@ -4,7 +4,6 @@ module Language.Java.Transformer (analyze) where
 
 import Data.Bifunctor (Bifunctor (second))
 import Data.Generics.Uniplate.Data (universeBi)
-import Language.Java.Parser (name)
 import Language.Java.Syntax
 
 class Transform a where
@@ -251,7 +250,7 @@ instance Transform FieldAccess where
   analyze _ (ClassFieldAccess name ident) = ClassFieldAccess name ident
 
 instance Transform MethodInvocation where
-  -- Todo : Classify name
+  -- Todo : classify multipart name
   analyze scope (MethodCall Nothing ident args) = MethodCall Nothing ident (map (analyze scope) args)
   analyze scope (MethodCall (Just name@(Name _ [singleId])) ident args) = MethodCall (Just (classifyName singleId scope name)) ident (map (analyze scope) args)
   analyze scope (MethodCall mbName ident args) = MethodCall Nothing ident (map (analyze scope) args)

@@ -1,12 +1,14 @@
 public class TestA {
 
-    TestA field = new TestA();
-    public void func1(){
+    TestB field = new TestB();
+
+    public TestA (TestB consParam){
+        consParam.funcB();
     }
 
-    public void func2(TestA formalParam){
-        formalParam.func1();
-        field.func1();
+    public void funcA(TestB formalParam){
+        formalParam.funcB();
+        field.funcB();
     }
 
 }
