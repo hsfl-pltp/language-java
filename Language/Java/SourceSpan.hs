@@ -2,7 +2,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 
 module Language.Java.SourceSpan
-  ( Location (..),
+  ( Located (..),
+    Location (..),
     SourceSpan,
     dummyLocation,
     dummySourceSpan,
@@ -39,3 +40,6 @@ isEof loc = loc == locationEof
 instance Equality Location where
   eq IgnoreSourceSpan _ _ = True
   eq IncludeSourceSpan l1 l2 = l1 == l2
+
+class Located a where
+  sourceSpan :: a -> SourceSpan
