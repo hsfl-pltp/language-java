@@ -305,7 +305,7 @@ instance Transform TryResource where
   analyze scope (TryResourceQualAccess fieldAccess) = TryResourceQualAccess (analyze scope fieldAccess)
 
 instance Transform Catch where
-  analyze scope (Catch formalParam block) = Catch (analyze scope formalParam) (analyze scope block)
+  analyze scope (Catch formalParam block) = Catch (analyze scope formalParam) (analyze (identFromParam formalParam : scope) block)
 
 instance Transform ResourceDecl where
   analyze scope (ResourceDecl modifiers type_ varDeclId varInit) = ResourceDecl (map (analyze scope) modifiers) type_ varDeclId (analyze scope varInit)
@@ -331,7 +331,14 @@ classFields (EnumDecl _ _ _ _ (EnumBody _ decls)) = identsfromDecls decls
 
 identsFromParams :: [FormalParam p] -> [Ident]
 identsFromParams params = do
-  universeBi (map (\(FormalParam _ _ _ _ vardeclId) -> vardeclId) params)
+  map (identFromVarDeclId . (\(FormalParam _ _ _ _ vardeclId) -> vardeclId)) params
+
+identFromParam :: FormalParam p -> Ident
+identFromParam (FormalParam _ _ _ _ vardeclId) = identFromVarDeclId vardeclId
+
+identFromVarDeclId :: VarDeclId -> Ident
+identFromVarDeclId (VarId ident) = ident
+identFromVarDeclId (VarDeclArray _ varDeclId) = identFromVarDeclId varDeclId
 
 methodParams :: MemberDecl Parsed -> [Ident]
 methodParams (MethodDecl _ _ _ _ _ params _ _ _) = identsFromParams params

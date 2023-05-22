@@ -9,6 +9,13 @@ public class TestA {
     public void funcA(TestB formalParam){
         formalParam.funcB();
         field.funcB();
+
+        try {
+            field.throwsBlewIt();
+        } catch (BlewIt b) {
+            b.getMessage();
+        }
     }
+
 
 }
