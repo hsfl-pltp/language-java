@@ -16,22 +16,22 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-instance Arbitrary CompilationUnit where
+instance Arbitrary (CompilationUnit p) where
   arbitrary = CompilationUnit <$> arbitrary <*> arbitrary <*> ((: []) <$> arbitrary)
 
-instance Arbitrary PackageDecl where
+instance Arbitrary (PackageDecl p) where
   arbitrary = PackageDecl <$> arbitrary
 
-instance Arbitrary ImportDecl where
+instance Arbitrary (ImportDecl p) where
   arbitrary = ImportDecl dummySourceSpan <$> arbitrary <*> arbitrary <*> arbitrary
 
-instance Arbitrary TypeDecl where
+instance Arbitrary (TypeDecl p) where
   arbitrary = ClassTypeDecl <$> arbitrary
 
-instance Arbitrary ClassDecl where
+instance Arbitrary (ClassDecl p) where
   arbitrary = ClassDecl dummySourceSpan <$> pure [] <*> arbitrary <*> pure [] <*> pure Nothing <*> pure [] <*> arbitrary
 
-instance Arbitrary ClassBody where
+instance Arbitrary (ClassBody p) where
   arbitrary = ClassBody <$> pure []
 
 instance Arbitrary Name where

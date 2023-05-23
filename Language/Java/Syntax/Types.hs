@@ -151,3 +151,18 @@ instance Equality Name where
 
 instance Located Name where
   sourceSpan (Name s _) = s
+
+data ClassifiedName
+  = ExpressionName Name
+  | TypeName Name
+  | PackageName Name
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality ClassifiedName where
+  eq opt (ExpressionName n1) (ExpressionName n2) =
+    eq opt n1 n2
+  eq opt (TypeName n1) (TypeName n2) =
+    eq opt n1 n2
+  eq opt (PackageName n1) (PackageName n2) =
+    eq opt n1 n2
+  eq _ _ _ = False
