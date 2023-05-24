@@ -9,7 +9,7 @@ import Language.Java.Syntax
 class Transform a where
   analyze :: IdentCollection -> a Parsed -> a Analyzed
 
--- record durchreichen statt liste an ident. {fields, params, local}, datenstruktur durch hilfsmethoden erweitern beim durchreichen
+-- | data type used to collect the identifiers that are currently in scope
 data IdentCollection = IdentCollection
   { fields :: [Ident],
     formalParams :: [Ident],
@@ -17,13 +17,13 @@ data IdentCollection = IdentCollection
   }
 
 addFields :: IdentCollection -> ClassDecl Parsed -> IdentCollection
-addFields ic classDecl = ic {fields = fieldsFromClassDecl classDecl ++ fields ic}
+addFields identCollection classDecl = identCollection {fields = fieldsFromClassDecl classDecl ++ fields identCollection}
 
-addFormalParams :: IdentCollection -> [Ident] -> IdentCollection
-addFormalParams ic idents = ic {formalParams = idents ++ formalParams ic}
+addFormalParams :: IdentCollection -> MemberDecl Parsed -> IdentCollection
+addFormalParams identCollection idents = identCollection {formalParams = methodParameters idents ++ formalParams identCollection}
 
 addLocalVars :: IdentCollection -> [Ident] -> IdentCollection
-addLocalVars ic idents = ic {localVars = idents ++ localVars ic}
+addLocalVars identCollection idents = identCollection {localVars = idents ++ localVars identCollection}
 
 instance Transform ClassDecl where
   analyze scope classDecl@(ClassDecl src modifiers ident typeParams mbRefType refTypes classBody) =
@@ -67,7 +67,7 @@ instance Transform MemberDecl where
       (map (analyze scope) formalParams)
       exceptionTypes
       (fmap (analyze scope) mbExp)
-      (analyze (addFormalParams scope (methodParameters methodDecl)) methodBody)
+      (analyze (addFormalParams scope methodDecl) methodBody)
   analyze scope constructorDecl@(ConstructorDecl span modifiers typeParams ident formalParams exceptionTypes constructorBody) =
     ConstructorDecl
       span
@@ -76,29 +76,18 @@ instance Transform MemberDecl where
       ident
       (map (analyze scope) formalParams)
       exceptionTypes
-      (analyze (addFormalParams scope (methodParameters constructorDecl)) constructorBody)
+      (analyze (addFormalParams scope constructorDecl) constructorBody)
   analyze scope (MemberClassDecl classDecl) = MemberClassDecl (analyze scope classDecl)
   analyze scope (MemberInterfaceDecl interfaceDecl) = MemberInterfaceDecl (analyze scope interfaceDecl)
 
 instance Transform Catch where
-  analyze scope (Catch formalParam block) =
+  analyze scope catch@(Catch formalParam block) =
     Catch
       (analyze scope formalParam)
-      (analyze (addFormalParams scope (exceptionParameter formalParam)) block)
+      (analyze (addLocalVars scope (exceptionParameter catch)) block)
 
--- add local variables in block to scope
 instance Transform Block where
-  analyze scope (Block blockstmts) = Block (map (analyze (addLocalVars scope (localVarsInBlock blockstmts))) blockstmts)
-
-instance Transform MethodInvocation where
-  -- Todo : classify multipart name
-  analyze scope (MethodCall Nothing ident args) = MethodCall Nothing ident (map (analyze scope) args)
-  analyze scope (MethodCall (Just name@(Name _ [singleId])) ident args) = MethodCall (Just (classifyName singleId scope name)) ident (map (analyze scope) args)
-  analyze scope (MethodCall mbName ident args) = MethodCall Nothing ident (map (analyze scope) args)
-  analyze scope (PrimaryMethodCall exp refTypes ident args) = PrimaryMethodCall (analyze scope exp) refTypes ident (map (analyze scope) args)
-  analyze scope (SuperMethodCall refTypes ident args) = SuperMethodCall refTypes ident (map (analyze scope) args)
-  analyze scope (ClassMethodCall name refTypes ident args) = ClassMethodCall name refTypes ident (map (analyze scope) args)
-  analyze scope (TypeMethodCall name refTypes ident args) = TypeMethodCall name refTypes ident (map (analyze scope) args)
+  analyze scope block@(Block blockstmts) = Block (map (analyze (addLocalVars scope (localVarsInBlock block))) blockstmts)
 
 instance Transform Stmt where
   analyze scope (StmtBlock block) = StmtBlock (analyze scope block)
@@ -113,14 +102,14 @@ instance Transform Stmt where
           (fmap (analyze newScope) mbExp)
           (fmap (map (analyze newScope)) mbExps)
           (analyze newScope stmt)
-  analyze scope (EnhancedFor span mods type_ ident exp stmt) =
+  analyze scope enhancedFor@(EnhancedFor span mods type_ ident exp stmt) =
     EnhancedFor
       span
       (map (analyze scope) mods)
       type_
       ident
       (analyze scope exp)
-      (analyze (addLocalVars scope [ident]) stmt)
+      (analyze (addLocalVars scope (localVarsInStmt enhancedFor)) stmt)
   analyze _ Empty = Empty
   analyze scope (ExpStmt span exp) = ExpStmt span (analyze scope exp)
   analyze scope (Assert exp mbExp) = Assert (analyze scope exp) (fmap (analyze scope) mbExp)
@@ -140,6 +129,17 @@ instance Transform Stmt where
       (fmap (analyze scope) mbBlock)
   analyze scope (Labeled ident stmt) = Labeled ident (analyze scope stmt)
 
+-- classification of MethodInvocation name
+instance Transform MethodInvocation where
+  -- Todo : classify multipart name
+  analyze scope (MethodCall Nothing ident args) = MethodCall Nothing ident (map (analyze scope) args)
+  analyze scope (MethodCall (Just name@(Name _ [singleId])) ident args) = MethodCall (Just (classifyName singleId scope name)) ident (map (analyze scope) args)
+  analyze scope (MethodCall mbName ident args) = MethodCall Nothing ident (map (analyze scope) args)
+  analyze scope (PrimaryMethodCall exp refTypes ident args) = PrimaryMethodCall (analyze scope exp) refTypes ident (map (analyze scope) args)
+  analyze scope (SuperMethodCall refTypes ident args) = SuperMethodCall refTypes ident (map (analyze scope) args)
+  analyze scope (ClassMethodCall name refTypes ident args) = ClassMethodCall name refTypes ident (map (analyze scope) args)
+  analyze scope (TypeMethodCall name refTypes ident args) = TypeMethodCall name refTypes ident (map (analyze scope) args)
+
 classifyName :: Ident -> IdentCollection -> Name -> ClassifiedName
 classifyName ident (IdentCollection cfields formal locals) = if any (eq IgnoreSourceSpan ident) (cfields ++ formal ++ locals) then ExpressionName else TypeName
 
@@ -149,8 +149,8 @@ identFromVarDeclId :: VarDeclId -> Ident
 identFromVarDeclId (VarId ident) = ident
 identFromVarDeclId (VarDeclArray _ varDeclId) = identFromVarDeclId varDeclId
 
--- class fields
-fieldsFromClassDecl :: ClassDecl Parsed -> [Ident]
+-- class fields from ClassDecl
+fieldsFromClassDecl :: ClassDecl p -> [Ident]
 fieldsFromClassDecl (ClassDecl _ _ _ _ _ _ (ClassBody decls)) = identsfromDecls decls
 fieldsFromClassDecl (RecordDecl _ _ _ _ _ _ (ClassBody decls)) = identsfromDecls decls
 fieldsFromClassDecl (EnumDecl _ _ _ _ (EnumBody _ decls)) = identsfromDecls decls
@@ -167,12 +167,12 @@ identsfromDecls decls = do
         decls
     )
 
--- exception parameter
-exceptionParameter :: FormalParam p -> [Ident]
-exceptionParameter (FormalParam _ _ _ _ vardeclId) = [identFromVarDeclId vardeclId]
+-- | ident of exception parameter from Catch
+exceptionParameter :: Catch p -> [Ident]
+exceptionParameter (Catch (FormalParam _ _ _ _ vardeclId) _) = [identFromVarDeclId vardeclId]
 
--- formal parameters
-methodParameters :: MemberDecl Parsed -> [Ident]
+-- | idents of formal parameters of method and constructor declaration
+methodParameters :: MemberDecl p -> [Ident]
 methodParameters (MethodDecl _ _ _ _ _ params _ _ _) = identsFromParams params
 methodParameters (ConstructorDecl _ _ _ _ params _ _) = identsFromParams params
 methodParameters _ = []
@@ -180,24 +180,22 @@ methodParameters _ = []
 identsFromParams :: [FormalParam p] -> [Ident]
 identsFromParams = map (identFromVarDeclId . (\(FormalParam _ _ _ _ vardeclId) -> vardeclId))
 
--- local variables from block
-localVarsInBlock :: [BlockStmt Parsed] -> [Ident]
-localVarsInBlock = concatMap identsFromBlockStmt
+-- | idents of local variables from block
+localVarsInBlock :: Block p -> [Ident]
+localVarsInBlock (Block blockstmts) = concatMap identsFromBlockStmt blockstmts
+  where
+    identsFromBlockStmt (LocalVars _ _ _ varDecls) = map (identFromVarDeclId . (\(VarDecl _ id _) -> id)) varDecls
+    identsFromBlockStmt _ = []
 
-identsFromBlockStmt :: BlockStmt Parsed -> [Ident]
-identsFromBlockStmt (LocalVars _ _ _ varDecls) = map (identFromVarDeclId . (\(VarDecl _ id _) -> id)) varDecls
-identsFromBlockStmt _ = []
-
--- local variables from basicFor and tryWithResource
-
+-- | idents of local variables from basicFor, enhancedFor and tryWithResource
 localVarsInStmt :: Stmt p -> [Ident]
 localVarsInStmt (BasicFor _ (Just (ForLocalVars _ _ varDecls)) _ _ _) = map (identFromVarDeclId . (\(VarDecl _ id _) -> id)) varDecls
+localVarsInStmt (EnhancedFor _ _ _ ident _ _) = [ident]
 localVarsInStmt (Try _ tryResources _ _ _) = mapMaybe identFromTryResource tryResources
+  where
+    identFromTryResource (TryResourceVarDecl (ResourceDecl _ _ vardDeclId _)) = Just (identFromVarDeclId vardDeclId)
+    identFromTryResource _ = Nothing
 localVarsInStmt _ = []
-
-identFromTryResource :: TryResource p -> Maybe Ident
-identFromTryResource (TryResourceVarDecl (ResourceDecl _ _ vardDeclId _)) = Just (identFromVarDeclId vardDeclId)
-identFromTryResource _ = Nothing
 
 -- boiler plate cases
 
