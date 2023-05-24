@@ -43,10 +43,10 @@ instance PrettyExtension p => Pretty (CompilationUnit p) where
   prettyPrec p (CompilationUnit mpd ids tds) =
     vcat $ (maybePP p mpd : map (prettyPrec p) ids) ++ map (prettyPrec p) tds
 
-instance Pretty (PackageDecl p) where
+instance Pretty PackageDecl where
   prettyPrec p (PackageDecl name) = text "package" <+> prettyPrec p name <> semi
 
-instance Pretty (ImportDecl p) where
+instance Pretty ImportDecl where
   prettyPrec p (ImportDecl _ st name wc) =
     text "import"
       <+> opt st (text "static")

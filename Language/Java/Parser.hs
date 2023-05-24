@@ -214,14 +214,14 @@ compilationUnit = do
   eof
   return $ CompilationUnit mpd ids (catMaybes tds)
 
-packageDecl :: P (PackageDecl Parsed)
+packageDecl :: P PackageDecl
 packageDecl = do
   tok KW_Package
   n <- noLoc name
   semiColon
   return $ PackageDecl n
 
-importDecl :: P (ImportDecl Parsed)
+importDecl :: P ImportDecl
 importDecl = do
   startLoc <- getLocation
   tok KW_Import

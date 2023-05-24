@@ -19,10 +19,10 @@ import Test.Tasty.QuickCheck
 instance Arbitrary (CompilationUnit p) where
   arbitrary = CompilationUnit <$> arbitrary <*> arbitrary <*> ((: []) <$> arbitrary)
 
-instance Arbitrary (PackageDecl p) where
+instance Arbitrary PackageDecl where
   arbitrary = PackageDecl <$> arbitrary
 
-instance Arbitrary (ImportDecl p) where
+instance Arbitrary ImportDecl where
   arbitrary = ImportDecl dummySourceSpan <$> arbitrary <*> arbitrary <*> arbitrary
 
 instance Arbitrary (TypeDecl p) where

@@ -111,7 +111,7 @@ instance EqualityExtension Analyzed
 -- Packages
 
 -- | A compilation unit is the top level syntactic goal symbol of a Java program.
-data CompilationUnit p = CompilationUnit (Maybe (PackageDecl p)) [ImportDecl p] [TypeDecl p]
+data CompilationUnit p = CompilationUnit (Maybe PackageDecl) [ImportDecl] [TypeDecl p]
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (CompilationUnit p)
@@ -125,16 +125,10 @@ instance EqualityExtension p => Equality (CompilationUnit p) where
     eq opt mpd1 mpd2 && eq opt ids1 ids2 && eq opt tds1 tds2
 
 -- | A package declaration appears within a compilation unit to indicate the package to which the compilation unit belongs.
-newtype PackageDecl p = PackageDecl Name
-  deriving (Typeable, Generic)
+newtype PackageDecl = PackageDecl Name
+  deriving (Show, Read, Typeable, Generic, Data)
 
-deriving instance ShowExtension p => Show (PackageDecl p)
-
-deriving instance ReadExtension p => Read (PackageDecl p)
-
-deriving instance DataExtension p => Data (PackageDecl p)
-
-instance Equality (PackageDecl p) where
+instance Equality PackageDecl where
   eq opt (PackageDecl n1) (PackageDecl n2) =
     eq opt n1 n2
 
@@ -142,21 +136,15 @@ instance Equality (PackageDecl p) where
 --   The first argument signals whether the declaration only imports static members.
 --   The last argument signals whether the declaration brings all names in the named type or package, or only brings
 --   a single name into scope.
-data ImportDecl p
+data ImportDecl
   = ImportDecl SourceSpan Bool {- static? -} Name Bool {- .*? -}
-  deriving (Typeable, Generic)
+  deriving (Show, Read, Typeable, Generic, Data)
 
-deriving instance ShowExtension p => Show (ImportDecl p)
-
-deriving instance ReadExtension p => Read (ImportDecl p)
-
-deriving instance DataExtension p => Data (ImportDecl p)
-
-instance Equality (ImportDecl p) where
+instance Equality ImportDecl where
   eq opt (ImportDecl s1 b11 n1 b12) (ImportDecl s2 b21 n2 b22) =
     eq opt s1 s2 && b11 == b21 && eq opt n1 n2 && b12 == b22
 
-instance Located (ImportDecl p) where
+instance Located ImportDecl where
   sourceSpan (ImportDecl s _ _ _) = s
 
 -----------------------------------------------------------------------
