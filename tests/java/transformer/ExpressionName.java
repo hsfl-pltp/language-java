@@ -10,7 +10,8 @@ public class TestA {
         formalParam.funcB();
         field.funcB();
 
-        try {
+        try (TestB tryTestB = new TestB()){
+            tryTestB.funcB();
             field.throwsBlewIt();
         } catch (BlewIt b) {
             b.getMessage();
@@ -24,4 +25,15 @@ public class TestA {
         local2.funcB();
         local3.funcB();
     }
+
+    public void funcForLoop(){
+        for (TestB varFor = new TestB(); varFor.returnBool(); varFor.funcB() ){
+            varFor.funcB();
+        }
+        for (TestB varEnhancedFor : arrayB){
+            varEnhancedFor.funcB();
+        }
+    }
+
+
 }

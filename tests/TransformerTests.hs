@@ -24,7 +24,7 @@ expressionNameTests =
         case result of
           Left _ -> assertFailure ""
           Right cUnit -> do
-            let classifiedNames = universeBi (analyze [] cUnit)
+            let classifiedNames = universeBi (analyze (IdentCollection [] [] []) cUnit)
             case checkExpressionNames classifiedNames of
               Left string -> assertFailure string
               Right _ -> return ()
