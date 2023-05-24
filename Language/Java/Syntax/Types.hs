@@ -166,3 +166,8 @@ instance Equality ClassifiedName where
   eq opt (PackageName n1) (PackageName n2) =
     eq opt n1 n2
   eq _ _ _ = False
+
+instance Located ClassifiedName where
+  sourceSpan (ExpressionName n) = sourceSpan n
+  sourceSpan (TypeName n) = sourceSpan n
+  sourceSpan (PackageName n) = sourceSpan n

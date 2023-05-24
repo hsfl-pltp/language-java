@@ -15,6 +15,7 @@ import System.FilePath
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
+import TransformerTests (allTransformerTests)
 
 instance Arbitrary (CompilationUnit p) where
   arbitrary = CompilationUnit <$> arbitrary <*> arbitrary <*> ((: []) <$> arbitrary)
@@ -90,5 +91,6 @@ main = do
           ( \g -> case parserWithState (ParserState ParseFull False) compilationUnit "<input>" (show $ pretty g) of
               Right g' -> eq IgnoreSourceSpan g g'
               Left perr -> error (show (pretty g) ++ show perr)
-          )
+          ),
+        testGroup "transformer tests" allTransformerTests
       ]
