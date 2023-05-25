@@ -19,8 +19,8 @@ data IdentCollection = IdentCollection
 addFields :: IdentCollection -> ClassDecl Parsed -> IdentCollection
 addFields identCollection classDecl = identCollection {fields = fieldsFromClassDecl classDecl ++ fields identCollection}
 
-addFormalParams :: IdentCollection -> MemberDecl Parsed -> IdentCollection
-addFormalParams identCollection idents = identCollection {formalParams = methodParameters idents ++ formalParams identCollection}
+addFormalParams :: IdentCollection -> [Ident] -> IdentCollection
+addFormalParams identCollection idents = identCollection {formalParams = idents ++ formalParams identCollection}
 
 addLocalVars :: IdentCollection -> [Ident] -> IdentCollection
 addLocalVars identCollection idents = identCollection {localVars = idents ++ localVars identCollection}
@@ -67,7 +67,7 @@ instance Transform MemberDecl where
       (map (analyze scope) formalParams)
       exceptionTypes
       (fmap (analyze scope) mbExp)
-      (analyze (addFormalParams scope methodDecl) methodBody)
+      (analyze (addFormalParams scope (methodParameters methodDecl)) methodBody)
   analyze scope constructorDecl@(ConstructorDecl span modifiers typeParams ident formalParams exceptionTypes constructorBody) =
     ConstructorDecl
       span
@@ -76,7 +76,7 @@ instance Transform MemberDecl where
       ident
       (map (analyze scope) formalParams)
       exceptionTypes
-      (analyze (addFormalParams scope constructorDecl) constructorBody)
+      (analyze (addFormalParams scope (methodParameters constructorDecl)) constructorBody)
   analyze scope (MemberClassDecl classDecl) = MemberClassDecl (analyze scope classDecl)
   analyze scope (MemberInterfaceDecl interfaceDecl) = MemberInterfaceDecl (analyze scope interfaceDecl)
 
@@ -84,7 +84,7 @@ instance Transform Catch where
   analyze scope catch@(Catch formalParam block) =
     Catch
       (analyze scope formalParam)
-      (analyze (addLocalVars scope (exceptionParameter catch)) block)
+      (analyze (addFormalParams scope (exceptionParameter catch)) block)
 
 instance Transform Block where
   analyze scope block@(Block blockstmts) = Block (map (analyze (addLocalVars scope (localVarsInBlock block))) blockstmts)
