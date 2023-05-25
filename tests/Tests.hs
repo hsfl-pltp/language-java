@@ -2,7 +2,6 @@
 
 module Main where
 
-import Control.Applicative
 import qualified Control.Exception as E
 import Control.Monad
 import Data.List (isSuffixOf)
@@ -29,10 +28,10 @@ instance Arbitrary (TypeDecl p) where
   arbitrary = ClassTypeDecl <$> arbitrary
 
 instance Arbitrary (ClassDecl p) where
-  arbitrary = ClassDecl dummySourceSpan <$> pure [] <*> arbitrary <*> pure [] <*> pure Nothing <*> pure [] <*> arbitrary
+  arbitrary = (ClassDecl dummySourceSpan [] <$> arbitrary) <*> pure [] <*> pure Nothing <*> pure [] <*> arbitrary
 
 instance Arbitrary (ClassBody p) where
-  arbitrary = ClassBody <$> pure []
+  arbitrary = pure (ClassBody [])
 
 instance Arbitrary Name where
   arbitrary = Name dummySourceSpan <$> (choose (1, 3) >>= \len -> replicateM len arbitrary)
