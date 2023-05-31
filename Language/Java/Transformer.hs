@@ -1,10 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Language.Java.Transformer (analyze, IdentCollection (..)) where
+module Language.Java.Transformer (analyzeCompilationUnit) where
 
 import Data.Bifunctor (Bifunctor (second))
 import Data.Maybe (mapMaybe)
 import Language.Java.Syntax
+
+analyzeCompilationUnit :: CompilationUnit Parsed -> CompilationUnit Analyzed
+analyzeCompilationUnit = analyze (IdentCollection [] [] [])
 
 class Transform a where
   analyze :: IdentCollection -> a Parsed -> a Analyzed
@@ -16,8 +19,8 @@ data IdentCollection = IdentCollection
     localVars :: [Ident]
   }
 
-addFields :: IdentCollection -> ClassDecl Parsed -> IdentCollection
-addFields identCollection classDecl = identCollection {fields = fieldsFromClassDecl classDecl ++ fields identCollection}
+addFields :: IdentCollection -> [Ident] -> IdentCollection
+addFields identCollection idents = identCollection {fields = idents ++ fields identCollection}
 
 addFormalParams :: IdentCollection -> [Ident] -> IdentCollection
 addFormalParams identCollection idents = identCollection {formalParams = idents ++ formalParams identCollection}
@@ -25,56 +28,60 @@ addFormalParams identCollection idents = identCollection {formalParams = idents 
 addLocalVars :: IdentCollection -> [Ident] -> IdentCollection
 addLocalVars identCollection idents = identCollection {localVars = idents ++ localVars identCollection}
 
+isIdent :: Ident -> IdentCollection -> Bool
+isIdent idnt (IdentCollection cfields fp vars) = any (eq IgnoreSourceSpan idnt) (cfields ++ fp ++ vars)
+
 instance Transform ClassDecl where
-  analyze scope classDecl@(ClassDecl src modifiers ident typeParams mbRefType refTypes classBody) =
-    let newScope = addFields scope classDecl
+  analyze scope (ClassDecl src modifiers idnt typeParams mbRefType refTypes classBody) =
+    let newScope = addFields scope (fieldsFromClassBody classBody)
      in ClassDecl
           src
-          (map (analyze newScope) modifiers)
-          ident
+          (map (analyze scope) modifiers)
+          idnt
           typeParams
           mbRefType
           refTypes
           (analyze newScope classBody)
-  analyze scope recordDecl@(RecordDecl src modifiers ident typeParams recordFieldDecls refTypes classBody) =
-    let newScope = addFields scope recordDecl
+  analyze scope (RecordDecl src modifiers idnt typeParams recordFieldDecls refTypes classBody) =
+    let newScope = addFields scope (fieldsFromClassBody classBody)
      in RecordDecl
           src
-          (map (analyze newScope) modifiers)
-          ident
+          (map (analyze scope) modifiers)
+          idnt
           typeParams
           recordFieldDecls
           refTypes
           (analyze newScope classBody)
-  analyze scope enumDecl@(EnumDecl src modifiers ident refTypes enumBody) =
-    let newScope = addFields scope enumDecl
+  analyze scope (EnumDecl src modifiers idnt refTypes enumBody) =
+    let newScope = addFields scope (fieldsFromEnumBody enumBody)
      in EnumDecl
           src
-          (map (analyze newScope) modifiers)
-          ident
+          (map (analyze scope) modifiers)
+          idnt
           refTypes
           (analyze newScope enumBody)
 
 instance Transform MemberDecl where
-  analyze scope (FieldDecl span modifiers type_ varDecls) = FieldDecl span (map (analyze scope) modifiers) type_ (map (analyze scope) varDecls)
-  analyze scope methodDecl@(MethodDecl span modifiers typeParams mbType ident formalParams exceptionTypes mbExp methodBody) =
+  analyze scope (FieldDecl srcspan modifiers type_ varDecls) =
+    FieldDecl srcspan (map (analyze scope) modifiers) type_ (map (analyze scope) varDecls)
+  analyze scope methodDecl@(MethodDecl srcspan modifiers typeParams mbType idnt fp exceptionTypes mbExp methodBody) =
     MethodDecl
-      span
+      srcspan
       (map (analyze scope) modifiers)
       typeParams
       mbType
-      ident
-      (map (analyze scope) formalParams)
+      idnt
+      (map (analyze scope) fp)
       exceptionTypes
       (fmap (analyze scope) mbExp)
       (analyze (addFormalParams scope (methodParameters methodDecl)) methodBody)
-  analyze scope constructorDecl@(ConstructorDecl span modifiers typeParams ident formalParams exceptionTypes constructorBody) =
+  analyze scope constructorDecl@(ConstructorDecl srcspan modifiers typeParams idnt fp exceptionTypes constructorBody) =
     ConstructorDecl
-      span
+      srcspan
       (map (analyze scope) modifiers)
       typeParams
-      ident
-      (map (analyze scope) formalParams)
+      idnt
+      (map (analyze scope) fp)
       exceptionTypes
       (analyze (addFormalParams scope (methodParameters constructorDecl)) constructorBody)
   analyze scope (MemberClassDecl classDecl) = MemberClassDecl (analyze scope classDecl)
@@ -91,74 +98,77 @@ instance Transform Block where
 
 instance Transform Stmt where
   analyze scope (StmtBlock block) = StmtBlock (analyze scope block)
-  analyze scope (IfThen span exp stmt) = IfThen span (analyze scope exp) (analyze scope stmt)
-  analyze scope (IfThenElse span exp stmt1 stmt2) = IfThenElse span (analyze scope exp) (analyze scope stmt1) (analyze scope stmt2)
-  analyze scope (While span exp stmt) = While span (analyze scope exp) (analyze scope stmt)
-  analyze scope basicFor@(BasicFor span mbForInit mbExp mbExps stmt) =
-    let newScope = addLocalVars scope (localVarsInStmt basicFor)
+  analyze scope (IfThen srcspan expr stmt) = IfThen srcspan (analyze scope expr) (analyze scope stmt)
+  analyze scope (IfThenElse srcspan expr stmt1 stmt2) = IfThenElse srcspan (analyze scope expr) (analyze scope stmt1) (analyze scope stmt2)
+  analyze scope (While srcspan expr stmt) = While srcspan (analyze scope expr) (analyze scope stmt)
+  analyze scope (BasicFor srcspan mbForInit mbExp mbExps stmt) =
+    let newScope = addLocalVars scope (localVarsInBasicForInit mbForInit)
      in BasicFor
-          span
+          srcspan
           (fmap (analyze scope) mbForInit)
           (fmap (analyze newScope) mbExp)
           (fmap (map (analyze newScope)) mbExps)
           (analyze newScope stmt)
-  analyze scope enhancedFor@(EnhancedFor span mods type_ ident exp stmt) =
+  analyze scope (EnhancedFor srcspan mods type_ idnt expr stmt) =
     EnhancedFor
-      span
+      srcspan
       (map (analyze scope) mods)
       type_
-      ident
-      (analyze scope exp)
-      (analyze (addLocalVars scope (localVarsInStmt enhancedFor)) stmt)
+      idnt
+      (analyze scope expr)
+      (analyze (addLocalVars scope [idnt]) stmt)
   analyze _ Empty = Empty
-  analyze scope (ExpStmt span exp) = ExpStmt span (analyze scope exp)
-  analyze scope (Assert exp mbExp) = Assert (analyze scope exp) (fmap (analyze scope) mbExp)
-  analyze scope (Switch switchStyle exp switchBlocks) = Switch switchStyle (analyze scope exp) (map (analyze scope) switchBlocks)
-  analyze scope (Do span exp stmt) = Do span (analyze scope exp) (analyze scope stmt)
-  analyze _ (Break span mbIdent) = Break span mbIdent
+  analyze scope (ExpStmt srcspan expr) = ExpStmt srcspan (analyze scope expr)
+  analyze scope (Assert expr mbExp) = Assert (analyze scope expr) (fmap (analyze scope) mbExp)
+  analyze scope (Switch switchStyle expr switchBlocks) = Switch switchStyle (analyze scope expr) (map (analyze scope) switchBlocks)
+  analyze scope (Do srcspan expr stmt) = Do srcspan (analyze scope expr) (analyze scope stmt)
+  analyze _ (Break srcspan mbIdent) = Break srcspan mbIdent
   analyze _ (Continue mbIdent) = Continue mbIdent
-  analyze scope (Return span mbExp) = Return span (fmap (analyze scope) mbExp)
-  analyze scope (Synchronized exp block) = Synchronized (analyze scope exp) (analyze scope block)
-  analyze scope (Throw exp) = Throw (analyze scope exp)
-  analyze scope tryStmt@(Try span tryResources block catches mbBlock) =
+  analyze scope (Return srcspan mbExp) = Return srcspan (fmap (analyze scope) mbExp)
+  analyze scope (Synchronized expr block) = Synchronized (analyze scope expr) (analyze scope block)
+  analyze scope (Throw expr) = Throw (analyze scope expr)
+  analyze scope (Try srcspan tryResources block catches mbBlock) =
     Try
-      span
+      srcspan
       (map (analyze scope) tryResources)
-      (analyze (addLocalVars scope (localVarsInStmt tryStmt)) block)
+      (analyze (addLocalVars scope (localVarsInTryResources tryResources)) block)
       (map (analyze scope) catches)
       (fmap (analyze scope) mbBlock)
-  analyze scope (Labeled ident stmt) = Labeled ident (analyze scope stmt)
+  analyze scope (Labeled idnt stmt) = Labeled idnt (analyze scope stmt)
 
 -- classification of MethodInvocation name
 instance Transform MethodInvocation where
   -- Todo : classify multipart name
-  analyze scope (MethodCall Nothing ident args) = MethodCall Nothing ident (map (analyze scope) args)
-  analyze scope (MethodCall (Just name@(Name _ [singleId])) ident args) = MethodCall (Just (classifyName singleId scope name)) ident (map (analyze scope) args)
-  analyze scope (MethodCall mbName ident args) = MethodCall Nothing ident (map (analyze scope) args)
-  analyze scope (PrimaryMethodCall exp refTypes ident args) = PrimaryMethodCall (analyze scope exp) refTypes ident (map (analyze scope) args)
-  analyze scope (SuperMethodCall refTypes ident args) = SuperMethodCall refTypes ident (map (analyze scope) args)
-  analyze scope (ClassMethodCall name refTypes ident args) = ClassMethodCall name refTypes ident (map (analyze scope) args)
-  analyze scope (TypeMethodCall name refTypes ident args) = TypeMethodCall name refTypes ident (map (analyze scope) args)
+  analyze scope (MethodCall Nothing idnt args) = MethodCall Nothing idnt (map (analyze scope) args)
+  analyze scope (MethodCall (Just name@(Name _ [singleId])) idnt args) = MethodCall (Just (classifyName singleId scope name)) idnt (map (analyze scope) args)
+  analyze scope (MethodCall _ idnt args) = MethodCall Nothing idnt (map (analyze scope) args)
+  analyze scope (PrimaryMethodCall expr refTypes idnt args) = PrimaryMethodCall (analyze scope expr) refTypes idnt (map (analyze scope) args)
+  analyze scope (SuperMethodCall refTypes idnt args) = SuperMethodCall refTypes idnt (map (analyze scope) args)
+  analyze scope (ClassMethodCall name refTypes idnt args) = ClassMethodCall name refTypes idnt (map (analyze scope) args)
+  analyze scope (TypeMethodCall name refTypes idnt args) = TypeMethodCall name refTypes idnt (map (analyze scope) args)
 
 classifyName :: Ident -> IdentCollection -> Name -> ClassifiedName
-classifyName ident (IdentCollection cfields formal locals) = if any (eq IgnoreSourceSpan ident) (cfields ++ formal ++ locals) then ExpressionName else TypeName
+classifyName idnt ic =
+  if isIdent idnt ic then ExpressionName else TypeName
 
 -- helper functions
 
 identFromVarDeclId :: VarDeclId -> Ident
-identFromVarDeclId (VarId ident) = ident
+identFromVarDeclId (VarId idnt) = idnt
 identFromVarDeclId (VarDeclArray _ varDeclId) = identFromVarDeclId varDeclId
 
 -- class fields from ClassDecl
-fieldsFromClassDecl :: ClassDecl p -> [Ident]
-fieldsFromClassDecl (ClassDecl _ _ _ _ _ _ (ClassBody decls)) = identsfromDecls decls
-fieldsFromClassDecl (RecordDecl _ _ _ _ _ _ (ClassBody decls)) = identsfromDecls decls
-fieldsFromClassDecl (EnumDecl _ _ _ _ (EnumBody _ decls)) = identsfromDecls decls
+
+fieldsFromClassBody :: ClassBody p -> [Ident]
+fieldsFromClassBody (ClassBody decls) = identsfromDecls decls
+
+fieldsFromEnumBody :: EnumBody p -> [Ident]
+fieldsFromEnumBody (EnumBody _ decls) = identsfromDecls decls
 
 identsfromDecls :: [Decl p] -> [Ident]
 identsfromDecls decls = do
   map
-    (identFromVarDeclId . (\(VarDecl _ id _) -> id))
+    (identFromVarDeclId . (\(VarDecl _ varId _) -> varId))
     ( concatMap
         ( \case
             (MemberDecl (FieldDecl _ _ _ vars)) -> vars
@@ -167,7 +177,7 @@ identsfromDecls decls = do
         decls
     )
 
--- | ident of exception parameter from Catch
+-- | idnt of exception parameter from Catch
 exceptionParameter :: Catch p -> [Ident]
 exceptionParameter (Catch (FormalParam _ _ _ _ vardeclId) _) = [identFromVarDeclId vardeclId]
 
@@ -184,18 +194,19 @@ identsFromParams = map (identFromVarDeclId . (\(FormalParam _ _ _ _ vardeclId) -
 localVarsInBlock :: Block p -> [Ident]
 localVarsInBlock (Block blockstmts) = concatMap identsFromBlockStmt blockstmts
   where
-    identsFromBlockStmt (LocalVars _ _ _ varDecls) = map (identFromVarDeclId . (\(VarDecl _ id _) -> id)) varDecls
+    identsFromBlockStmt (LocalVars _ _ _ varDecls) = map (identFromVarDeclId . (\(VarDecl _ varId _) -> varId)) varDecls
     identsFromBlockStmt _ = []
 
 -- | idents of local variables from basicFor, enhancedFor and tryWithResource
-localVarsInStmt :: Stmt p -> [Ident]
-localVarsInStmt (BasicFor _ (Just (ForLocalVars _ _ varDecls)) _ _ _) = map (identFromVarDeclId . (\(VarDecl _ id _) -> id)) varDecls
-localVarsInStmt (EnhancedFor _ _ _ ident _ _) = [ident]
-localVarsInStmt (Try _ tryResources _ _ _) = mapMaybe identFromTryResource tryResources
+localVarsInTryResources :: [TryResource p] -> [Ident]
+localVarsInTryResources = mapMaybe identFromTryResource
   where
     identFromTryResource (TryResourceVarDecl (ResourceDecl _ _ vardDeclId _)) = Just (identFromVarDeclId vardDeclId)
     identFromTryResource _ = Nothing
-localVarsInStmt _ = []
+
+localVarsInBasicForInit :: Maybe (ForInit p) -> [Ident]
+localVarsInBasicForInit (Just (ForLocalVars _ _ varDecls)) = map (identFromVarDeclId . (\(VarDecl _ varid _) -> varid)) varDecls
+localVarsInBasicForInit _ = []
 
 -- boiler plate cases
 
@@ -211,12 +222,12 @@ instance Transform TypeDecl where
   analyze scope (InterfaceTypeDecl interfaceDecl) = InterfaceTypeDecl (analyze scope interfaceDecl)
 
 instance Transform InterfaceDecl where
-  analyze scope (InterfaceDecl src kind modifiers ident typeParams refTypesExtends refTypesPermits interfaceBody) =
+  analyze scope (InterfaceDecl src kind modifiers idnt typeParams refTypesExtends refTypesPermits interfaceBody) =
     InterfaceDecl
       src
       kind
       (map (analyze scope) modifiers)
-      ident
+      idnt
       typeParams
       refTypesExtends
       refTypesPermits
@@ -238,14 +249,14 @@ instance Transform Modifier where
   analyze _ Sealed = Sealed
 
 instance Transform Annotation where
-  analyze scope (NormalAnnotation span annName annkV) =
+  analyze scope (NormalAnnotation srcspan annoName annkV) =
     NormalAnnotation
-      span
-      annName
+      srcspan
+      annoName
       (map (second (analyze scope)) annkV)
-  analyze scope (SingleElementAnnotation span annName annValue) =
-    SingleElementAnnotation span annName (analyze scope annValue)
-  analyze _ (MarkerAnnotation span annName) = MarkerAnnotation span annName
+  analyze scope (SingleElementAnnotation srcspan annoName annoValue) =
+    SingleElementAnnotation srcspan annoName (analyze scope annoValue)
+  analyze _ (MarkerAnnotation srcspan annoName) = MarkerAnnotation srcspan annoName
 
 instance Transform ClassBody where
   analyze scope (ClassBody decls) = ClassBody (map (analyze scope) decls)
@@ -265,18 +276,18 @@ instance Transform Decl where
   analyze scope (InitDecl static block) = InitDecl static (analyze scope block)
 
 instance Transform EnumConstant where
-  analyze scope (EnumConstant ident arguments mbClassBody) = EnumConstant ident (map (analyze scope) arguments) (fmap (analyze scope) mbClassBody)
+  analyze scope (EnumConstant idnt arguments mbClassBody) = EnumConstant idnt (map (analyze scope) arguments) (fmap (analyze scope) mbClassBody)
 
 instance Transform VarInit where
-  analyze scope (InitExp exp) = InitExp (analyze scope exp)
+  analyze scope (InitExp expr) = InitExp (analyze scope expr)
   analyze scope (InitArray arrayInit) = InitArray (analyze scope arrayInit)
 
 instance Transform BlockStmt where
-  analyze scope (BlockStmt span stmt) = BlockStmt span (analyze scope stmt)
+  analyze scope (BlockStmt srcspan stmt) = BlockStmt srcspan (analyze scope stmt)
   analyze scope (LocalClass classDecl) = LocalClass (analyze scope classDecl)
-  analyze scope (LocalVars span modifiers type_ varDecls) =
+  analyze scope (LocalVars srcspan modifiers type_ varDecls) =
     LocalVars
-      span
+      srcspan
       (map (analyze scope) modifiers)
       type_
       (map (analyze scope) varDecls)
@@ -292,11 +303,11 @@ instance Transform Exp where
       typeDeclSpec
       (map (analyze scope) arguments)
       (fmap (analyze scope) mbClassBody)
-  analyze scope (QualInstanceCreation exp typeArgs ident arguments mbClassBody) =
+  analyze scope (QualInstanceCreation expr typeArgs idnt arguments mbClassBody) =
     QualInstanceCreation
-      (analyze scope exp)
+      (analyze scope expr)
       typeArgs
-      ident
+      idnt
       (map (analyze scope) arguments)
       (fmap (analyze scope) mbClassBody)
   analyze scope (ArrayCreate type_ exps int) = ArrayCreate type_ (map (analyze scope) exps) int
@@ -305,28 +316,28 @@ instance Transform Exp where
   analyze scope (MethodInv methodInv) = MethodInv (analyze scope methodInv)
   analyze scope (ArrayAccess arrayIndex) = ArrayAccess (analyze scope arrayIndex)
   analyze _ (ExpName name) = ExpName name
-  analyze scope (PostIncrement span exp) = PostIncrement span (analyze scope exp)
-  analyze scope (PostDecrement span exp) = PostDecrement span (analyze scope exp)
-  analyze scope (PreIncrement span exp) = PreIncrement span (analyze scope exp)
-  analyze scope (PreDecrement span exp) = PreDecrement span (analyze scope exp)
-  analyze scope (PrePlus exp) = PrePlus (analyze scope exp)
-  analyze scope (PreMinus exp) = PreMinus (analyze scope exp)
-  analyze scope (PreBitCompl exp) = PreBitCompl (analyze scope exp)
-  analyze scope (PreNot exp) = PreNot (analyze scope exp)
-  analyze scope (Cast type_ exp) = Cast type_ (analyze scope exp)
+  analyze scope (PostIncrement srcspan expr) = PostIncrement srcspan (analyze scope expr)
+  analyze scope (PostDecrement srcspan expr) = PostDecrement srcspan (analyze scope expr)
+  analyze scope (PreIncrement srcspan expr) = PreIncrement srcspan (analyze scope expr)
+  analyze scope (PreDecrement srcspan expr) = PreDecrement srcspan (analyze scope expr)
+  analyze scope (PrePlus expr) = PrePlus (analyze scope expr)
+  analyze scope (PreMinus expr) = PreMinus (analyze scope expr)
+  analyze scope (PreBitCompl expr) = PreBitCompl (analyze scope expr)
+  analyze scope (PreNot expr) = PreNot (analyze scope expr)
+  analyze scope (Cast type_ expr) = Cast type_ (analyze scope expr)
   analyze scope (BinOp exp1 op exp2) = BinOp (analyze scope exp1) op (analyze scope exp2)
-  analyze scope (InstanceOf exp refType mbName) = InstanceOf (analyze scope exp) refType mbName
-  analyze scope (Cond span exp1 exp2 exp3) = Cond span (analyze scope exp1) (analyze scope exp2) (analyze scope exp3)
-  analyze scope (Assign span lhs assignOp exp) = Assign span (analyze scope lhs) assignOp (analyze scope exp)
+  analyze scope (InstanceOf expr refType mbName) = InstanceOf (analyze scope expr) refType mbName
+  analyze scope (Cond srcspan exp1 exp2 exp3) = Cond srcspan (analyze scope exp1) (analyze scope exp2) (analyze scope exp3)
+  analyze scope (Assign srcspan lhs assignOp expr) = Assign srcspan (analyze scope lhs) assignOp (analyze scope expr)
   analyze scope (Lambda lambdaParams lambdaExp) = Lambda (analyze scope lambdaParams) (analyze scope lambdaExp)
   analyze _ (MethodRef name target) = MethodRef name target
-  analyze scope (SwitchExp exp branches) = SwitchExp (analyze scope exp) (map (analyze scope) branches)
+  analyze scope (SwitchExp expr branches) = SwitchExp (analyze scope expr) (map (analyze scope) branches)
 
 instance Transform FormalParam where
-  analyze scope (FormalParam span modifiers type_ bool varDeclId) = FormalParam span (map (analyze scope) modifiers) type_ bool varDeclId
+  analyze scope (FormalParam srcspan modifiers type_ bool varDeclId) = FormalParam srcspan (map (analyze scope) modifiers) type_ bool varDeclId
 
 instance Transform VarDecl where
-  analyze scope (VarDecl span varDeclId mbVarInit) = VarDecl span varDeclId (fmap (analyze scope) mbVarInit)
+  analyze scope (VarDecl srcspan varDeclId mbVarInit) = VarDecl srcspan varDeclId (fmap (analyze scope) mbVarInit)
 
 instance Transform MethodBody where
   analyze scope (MethodBody mbBlock) = MethodBody (fmap (analyze scope) mbBlock)
@@ -338,12 +349,12 @@ instance Transform ArrayInit where
   analyze scope (ArrayInit varInits) = ArrayInit (map (analyze scope) varInits)
 
 instance Transform FieldAccess where
-  analyze scope (PrimaryFieldAccess exp ident) = PrimaryFieldAccess (analyze scope exp) ident
-  analyze _ (SuperFieldAccess ident) = SuperFieldAccess ident
-  analyze _ (ClassFieldAccess name ident) = ClassFieldAccess name ident
+  analyze scope (PrimaryFieldAccess expr idnt) = PrimaryFieldAccess (analyze scope expr) idnt
+  analyze _ (SuperFieldAccess idnt) = SuperFieldAccess idnt
+  analyze _ (ClassFieldAccess name idnt) = ClassFieldAccess name idnt
 
 instance Transform ArrayIndex where
-  analyze scope (ArrayIndex exp exps) = ArrayIndex (analyze scope exp) (map (analyze scope) exps)
+  analyze scope (ArrayIndex expr exps) = ArrayIndex (analyze scope expr) (map (analyze scope) exps)
 
 instance Transform Lhs where
   analyze _ (NameLhs name) = NameLhs name
@@ -351,12 +362,12 @@ instance Transform Lhs where
   analyze scope (ArrayLhs arrayIndex) = ArrayLhs (analyze scope arrayIndex)
 
 instance Transform LambdaParams where
-  analyze _ (LambdaSingleParam ident) = LambdaSingleParam ident
-  analyze scope (LambdaFormalParams formalParams) = LambdaFormalParams (map (analyze scope) formalParams)
+  analyze _ (LambdaSingleParam idnt) = LambdaSingleParam idnt
+  analyze scope (LambdaFormalParams params) = LambdaFormalParams (map (analyze scope) params)
   analyze _ (LambdaInferredParams idents) = LambdaInferredParams idents
 
 instance Transform LambdaExpression where
-  analyze scope (LambdaExpression exp) = LambdaExpression (analyze scope exp)
+  analyze scope (LambdaExpression expr) = LambdaExpression (analyze scope expr)
   analyze scope (LambdaBlock block) = LambdaBlock (analyze scope block)
 
 instance Transform ForInit where
@@ -371,20 +382,20 @@ instance Transform SwitchLabel where
   analyze _ Default = Default
 
 instance Transform SwitchExpBranchBody where
-  analyze scope (SwitchExpBranchExp exp) = SwitchExpBranchExp (analyze scope exp)
+  analyze scope (SwitchExpBranchExp expr) = SwitchExpBranchExp (analyze scope expr)
   analyze scope (SwitchExpBranchBlock blockStmts) = SwitchExpBranchBlock (map (analyze scope) blockStmts)
 
 instance Transform ExplConstrInv where
   analyze scope (ThisInvoke refTypes args) = ThisInvoke refTypes (map (analyze scope) args)
   analyze scope (SuperInvoke refTypes args) = SuperInvoke refTypes (map (analyze scope) args)
-  analyze scope (PrimarySuperInvoke exp refTypes args) = PrimarySuperInvoke (analyze scope exp) refTypes (map (analyze scope) args)
+  analyze scope (PrimarySuperInvoke expr refTypes args) = PrimarySuperInvoke (analyze scope expr) refTypes (map (analyze scope) args)
 
 instance Transform SwitchBlock where
-  analyze scope (SwitchBlock span switchLabel blockStmts) = SwitchBlock span (analyze scope switchLabel) (map (analyze scope) blockStmts)
+  analyze scope (SwitchBlock srcspan switchLabel blockStmts) = SwitchBlock srcspan (analyze scope switchLabel) (map (analyze scope) blockStmts)
 
 instance Transform TryResource where
   analyze scope (TryResourceVarDecl resourceDecl) = TryResourceVarDecl (analyze scope resourceDecl)
-  analyze _ (TryResourceVarAccess ident) = TryResourceVarAccess ident
+  analyze _ (TryResourceVarAccess idnt) = TryResourceVarAccess idnt
   analyze scope (TryResourceQualAccess fieldAccess) = TryResourceQualAccess (analyze scope fieldAccess)
 
 instance Transform ResourceDecl where
