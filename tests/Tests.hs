@@ -28,7 +28,7 @@ instance Arbitrary (TypeDecl p) where
   arbitrary = ClassTypeDecl <$> arbitrary
 
 instance Arbitrary (ClassDecl p) where
-  arbitrary = (ClassDecl dummySourceSpan [] <$> arbitrary) <*> pure [] <*> pure Nothing <*> pure [] <*> arbitrary
+  arbitrary = (\x y -> ClassDecl dummySourceSpan [] x [] Nothing [] y) <$> arbitrary <*> arbitrary
 
 instance Arbitrary (ClassBody p) where
   arbitrary = pure (ClassBody [])

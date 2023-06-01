@@ -321,7 +321,7 @@ instance PrettyExtension p => Pretty (Catch p) where
 
 instance PrettyExtension p => Pretty (SwitchBlock p) where
   prettyPrec p (SwitchBlock _ lbl stmts) =
-    vcat (prettyPrec p lbl <> char ':' : map (nest 2 . prettyPrec p) stmts)
+    vcat (prettyPrec p lbl <> colon : map (nest 2 . prettyPrec p) stmts)
 
 instance PrettyExtension p => Pretty (SwitchLabel p) where
   prettyPrec _p (SwitchCase e) =
