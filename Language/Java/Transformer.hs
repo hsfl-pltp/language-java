@@ -190,13 +190,6 @@ methodParameters _ = []
 identsFromParams :: [FormalParam p] -> [Ident]
 identsFromParams = map (identFromVarDeclId . (\(FormalParam _ _ _ _ vardeclId) -> vardeclId))
 
--- | idents of local variables from block
-localVarsInBlock :: Block p -> [Ident]
-localVarsInBlock (Block blockstmts) = concatMap identsFromBlockStmt blockstmts
-  where
-    identsFromBlockStmt (LocalVars _ _ _ varDecls) = map (identFromVarDeclId . (\(VarDecl _ varId _) -> varId)) varDecls
-    identsFromBlockStmt _ = []
-
 -- | idents of local variables from basicFor, enhancedFor and tryWithResource
 localVarsInTryResources :: [TryResource p] -> [Ident]
 localVarsInTryResources = mapMaybe identFromTryResource
