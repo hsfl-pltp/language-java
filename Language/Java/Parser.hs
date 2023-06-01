@@ -66,11 +66,8 @@ import Language.Java.Lexer (L1 (..), Token (..), lexer)
 import Language.Java.SourceSpan (Location (..), dummyLocation, locationEof)
 import Language.Java.Syntax
 import Text.Parsec
-  ( ParseError,
-    Parsec,
-    SourcePos,
+  ( Parsec,
     State (stateInput, statePos),
-    between,
     eof,
     getParserState,
     getState,
@@ -80,9 +77,6 @@ import Text.Parsec
     optionMaybe,
     optional,
     runParser,
-    sourceColumn,
-    sourceLine,
-    sourceName,
     token,
     try,
     (<?>),
@@ -101,7 +95,6 @@ import Control.Applicative ( (<$>), (<$), (<*) )
 infixl 4 <*>
 #else
 import Control.Applicative ( (<$>), (<$), (<*), (<*>) )
-import GHC.IO (unsafePerformIO)
 #endif
 
 mapFst :: (a -> b) -> (a, c) -> (b, c)
@@ -153,22 +146,6 @@ getEndLoc = do
           let file = sourceName (statePos parserState)
            in return (Location {loc_file = file, loc_line = line, loc_column = column + len})
     else return dummyLocation
-
--- unused Functions
--- getNextTok :: P (Maybe (L1 Token))
--- getNextTok = do
---  state <- getParserState
---  case stateInput state of
---    [] -> return Nothing
---    (x : _) -> return (Just x)
-
--- traceP :: String -> P ()
--- traceP s =
--- unsafePerformIO (logToFile s) `seq` return ()
-
--- logToFile :: String -> IO ()
--- logToFile msg =
---   appendFile "hs-java-parser.log" (msg ++ "\n")
 
 -- A trick to allow >> and >>=, normally infixr 1, to be
 -- used inside branches of <|>, which is declared as infixl 1.

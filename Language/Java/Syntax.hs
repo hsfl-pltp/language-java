@@ -171,7 +171,7 @@ instance EqualityExtension p => Equality (TypeDecl p) where
 
 instance Located (TypeDecl p) where
   sourceSpan (ClassTypeDecl cd) = sourceSpan cd
-  sourceSpan (InterfaceTypeDecl id) = sourceSpan id
+  sourceSpan (InterfaceTypeDecl itd) = sourceSpan itd
 
 -- | A class declaration specifies a new named reference type.
 data ClassDecl p
@@ -538,7 +538,7 @@ instance ShowExtension p => Located (Modifier p) where
   sourceSpan (Public s) = s
   sourceSpan (Abstract s) = s
   sourceSpan (Annotation a) = sourceSpan a
-  sourceSpan mod = error ("No SourceSpan implemented for Modifier: " ++ show mod)
+  sourceSpan m = error ("No SourceSpan implemented for Modifier: " ++ show m)
 
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation p
