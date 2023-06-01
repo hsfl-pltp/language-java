@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module TransformerTests where
 
 import Data.Generics.Uniplate.Data (universeBi)
@@ -19,7 +17,10 @@ typeNameFile :: FilePath
 typeNameFile = "tests" </> "java" </> "transformer" </> "TypeName.java"
 
 allTransformerTests :: [TestTree]
-allTransformerTests = [expressionNameTests, typeNameTests]
+allTransformerTests =
+  [ createTestTree "ExpressionName" expressionFile isExpressionName,
+    createTestTree "TypeName" typeNameFile isTypeName
+  ]
 
 createTestTree :: String -> FilePath -> (ClassifiedName -> Bool) -> TestTree
 createTestTree testName filepath predicate =
@@ -31,29 +32,15 @@ createTestTree testName filepath predicate =
           Left parseError -> assertFailure (show parseError)
           Right cUnit -> do
             let classifiedNames = universeBi (analyzeCompilationUnit cUnit)
-            case filter
-              predicate
-              classifiedNames of
+            case filter predicate classifiedNames of
               [] -> return ()
               xs -> assertFailure (intercalate "\n" (map (show . sourceSpan) xs))
     )
 
-expressionNameTests :: TestTree
-expressionNameTests =
-  createTestTree
-    "ExpressionName"
-    expressionFile
-    ( \case
-        (ExpressionName _) -> False
-        _ -> True
-    )
+isExpressionName :: ClassifiedName -> Bool
+isExpressionName (ExpressionName _) = False
+isExpressionName _ = True
 
-typeNameTests :: TestTree
-typeNameTests =
-  createTestTree
-    "TypeName"
-    typeNameFile
-    ( \case
-        (TypeName _) -> False
-        _ -> True
-    )
+isTypeName :: ClassifiedName -> Bool
+isTypeName (TypeName _) = False
+isTypeName _ = True

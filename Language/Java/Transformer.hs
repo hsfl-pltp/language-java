@@ -4,6 +4,7 @@ module Language.Java.Transformer (analyzeCompilationUnit) where
 
 import Data.Bifunctor (Bifunctor (second))
 import Data.Maybe (mapMaybe)
+import Language.Java.Parser (blockStmt)
 import Language.Java.Syntax
 
 analyzeCompilationUnit :: CompilationUnit Parsed -> CompilationUnit Analyzed
@@ -202,11 +203,11 @@ localVarsInBasicForInit (Just (ForLocalVars _ _ varDecls)) = map (identFromVarDe
 localVarsInBasicForInit _ = []
 
 analyzeBlockStmts :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
-analyzeBlockStmts __ [] = []
-analyzeBlockStmts scope (x@(LocalVars _ _ _ varDecls) : xs) =
+analyzeBlockStmts _ [] = []
+analyzeBlockStmts scope (blckStmt@(LocalVars _ _ _ varDecls) : rest) =
   let newscope = addLocalVars scope (map (identFromVarDeclId . (\(VarDecl _ varId _) -> varId)) varDecls)
-   in analyze scope x : analyzeBlockStmts newscope xs
-analyzeBlockStmts scope (x : xs) = analyze scope x : analyzeBlockStmts scope xs
+   in analyze newscope blckStmt : analyzeBlockStmts newscope rest
+analyzeBlockStmts scope (blckStmt : rest) = analyze scope blckStmt : analyzeBlockStmts scope rest
 
 -- boiler plate cases
 

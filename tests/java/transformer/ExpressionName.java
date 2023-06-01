@@ -9,6 +9,8 @@ public class TestA {
     public void funcA(TestB formalParam) {
         formalParam.funcB();
         field.funcB();
+        TestB a = new TestB(), b = a.myself();
+        TestB a1 = field.myself(), a2 = a1.myself();
 
         try (TestB tryTestB = new TestB()){
             tryTestB.funcB();
