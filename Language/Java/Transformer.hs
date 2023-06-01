@@ -94,7 +94,7 @@ instance Transform Catch where
       (analyze (addFormalParams scope (exceptionParameter catch)) block)
 
 instance Transform Block where
-  analyze scope block@(Block blockstmts) = Block (map (analyze (addLocalVars scope (localVarsInBlock block))) blockstmts)
+  analyze scope (Block blockstmts) = Block (analyzeBlockStmts scope blockstmts)
 
 instance Transform Stmt where
   analyze scope (StmtBlock block) = StmtBlock (analyze scope block)
@@ -207,6 +207,13 @@ localVarsInTryResources = mapMaybe identFromTryResource
 localVarsInBasicForInit :: Maybe (ForInit p) -> [Ident]
 localVarsInBasicForInit (Just (ForLocalVars _ _ varDecls)) = map (identFromVarDeclId . (\(VarDecl _ varid _) -> varid)) varDecls
 localVarsInBasicForInit _ = []
+
+analyzeBlockStmts :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
+analyzeBlockStmts __ [] = []
+analyzeBlockStmts scope (x@(LocalVars _ _ _ varDecls) : xs) =
+  let newscope = addLocalVars scope (map (identFromVarDeclId . (\(VarDecl _ varId _) -> varId)) varDecls)
+   in analyze scope x : analyzeBlockStmts newscope xs
+analyzeBlockStmts scope (x : xs) = analyze scope x : analyzeBlockStmts scope xs
 
 -- boiler plate cases
 

@@ -15,25 +15,45 @@ import Test.Tasty.HUnit
 expressionFile :: FilePath
 expressionFile = "tests" </> "java" </> "transformer" </> "ExpressionName.java"
 
-allTransformerTests :: [TestTree]
-allTransformerTests = [expressionNameTests]
+typeNameFile :: FilePath
+typeNameFile = "tests" </> "java" </> "transformer" </> "TypeName.java"
 
-expressionNameTests :: TestTree
-expressionNameTests =
+allTransformerTests :: [TestTree]
+allTransformerTests = [expressionNameTests, typeNameTests]
+
+createTestTree :: String -> FilePath -> (ClassifiedName -> Bool) -> TestTree
+createTestTree testName filepath predicate =
   testCase
-    "ExressionName"
+    testName
     ( do
-        result <- parser compilationUnit expressionFile <$> readFile expressionFile
+        result <- parser compilationUnit filepath <$> readFile filepath
         case result of
           Left parseError -> assertFailure (show parseError)
           Right cUnit -> do
             let classifiedNames = universeBi (analyzeCompilationUnit cUnit)
             case filter
-              ( \case
-                  (ExpressionName _) -> False
-                  _ -> True
-              )
+              predicate
               classifiedNames of
               [] -> return ()
               xs -> assertFailure (intercalate "\n" (map (show . sourceSpan) xs))
+    )
+
+expressionNameTests :: TestTree
+expressionNameTests =
+  createTestTree
+    "ExpressionName"
+    expressionFile
+    ( \case
+        (ExpressionName _) -> False
+        _ -> True
+    )
+
+typeNameTests :: TestTree
+typeNameTests =
+  createTestTree
+    "TypeName"
+    typeNameFile
+    ( \case
+        (TypeName _) -> False
+        _ -> True
     )
