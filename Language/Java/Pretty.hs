@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Language.Java.Pretty where
 
@@ -80,8 +81,16 @@ instance PrettyExtension p => Pretty (ClassDecl p) where
         ppImplements p impls
       ]
       $$ prettyPrec p body
-
--- FIXME: case for record missing
+  prettyPrec p (RecordDecl _ mods ident tParams recordFields impls body) =
+    hsep
+      [ hsep (map (prettyPrec p) mods),
+        text "record",
+        prettyPrec p ident,
+        ppTypeParams p tParams,
+        ppArgs p recordFields,
+        ppImplements p impls
+      ]
+      $$ prettyPrec p body
 
 instance PrettyExtension p => Pretty (ClassBody p) where
   prettyPrec p (ClassBody ds) =
@@ -151,6 +160,10 @@ instance PrettyExtension p => Pretty (MemberDecl p) where
       $$ prettyPrec p body
   prettyPrec p (MemberClassDecl cd) = prettyPrec p cd
   prettyPrec p (MemberInterfaceDecl mid) = prettyPrec p mid
+
+instance Pretty RecordFieldDecl where
+  prettyPrec p (RecordFieldDecl t ident) =
+    prettyPrec p t <+> prettyPrec p ident
 
 instance PrettyExtension p => Pretty (VarDecl p) where
   prettyPrec p (VarDecl _ vdId Nothing) = prettyPrec p vdId
@@ -308,12 +321,19 @@ instance PrettyExtension p => Pretty (Catch p) where
 
 instance PrettyExtension p => Pretty (SwitchBlock p) where
   prettyPrec p (SwitchBlock _ lbl stmts) =
-    vcat (prettyPrec p lbl : map (nest 2 . prettyPrec p) stmts)
+    vcat (prettyPrec p lbl <> char ':' : map (nest 2 . prettyPrec p) stmts)
 
 instance PrettyExtension p => Pretty (SwitchLabel p) where
   prettyPrec _p (SwitchCase e) =
-    text "case" <+> hsep (intersperse comma $ map (prettyPrec 0) e) <> colon
-  prettyPrec _p Default = text "default:"
+    text "case" <+> hsep (intersperse comma $ map (prettyPrec 0) e)
+  prettyPrec _p Default = text "default"
+
+instance PrettyExtension p => Pretty (SwitchExpBranch p) where
+  prettyPrec :: PrettyExtension p => Int -> SwitchExpBranch p -> Doc
+  prettyPrec p (SwitchExpBranch lbl (SwitchExpBranchExp e)) =
+    prettyPrec p lbl <+> text "->" <+> prettyPrec p e
+  prettyPrec p (SwitchExpBranch lbl (SwitchExpBranchBlock blockStmts)) =
+    prettyPrec p lbl <+> text "->" <+> braceBlock (map (prettyPrec p) blockStmts)
 
 instance PrettyExtension p => Pretty (ForInit p) where
   prettyPrec p (ForLocalVars mods t vds) =
@@ -400,8 +420,12 @@ instance PrettyExtension p => Pretty (Exp p) where
     prettyPrec p i1 <+> text "::" <+> prettyPrec p i2
   prettyPrec p (MethodRef i1 MethodRefConstructor) =
     prettyPrec p i1 <+> text "::new"
-
--- FIXME: case for newstyle switch exp missing
+  prettyPrec p (SwitchExp e branches) =
+    hsep
+      [ text "switch",
+        parens (prettyPrec p e),
+        braceBlock (map (prettyPrec p) branches)
+      ]
 
 instance PrettyExtension p => Pretty (LambdaParams p) where
   prettyPrec p (LambdaSingleParam ident) = prettyPrec p ident
