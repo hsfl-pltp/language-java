@@ -37,7 +37,8 @@ Library
                         Language.Java.Syntax,
                         Language.Java.Parser,
                         Language.Java.Pretty,
-                        Language.Java.SourceSpan
+                        Language.Java.SourceSpan,
+                        Language.Java.Transformer
   
   Other-modules:	      Language.Java.Syntax.Types,
                         Language.Java.Syntax.Exp,
@@ -55,4 +56,5 @@ Test-Suite test-java-parse
                    , language-java
                    , filepath
                    , directory
+                   , uniplate
   ghc-options:       -Wall -fno-warn-orphans -fno-warn-missing-signatures

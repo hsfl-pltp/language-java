@@ -158,6 +158,14 @@ data ClassifiedName
   | PackageName Name
   deriving (Show, Read, Typeable, Generic, Data)
 
+isExpressionName :: ClassifiedName -> Bool
+isExpressionName (ExpressionName _) = False
+isExpressionName _ = True
+
+isTypeName :: ClassifiedName -> Bool
+isTypeName (TypeName _) = False
+isTypeName _ = True
+
 instance Equality ClassifiedName where
   eq opt (ExpressionName n1) (ExpressionName n2) =
     eq opt n1 n2
@@ -166,3 +174,8 @@ instance Equality ClassifiedName where
   eq opt (PackageName n1) (PackageName n2) =
     eq opt n1 n2
   eq _ _ _ = False
+
+instance Located ClassifiedName where
+  sourceSpan (ExpressionName n) = sourceSpan n
+  sourceSpan (TypeName n) = sourceSpan n
+  sourceSpan (PackageName n) = sourceSpan n
