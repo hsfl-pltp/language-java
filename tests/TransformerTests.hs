@@ -4,7 +4,7 @@ import Data.Generics.Uniplate.Data (universeBi)
 import Data.List (intercalate)
 import Language.Java.Parser
 import Language.Java.SourceSpan (Located (sourceSpan))
-import Language.Java.Syntax (ClassifiedName (..))
+import Language.Java.Syntax (ClassifiedName (..), isExpressionName, isTypeName)
 import Language.Java.Transformer
 import System.FilePath ((</>))
 import Test.Tasty (TestTree)
@@ -36,11 +36,3 @@ createTestTree testName filepath predicate =
               [] -> return ()
               xs -> assertFailure (intercalate "\n" (map (show . sourceSpan) xs))
     )
-
-isExpressionName :: ClassifiedName -> Bool
-isExpressionName (ExpressionName _) = False
-isExpressionName _ = True
-
-isTypeName :: ClassifiedName -> Bool
-isTypeName (TypeName _) = False
-isTypeName _ = True
