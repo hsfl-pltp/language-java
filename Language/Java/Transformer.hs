@@ -56,6 +56,13 @@ instance Transform MethodInvocation where
   analyze scope (ClassMethodCall name refTypes idnt args) = ClassMethodCall name refTypes idnt (map (analyze scope) args)
   analyze scope (TypeMethodCall name refTypes idnt args) = TypeMethodCall name refTypes idnt (map (analyze scope) args)
 
+instance Transform CompilationUnit where
+  analyze scope (CompilationUnit mbPackageDecl importDecls typeDecls) =
+    CompilationUnit
+      mbPackageDecl
+      importDecls
+      (map (analyze (addTypeVarIdentifiers (topLevelClasses typeDecls) scope)) typeDecls)
+
 instance Transform ClassDecl where
   analyze scope (ClassDecl src modifiers idnt typeParams mbRefType refTypes classBody) =
     let newScope = (addTypeVarIdentifiers (idnt : classesFromClassBody classBody) . addFields (fieldsFromClassBody classBody)) scope
@@ -163,6 +170,24 @@ instance Transform Stmt where
 
 -- helper functions
 
+topLevelClasses :: [TypeDecl p] -> [Ident]
+topLevelClasses =
+  mapMaybe
+    ( \case
+        (ClassTypeDecl classDecl) -> Just (identFromClass classDecl)
+        _ -> Nothing
+    )
+
+analyzeBlockStmts :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
+analyzeBlockStmts _ [] = []
+analyzeBlockStmts scope (blckStmt@(LocalVars _ _ _ varDecls) : rest) =
+  let newscope = addLocalVars (map (identFromVarDeclId . (\(VarDecl _ varId _) -> varId)) varDecls) scope
+   in analyze newscope blckStmt : analyzeBlockStmts newscope rest
+analyzeBlockStmts scope (blckStmt@(LocalClass classDecl) : rest) =
+  let newscope = addTypeVarIdentifiers [identFromClass classDecl] scope
+   in analyze newscope blckStmt : analyzeBlockStmts newscope rest
+analyzeBlockStmts scope (blckStmt : rest) = analyze scope blckStmt : analyzeBlockStmts scope rest
+
 identFromVarDeclId :: VarDeclId -> Ident
 identFromVarDeclId (VarId idnt) = idnt
 identFromVarDeclId (VarDeclArray _ varDeclId) = identFromVarDeclId varDeclId
@@ -226,24 +251,7 @@ localVarsInBasicForInit :: Maybe (ForInit p) -> [Ident]
 localVarsInBasicForInit (Just (ForLocalVars _ _ varDecls)) = map (identFromVarDeclId . (\(VarDecl _ varid _) -> varid)) varDecls
 localVarsInBasicForInit _ = []
 
-analyzeBlockStmts :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
-analyzeBlockStmts _ [] = []
-analyzeBlockStmts scope (blckStmt@(LocalVars _ _ _ varDecls) : rest) =
-  let newscope = addLocalVars (map (identFromVarDeclId . (\(VarDecl _ varId _) -> varId)) varDecls) scope
-   in analyze newscope blckStmt : analyzeBlockStmts newscope rest
-analyzeBlockStmts scope (blckStmt@(LocalClass classDecl) : rest) =
-  let newscope = addTypeVarIdentifiers [identFromClass classDecl] scope
-   in analyze newscope blckStmt : analyzeBlockStmts newscope rest
-analyzeBlockStmts scope (blckStmt : rest) = analyze scope blckStmt : analyzeBlockStmts scope rest
-
 -- boiler plate cases
-
-instance Transform CompilationUnit where
-  analyze scope (CompilationUnit mbPackageDecl importDecls typeDecls) =
-    CompilationUnit
-      mbPackageDecl
-      importDecls
-      (map (analyze scope) typeDecls)
 
 instance Transform TypeDecl where
   analyze scope (ClassTypeDecl classDecl) = ClassTypeDecl (analyze scope classDecl)

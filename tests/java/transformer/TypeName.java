@@ -51,6 +51,13 @@ public class TypeName {
 
         Record.staticRecordFunc();
 
+        staticC.scFunc();
+        class staticC {
+            static void scFunc() {
+
+            }
+        }
+
     }
 
     static TypeName myself() {
@@ -63,3 +70,8 @@ public class TypeName {
 
 }
 
+class staticC {
+    static void scFunc() {
+
+    }
+}

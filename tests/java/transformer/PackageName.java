@@ -3,17 +3,6 @@ public class PackageName {
         staticB.staticFunc();
         var staticB = new staticB();
 
-        staticC.scFunc();
-        class staticC {
-            static void scFunc() {
-
-            }
-        }
     }
 }
 
-class staticC {
-    static void scFunc() {
-
-    }
-}
