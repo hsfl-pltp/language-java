@@ -1,4 +1,4 @@
-
+import package2.ClassFromPackage2;
 public class TypeName {
 
     public static void staticFunc() {
@@ -15,6 +15,7 @@ public class TypeName {
             }
         }
         Foo.funcFoo();
+        ClassFromPackage2.func();
     }
 
 

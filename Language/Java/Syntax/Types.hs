@@ -155,31 +155,31 @@ instance Located Name where
 data ClassifiedName
   = ExpressionName Name
   | TypeName Name
-  | PackageName Name
+  | Unknown Name
   deriving (Show, Read, Typeable, Generic, Data)
 
-isNotExpressionName :: ClassifiedName -> Bool
-isNotExpressionName (ExpressionName _) = False
-isNotExpressionName _ = True
+isExpressionName :: ClassifiedName -> Bool
+isExpressionName (ExpressionName _) = True
+isExpressionName _ = False
 
-isNotTypeName :: ClassifiedName -> Bool
-isNotTypeName (TypeName _) = False
-isNotTypeName _ = True
+isTypeName :: ClassifiedName -> Bool
+isTypeName (TypeName _) = True
+isTypeName _ = False
 
-isNotPackageName :: ClassifiedName -> Bool
-isNotPackageName (PackageName _) = False
-isNotPackageName _ = True
+isUnknownName :: ClassifiedName -> Bool
+isUnknownName (Unknown _) = True
+isUnknownName _ = False
 
 instance Equality ClassifiedName where
   eq opt (ExpressionName n1) (ExpressionName n2) =
     eq opt n1 n2
   eq opt (TypeName n1) (TypeName n2) =
     eq opt n1 n2
-  eq opt (PackageName n1) (PackageName n2) =
+  eq opt (Unknown n1) (Unknown n2) =
     eq opt n1 n2
   eq _ _ _ = False
 
 instance Located ClassifiedName where
   sourceSpan (ExpressionName n) = sourceSpan n
   sourceSpan (TypeName n) = sourceSpan n
-  sourceSpan (PackageName n) = sourceSpan n
+  sourceSpan (Unknown n) = sourceSpan n
