@@ -38,7 +38,7 @@ createTestTree testName filepath predicate =
         case result of
           Left parseError -> assertFailure (show parseError)
           Right cUnit -> do
-            let classifiedNames = universeBi (analyzeCompilationUnit cUnit)
+            let classifiedNames = universeBi (transformCompilationUnitToAnalyzed cUnit)
             case filter predicate classifiedNames of
               [] -> return ()
               xs -> assertFailure (intercalate "\n" (map (show . sourceSpan) xs))

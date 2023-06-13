@@ -1,16 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Language.Java.MethodInvokerClassifier (analyzeCompilationUnit) where
+module Language.Java.MethodInvokerClassifier (transformCompilationUnitToAnalyzed) where
 
 import Data.Bifunctor (Bifunctor (second))
 import Data.Maybe (mapMaybe)
 import Language.Java.Syntax
 
-analyzeCompilationUnit :: CompilationUnit Parsed -> CompilationUnit Analyzed
-analyzeCompilationUnit = transformToAnalyzed (IdentCollection [] [] [] [])
-
-class AnalyzedTransformer a where
-  transformToAnalyzed :: IdentCollection -> a Parsed -> a Analyzed
+-- | Entry point for transforming a compilationunit from parsed to analyzed and classifying all methodinvoker names
+transformCompilationUnitToAnalyzed :: CompilationUnit Parsed -> CompilationUnit Analyzed
+transformCompilationUnitToAnalyzed = transformToAnalyzed (IdentCollection [] [] [] [])
 
 -- | data type used to collect the identifiers that are currently in scope
 data IdentCollection = IdentCollection
@@ -20,29 +18,32 @@ data IdentCollection = IdentCollection
     typeNameIdents :: [Ident]
   }
 
-addFields :: [Ident] -> IdentCollection -> IdentCollection
-addFields idents identCollection = identCollection {fields = idents ++ fields identCollection}
+addFieldIdents :: [Ident] -> IdentCollection -> IdentCollection
+addFieldIdents idents identCollection = identCollection {fields = idents ++ fields identCollection}
 
-addFormalParams :: [Ident] -> IdentCollection -> IdentCollection
-addFormalParams idents identCollection = identCollection {formalParams = idents ++ formalParams identCollection}
+addFormalParameterIdents :: [Ident] -> IdentCollection -> IdentCollection
+addFormalParameterIdents idents identCollection = identCollection {formalParams = idents ++ formalParams identCollection}
 
-addLocalVars :: [Ident] -> IdentCollection -> IdentCollection
-addLocalVars idents identCollection = identCollection {localVars = idents ++ localVars identCollection}
+addLocalVarIdents :: [Ident] -> IdentCollection -> IdentCollection
+addLocalVarIdents idents identCollection = identCollection {localVars = idents ++ localVars identCollection}
 
-addTypeVarIdentifiers :: [Ident] -> IdentCollection -> IdentCollection
-addTypeVarIdentifiers idents identCollection = identCollection {typeNameIdents = idents ++ typeNameIdents identCollection}
+addTypeVarIdents :: [Ident] -> IdentCollection -> IdentCollection
+addTypeVarIdents idents identCollection = identCollection {typeNameIdents = idents ++ typeNameIdents identCollection}
 
-isExpressionNameIdent :: Ident -> IdentCollection -> Bool
-isExpressionNameIdent idnt (IdentCollection cfields fp vars _) = any (eq IgnoreSourceSpan idnt) (cfields ++ fp ++ vars)
+isInExpressionNameList :: Ident -> IdentCollection -> Bool
+isInExpressionNameList idnt (IdentCollection cfields fp vars _) = any (eq IgnoreSourceSpan idnt) (cfields ++ fp ++ vars)
 
-isTypeNameIdent :: Ident -> IdentCollection -> Bool
-isTypeNameIdent idnt (IdentCollection _ _ _ typeVars) = any (eq IgnoreSourceSpan idnt) typeVars
+isInTypeNameList :: Ident -> IdentCollection -> Bool
+isInTypeNameList idnt (IdentCollection _ _ _ typeVars) = any (eq IgnoreSourceSpan idnt) typeVars
 
 classifyName :: Ident -> IdentCollection -> Name -> ClassifiedName
 classifyName idnt identCollection
-  | isExpressionNameIdent idnt identCollection = ExpressionName
-  | isTypeNameIdent idnt identCollection = TypeName
+  | idnt `isInExpressionNameList` identCollection = ExpressionName
+  | idnt `isInTypeNameList` identCollection = TypeName
   | otherwise = Unknown
+
+class AnalyzedTransformer a where
+  transformToAnalyzed :: IdentCollection -> a Parsed -> a Analyzed
 
 instance AnalyzedTransformer MethodInvocation where
   -- calling the method with its unqualified name, bar()
@@ -50,7 +51,7 @@ instance AnalyzedTransformer MethodInvocation where
   -- single ident in name, foo.bar()
   transformToAnalyzed scope (MethodCall (Just name@(Name _ [singleId])) idnt args) = MethodCall (Just (classifyName singleId scope name)) idnt (map (transformToAnalyzed scope) args)
   -- multiple idents in name, math.foo.bar()
-  transformToAnalyzed scope (MethodCall _ idnt args) = MethodCall Nothing idnt (map (transformToAnalyzed scope) args)
+  transformToAnalyzed scope (MethodCall (Just name) idnt args) = MethodCall (Just (Unknown name)) idnt (map (transformToAnalyzed scope) args)
   transformToAnalyzed scope (PrimaryMethodCall expr refTypes idnt args) = PrimaryMethodCall (transformToAnalyzed scope expr) refTypes idnt (map (transformToAnalyzed scope) args)
   transformToAnalyzed scope (SuperMethodCall refTypes idnt args) = SuperMethodCall refTypes idnt (map (transformToAnalyzed scope) args)
   transformToAnalyzed scope (ClassMethodCall name refTypes idnt args) = ClassMethodCall name refTypes idnt (map (transformToAnalyzed scope) args)
@@ -61,11 +62,11 @@ instance AnalyzedTransformer CompilationUnit where
     CompilationUnit
       mbPackageDecl
       importDecls
-      (map (transformToAnalyzed (addTypeVarIdentifiers (topLevelClasses typeDecls) scope)) typeDecls)
+      (map (transformToAnalyzed (addTypeVarIdents (classIdentsFromTypeDecls typeDecls ++ classIdentsFromImports importDecls) scope)) typeDecls)
 
 instance AnalyzedTransformer ClassDecl where
   transformToAnalyzed scope (ClassDecl src modifiers idnt typeParams mbRefType refTypes classBody) =
-    let newScope = (addTypeVarIdentifiers (idnt : classesFromClassBody classBody) . addFields (fieldsFromClassBody classBody)) scope
+    let newScope = (addTypeVarIdents (idnt : classesFromClassBody classBody) . addFieldIdents (fieldIdentsFromClassBody classBody)) scope
      in ClassDecl
           src
           (map (transformToAnalyzed scope) modifiers)
@@ -75,7 +76,7 @@ instance AnalyzedTransformer ClassDecl where
           refTypes
           (transformToAnalyzed newScope classBody)
   transformToAnalyzed scope (RecordDecl src modifiers idnt typeParams recordFieldDecls refTypes classBody) =
-    let newScope = (addTypeVarIdentifiers (idnt : classesFromClassBody classBody) . addFields (fieldsFromClassBody classBody)) scope
+    let newScope = (addTypeVarIdents (idnt : classesFromClassBody classBody) . addFieldIdents (fieldIdentsFromClassBody classBody)) scope
      in RecordDecl
           src
           (map (transformToAnalyzed scope) modifiers)
@@ -85,7 +86,7 @@ instance AnalyzedTransformer ClassDecl where
           refTypes
           (transformToAnalyzed newScope classBody)
   transformToAnalyzed scope (EnumDecl src modifiers idnt refTypes enumBody) =
-    let newScope = (addTypeVarIdentifiers (idnt : classesFromEnumBody enumBody) . addFields (fieldsFromEnumBody enumBody)) scope
+    let newScope = (addTypeVarIdents (idnt : classesFromEnumBody enumBody) . addFieldIdents (fieldIdentsFromEnumBody enumBody)) scope
      in EnumDecl
           src
           (map (transformToAnalyzed scope) modifiers)
@@ -106,7 +107,7 @@ instance AnalyzedTransformer MemberDecl where
       (map (transformToAnalyzed scope) fp)
       exceptionTypes
       (fmap (transformToAnalyzed scope) mbExp)
-      (transformToAnalyzed (addFormalParams (methodParameters methodDecl) scope) methodBody)
+      (transformToAnalyzed (addFormalParameterIdents (methodParameterIdents methodDecl) scope) methodBody)
   transformToAnalyzed scope constructorDecl@(ConstructorDecl srcspan modifiers typeParams idnt fp exceptionTypes constructorBody) =
     ConstructorDecl
       srcspan
@@ -115,7 +116,7 @@ instance AnalyzedTransformer MemberDecl where
       idnt
       (map (transformToAnalyzed scope) fp)
       exceptionTypes
-      (transformToAnalyzed (addFormalParams (methodParameters constructorDecl) scope) constructorBody)
+      (transformToAnalyzed (addFormalParameterIdents (methodParameterIdents constructorDecl) scope) constructorBody)
   transformToAnalyzed scope (MemberClassDecl classDecl) = MemberClassDecl (transformToAnalyzed scope classDecl)
   transformToAnalyzed scope (MemberInterfaceDecl interfaceDecl) = MemberInterfaceDecl (transformToAnalyzed scope interfaceDecl)
 
@@ -123,10 +124,20 @@ instance AnalyzedTransformer Catch where
   transformToAnalyzed scope catch@(Catch formalParam block) =
     Catch
       (transformToAnalyzed scope formalParam)
-      (transformToAnalyzed (addFormalParams (exceptionParameter catch) scope) block)
+      (transformToAnalyzed (addFormalParameterIdents (identFromExceptionParameter catch) scope) block)
 
 instance AnalyzedTransformer Block where
-  transformToAnalyzed scope (Block blockstmts) = Block (analyzeBlockStmts scope blockstmts)
+  transformToAnalyzed scope (Block blockstmts) = Block (transformBlockStmtsToAnalyzed scope blockstmts)
+
+transformBlockStmtsToAnalyzed :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
+transformBlockStmtsToAnalyzed _ [] = []
+transformBlockStmtsToAnalyzed scope (blckStmt@(LocalVars _ _ _ varDecls) : rest) =
+  let newscope = addLocalVarIdents (map (identFromVarDeclId . (\(VarDecl _ varId _) -> varId)) varDecls) scope
+   in transformToAnalyzed newscope blckStmt : transformBlockStmtsToAnalyzed newscope rest
+transformBlockStmtsToAnalyzed scope (blckStmt@(LocalClass classDecl) : rest) =
+  let newscope = addTypeVarIdents [identFromClass classDecl] scope
+   in transformToAnalyzed newscope blckStmt : transformBlockStmtsToAnalyzed newscope rest
+transformBlockStmtsToAnalyzed scope (blckStmt : rest) = transformToAnalyzed scope blckStmt : transformBlockStmtsToAnalyzed scope rest
 
 instance AnalyzedTransformer Stmt where
   transformToAnalyzed scope (StmtBlock block) = StmtBlock (transformToAnalyzed scope block)
@@ -134,7 +145,7 @@ instance AnalyzedTransformer Stmt where
   transformToAnalyzed scope (IfThenElse srcspan expr stmt1 stmt2) = IfThenElse srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope stmt1) (transformToAnalyzed scope stmt2)
   transformToAnalyzed scope (While srcspan expr stmt) = While srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope stmt)
   transformToAnalyzed scope (BasicFor srcspan mbForInit mbExp mbExps stmt) =
-    let newScope = addLocalVars (localVarsInBasicForInit mbForInit) scope
+    let newScope = addLocalVarIdents (localVarsIdentsFromBasicForInit mbForInit) scope
      in BasicFor
           srcspan
           (fmap (transformToAnalyzed scope) mbForInit)
@@ -148,7 +159,7 @@ instance AnalyzedTransformer Stmt where
       type_
       idnt
       (transformToAnalyzed scope expr)
-      (transformToAnalyzed (addLocalVars [idnt] scope) stmt)
+      (transformToAnalyzed (addLocalVarIdents [idnt] scope) stmt)
   transformToAnalyzed _ Empty = Empty
   transformToAnalyzed scope (ExpStmt srcspan expr) = ExpStmt srcspan (transformToAnalyzed scope expr)
   transformToAnalyzed scope (Assert expr mbExp) = Assert (transformToAnalyzed scope expr) (fmap (transformToAnalyzed scope) mbExp)
@@ -163,45 +174,41 @@ instance AnalyzedTransformer Stmt where
     Try
       srcspan
       (map (transformToAnalyzed scope) tryResources)
-      (transformToAnalyzed (addLocalVars (localVarsInTryResources tryResources) scope) block)
+      (transformToAnalyzed (addLocalVarIdents (localVarIdentsFromTryResources tryResources) scope) block)
       (map (transformToAnalyzed scope) catches)
       (fmap (transformToAnalyzed scope) mbBlock)
   transformToAnalyzed scope (Labeled idnt stmt) = Labeled idnt (transformToAnalyzed scope stmt)
 
 -- helper functions
 
-topLevelClasses :: [TypeDecl p] -> [Ident]
-topLevelClasses =
+classIdentsFromTypeDecls :: [TypeDecl p] -> [Ident]
+classIdentsFromTypeDecls =
   mapMaybe
     ( \case
         (ClassTypeDecl classDecl) -> Just (identFromClass classDecl)
         _ -> Nothing
     )
 
-analyzeBlockStmts :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
-analyzeBlockStmts _ [] = []
-analyzeBlockStmts scope (blckStmt@(LocalVars _ _ _ varDecls) : rest) =
-  let newscope = addLocalVars (map (identFromVarDeclId . (\(VarDecl _ varId _) -> varId)) varDecls) scope
-   in transformToAnalyzed newscope blckStmt : analyzeBlockStmts newscope rest
-analyzeBlockStmts scope (blckStmt@(LocalClass classDecl) : rest) =
-  let newscope = addTypeVarIdentifiers [identFromClass classDecl] scope
-   in transformToAnalyzed newscope blckStmt : analyzeBlockStmts newscope rest
-analyzeBlockStmts scope (blckStmt : rest) = transformToAnalyzed scope blckStmt : analyzeBlockStmts scope rest
+classIdentsFromImports :: [ImportDecl] -> [Ident]
+classIdentsFromImports =
+  mapMaybe
+    ( \case
+        (ImportDecl _ False (Name _ idents) False) -> Just (last idents)
+        _ -> Nothing
+    )
 
 identFromVarDeclId :: VarDeclId -> Ident
 identFromVarDeclId (VarId idnt) = idnt
 identFromVarDeclId (VarDeclArray _ varDeclId) = identFromVarDeclId varDeclId
 
--- class fields from ClassDecl
+fieldIdentsFromClassBody :: ClassBody p -> [Ident]
+fieldIdentsFromClassBody (ClassBody decls) = identsFromVarDecls decls
 
-fieldsFromClassBody :: ClassBody p -> [Ident]
-fieldsFromClassBody (ClassBody decls) = identsfromVarDecls decls
+fieldIdentsFromEnumBody :: EnumBody p -> [Ident]
+fieldIdentsFromEnumBody (EnumBody _ decls) = identsFromVarDecls decls
 
-fieldsFromEnumBody :: EnumBody p -> [Ident]
-fieldsFromEnumBody (EnumBody _ decls) = identsfromVarDecls decls
-
-identsfromVarDecls :: [Decl p] -> [Ident]
-identsfromVarDecls decls = do
+identsFromVarDecls :: [Decl p] -> [Ident]
+identsFromVarDecls decls = do
   map
     (identFromVarDeclId . (\(VarDecl _ varId _) -> varId))
     ( concatMap
@@ -227,29 +234,28 @@ identFromClass (ClassDecl _ _ idnt _ _ _ _) = idnt
 identFromClass (RecordDecl _ _ idnt _ _ _ _) = idnt
 identFromClass (EnumDecl _ _ idnt _ _) = idnt
 
--- | idnt of exception parameter from Catch
-exceptionParameter :: Catch p -> [Ident]
-exceptionParameter (Catch (FormalParam _ _ _ _ vardeclId) _) = [identFromVarDeclId vardeclId]
+identFromExceptionParameter :: Catch p -> [Ident]
+identFromExceptionParameter (Catch (FormalParam _ _ _ _ vardeclId) _) = [identFromVarDeclId vardeclId]
 
--- | idents of formal parameters of method and constructor declaration
-methodParameters :: MemberDecl p -> [Ident]
-methodParameters (MethodDecl _ _ _ _ _ params _ _ _) = identsFromParams params
-methodParameters (ConstructorDecl _ _ _ _ params _ _) = identsFromParams params
-methodParameters _ = []
+methodParameterIdents :: MemberDecl p -> [Ident]
+methodParameterIdents (MethodDecl _ _ _ _ _ params _ _ _) = formalParamIdent params
+methodParameterIdents (ConstructorDecl _ _ _ _ params _ _) = formalParamIdent params
+methodParameterIdents _ = []
 
-identsFromParams :: [FormalParam p] -> [Ident]
-identsFromParams = map (identFromVarDeclId . (\(FormalParam _ _ _ _ vardeclId) -> vardeclId))
+formalParamIdent :: [FormalParam p] -> [Ident]
+formalParamIdent = map (identFromVarDeclId . (\(FormalParam _ _ _ _ vardeclId) -> vardeclId))
 
--- | idents of local variables from basicFor, enhancedFor and tryWithResource
-localVarsInTryResources :: [TryResource p] -> [Ident]
-localVarsInTryResources = mapMaybe identFromTryResource
-  where
-    identFromTryResource (TryResourceVarDecl (ResourceDecl _ _ vardDeclId _)) = Just (identFromVarDeclId vardDeclId)
-    identFromTryResource _ = Nothing
+localVarIdentsFromTryResources :: [TryResource p] -> [Ident]
+localVarIdentsFromTryResources =
+  mapMaybe
+    ( \case
+        (TryResourceVarDecl (ResourceDecl _ _ vardDeclId _)) -> Just (identFromVarDeclId vardDeclId)
+        _ -> Nothing
+    )
 
-localVarsInBasicForInit :: Maybe (ForInit p) -> [Ident]
-localVarsInBasicForInit (Just (ForLocalVars _ _ varDecls)) = map (identFromVarDeclId . (\(VarDecl _ varid _) -> varid)) varDecls
-localVarsInBasicForInit _ = []
+localVarsIdentsFromBasicForInit :: Maybe (ForInit p) -> [Ident]
+localVarsIdentsFromBasicForInit (Just (ForLocalVars _ _ varDecls)) = map (identFromVarDeclId . (\(VarDecl _ varid _) -> varid)) varDecls
+localVarsIdentsFromBasicForInit _ = []
 
 -- boiler plate cases
 

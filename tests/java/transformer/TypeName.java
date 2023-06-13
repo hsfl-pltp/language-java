@@ -48,8 +48,6 @@ public class TypeName {
         InnerClass.staticClassFunc();
         Enum.staticEnumFunc();
 
-        Enum.High.enumFunc();
-
         Record.staticRecordFunc();
 
         staticC.scFunc();

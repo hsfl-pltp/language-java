@@ -3,6 +3,9 @@ public class PackageName {
         staticB.staticFunc();
         var staticB = new staticB();
 
+        System.out.println("qualified use");
+
     }
+
 }
 
