@@ -1322,7 +1322,7 @@ qualifiedMethodName = do
   mapFst
     ( \case
         ([], _) -> Nothing
-        (is, endLoc) -> Just (Name (startLoc, endLoc) is)
+        (is, endLoc) -> Just (Name (startLoc, endLoc) (reverse is))
     )
     <$> go startLoc []
   where
