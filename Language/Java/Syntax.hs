@@ -1060,6 +1060,9 @@ instance ShowExtension p => Located (Exp p) where
   sourceSpan (PreDecrement s _) = s
   sourceSpan (Cond s _ _ _) = s
   sourceSpan (Assign s _ _ _) = s
+  sourceSpan (PrePlus s _) = s
+  sourceSpan (PreMinus s _) = s
+  sourceSpan (PreBitCompl s _) = s
   sourceSpan (PreNot s _) = s
   sourceSpan e = error ("No SourceSpan implemented for expression: " ++ show e)
 
