@@ -41,5 +41,5 @@ createTestTree testName filepath predicate =
             let classifiedNames = universeBi (transformCompilationUnitToAnalyzed cUnit)
             case filter predicate classifiedNames of
               [] -> return ()
-              xs -> assertFailure (intercalate "\n" (map (show . sourceSpan) xs))
+              xs -> assertFailure (intercalate "\n" (map show xs))
     )

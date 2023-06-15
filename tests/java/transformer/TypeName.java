@@ -74,3 +74,27 @@ class staticC {
 
     }
 }
+
+class MultiNameTypeName {
+    void func() {
+        outerClass.innerA.func();//TypeName
+    }
+}
+
+class outerClass {
+    static TestB fieldOfOuter = new TestB();
+
+    class innerA {
+        static void func() {
+            innerB.innerInnerB.func();//TypeName
+        }
+    }
+
+    class innerB {
+        class innerInnerB {
+            static void func() {
+
+            }
+        }
+    }
+}
