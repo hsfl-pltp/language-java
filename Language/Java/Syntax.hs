@@ -959,13 +959,13 @@ data Exp p
   | -- | Pre-decrementation expression, i.e. an expression preceded by @--@.
     PreDecrement SourceSpan (Exp p)
   | -- | Unary plus, the promotion of the value of the expression to a primitive numeric type.
-    PrePlus (Exp p)
+    PrePlus SourceSpan (Exp p)
   | -- | Unary minus, the promotion of the negation of the value of the expression to a primitive numeric type.
-    PreMinus (Exp p)
+    PreMinus SourceSpan (Exp p)
   | -- | Unary bitwise complementation: note that, in all cases, @~x@ equals @(-x)-1@.
-    PreBitCompl (Exp p)
+    PreBitCompl SourceSpan (Exp p)
   | -- | Logical complementation of boolean values.
-    PreNot (Exp p)
+    PreNot SourceSpan (Exp p)
   | -- | A cast expression converts, at run time, a value of one numeric type to a similar value of another
     --   numeric type; or confirms, at compile time, that the type of an expression is boolean; or checks,
     --   at run time, that a reference value refers to an object whose class is compatible with a specified
@@ -1026,14 +1026,14 @@ instance EqualityExtension p => Equality (Exp p) where
     eq opt s1 s2 && eq opt e1 e2
   eq opt (PreDecrement s1 e1) (PreDecrement s2 e2) =
     eq opt s1 s2 && eq opt e1 e2
-  eq opt (PrePlus e1) (PrePlus e2) =
-    eq opt e1 e2
-  eq opt (PreMinus e1) (PreMinus e2) =
-    eq opt e1 e2
-  eq opt (PreBitCompl e1) (PreBitCompl e2) =
-    eq opt e1 e2
-  eq opt (PreNot e1) (PreNot e2) =
-    eq opt e1 e2
+  eq opt (PrePlus s1 e1) (PrePlus s2 e2) =
+    eq opt s1 s2 && eq opt e1 e2
+  eq opt (PreMinus s1 e1) (PreMinus s2 e2) =
+    eq opt s1 s2 && eq opt e1 e2
+  eq opt (PreBitCompl s1 e1) (PreBitCompl s2 e2) =
+    eq opt s1 s2 && eq opt e1 e2
+  eq opt (PreNot s1 e1) (PreNot s2 e2) =
+    eq opt s1 s2 && eq opt e1 e2
   eq opt (Cast t1 e1) (Cast t2 e2) =
     eq opt t1 t2 && eq opt e1 e2
   eq opt (BinOp e11 o1 e12) (BinOp e21 o2 e22) =
@@ -1060,6 +1060,7 @@ instance ShowExtension p => Located (Exp p) where
   sourceSpan (PreDecrement s _) = s
   sourceSpan (Cond s _ _ _) = s
   sourceSpan (Assign s _ _ _) = s
+  sourceSpan (PreNot s _) = s
   sourceSpan e = error ("No SourceSpan implemented for expression: " ++ show e)
 
 -- | The left-hand side of an assignment expression. This operand may be a named variable, such as a local
