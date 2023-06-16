@@ -60,11 +60,10 @@ module Language.Java.Parser
   )
 where
 
-import Control.Applicative ((<$), (<$>), (<*), (<*>))
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Language.Java.Lexer (L1 (..), Token (..), lexer)
-import Language.Java.SourceSpan (Location (..), dummyLocation, dummySourceSpan, locationEof)
+import Language.Java.SourceSpan (Location (..), dummyLocation, locationEof)
 import Language.Java.Syntax
 import Text.Parsec
   ( Parsec,
