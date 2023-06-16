@@ -100,8 +100,8 @@ instance PrettyExtension p => Pretty (EnumBody p) where
   prettyPrec p (EnumBody cs ds) =
     braceBlock $
       punctuate comma (map (prettyPrec p) cs)
-        ++ opt (not $ null ds) semi
-        : map (prettyPrec p) ds
+        ++ opt (not $ null ds) semi :
+      map (prettyPrec p) ds
 
 instance PrettyExtension p => Pretty (EnumConstant p) where
   prettyPrec p (EnumConstant ident args mBody) =
@@ -339,8 +339,8 @@ instance PrettyExtension p => Pretty (ForInit p) where
   prettyPrec p (ForLocalVars mods t vds) =
     hsep $
       map (prettyPrec p) mods
-        ++ prettyPrec p t
-        : punctuate comma (map (prettyPrec p) vds)
+        ++ prettyPrec p t :
+      punctuate comma (map (prettyPrec p) vds)
   prettyPrec p (ForInitExps es) =
     hsep $ punctuate comma (map (prettyPrec p) es)
 
@@ -348,7 +348,7 @@ instance PrettyExtension p => Pretty (ForInit p) where
 -- Expressions
 
 instance PrettyExtension p => Pretty (Exp p) where
-  prettyPrec p (Lit l) = prettyPrec p l
+  prettyPrec p (Lit _ l) = prettyPrec p l
   prettyPrec p (ClassLit mT) =
     ppResultType p mT <> text ".class"
   prettyPrec _ This = text "this"
@@ -371,8 +371,8 @@ instance PrettyExtension p => Pretty (Exp p) where
   prettyPrec p (ArrayCreate t es k) =
     text "new"
       <+> hcat
-        ( prettyPrec p t
-            : map (brackets . prettyPrec p) es
+        ( prettyPrec p t :
+          map (brackets . prettyPrec p) es
             ++ replicate k (text "[]")
         )
   prettyPrec p (ArrayCreateInit t k i) =
@@ -599,8 +599,8 @@ instance Pretty TypeParam where
       <+> opt
         (not $ null rts)
         ( hsep $
-            text "extends"
-              : punctuate (text " &") (map (prettyPrec p) rts)
+            text "extends" :
+            punctuate (text " &") (map (prettyPrec p) rts)
         )
 
 ppTypeParams :: Pretty a => Int -> [a] -> Doc

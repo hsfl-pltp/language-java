@@ -917,7 +917,7 @@ type Argument p = Exp p
 -- | A Java expression.
 data Exp p
   = -- | A literal denotes a fixed, unchanging value.
-    Lit Literal
+    Lit SourceSpan Literal
   | -- | A class literal, which is an expression consisting of the name of a class, interface, array,
     --   or primitive type, or the pseudo-type void (modelled by 'Nothing'), followed by a `.' and the token class.
     ClassLit (Maybe Type)
@@ -995,7 +995,7 @@ deriving instance ReadExtension p => Read (Exp p)
 deriving instance DataExtension p => Data (Exp p)
 
 instance EqualityExtension p => Equality (Exp p) where
-  eq opt (Lit l1) (Lit l2) =
+  eq opt (Lit _ l1) (Lit _ l2) =
     eq opt l1 l2
   eq opt (ClassLit mt1) (ClassLit mt2) =
     eq opt mt1 mt2

@@ -294,7 +294,7 @@ instance Transform BlockStmt where
       (map (analyze scope) varDecls)
 
 instance Transform Exp where
-  analyze _ (Lit literal) = Lit literal
+  analyze _ (Lit sourceSpan literal) = Lit sourceSpan literal
   analyze _ (ClassLit mbType) = ClassLit mbType
   analyze _ This = This
   analyze _ (ThisClass name) = ThisClass name

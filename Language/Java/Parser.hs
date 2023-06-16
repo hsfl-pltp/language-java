@@ -60,10 +60,11 @@ module Language.Java.Parser
   )
 where
 
+import Control.Applicative ((<$), (<$>), (<*), (<*>))
 import Data.Functor ((<&>))
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Language.Java.Lexer (L1 (..), Token (..), lexer)
-import Language.Java.SourceSpan (Location (..), dummyLocation, locationEof)
+import Language.Java.SourceSpan (Location (..), dummyLocation, dummySourceSpan, locationEof)
 import Language.Java.Syntax
 import Text.Parsec
   ( Parsec,
@@ -86,16 +87,6 @@ import Text.Parsec.Pos
 import Text.ParserCombinators.Parsec.Error
 import Prelude hiding (exp, (>>), (>>=))
 import qualified Prelude as P ((>>), (>>=))
-
-#if __GLASGOW_HASKELL__ < 707
-import Control.Applicative ( (<$>), (<$), (<*) )
--- Since I cba to find the instance Monad m => Applicative m declaration.
-(<*>) :: Monad m => m (a -> b) -> m a -> m b
-(<*>) = ap
-infixl 4 <*>
-#else
-import Control.Applicative ( (<$>), (<$), (<*), (<*>) )
-#endif
 
 mapFst :: (a -> b) -> (a, c) -> (b, c)
 mapFst f (x, y) = (f x, y)
@@ -476,11 +467,12 @@ throws = tok KW_Throws >> refTypeList
 -- Formal parameters
 
 formalParams :: P [FormalParam Parsed]
-formalParams = noLoc $ parens $ do
-  fps <- seplist formalParam comma
-  if validateFPs fps
-    then return fps
-    else fail "Only the last formal parameter may be of variable arity"
+formalParams = noLoc $
+  parens $ do
+    fps <- seplist formalParam comma
+    if validateFPs fps
+      then return fps
+      else fail "Only the last formal parameter may be of variable arity"
   where
     validateFPs :: [FormalParam Parsed] -> Bool
     validateFPs [] = True
@@ -763,6 +755,8 @@ stmtNoTrail =
   -- empty statement
   attrTok SemiColon Empty
     <|>
+    -- inner block
+
     -- inner block
     mapFst StmtBlock <$> block
     <|>
@@ -1107,8 +1101,10 @@ primaryNPS = try arrayCreation <|> primaryNoNewArrayNPS
 -- primaryNoNewArray = startSuff primaryNoNewArrayNPS primarySuffix
 
 primaryNoNewArrayNPS :: P (Exp Parsed, Location)
-primaryNoNewArrayNPS =
-  mapFst Lit <$> literal
+primaryNoNewArrayNPS = do
+  startLoc <- getLocation
+  endLoc <- getEndLoc
+  mapFst (Lit (startLoc, endLoc)) <$> literal
     <|> attrTok KW_This This
     <|> parens (noLoc exp)
     <|>
