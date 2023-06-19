@@ -755,8 +755,6 @@ stmtNoTrail =
   attrTok SemiColon Empty
     <|>
     -- inner block
-
-    -- inner block
     mapFst StmtBlock <$> block
     <|>
     -- assertions
