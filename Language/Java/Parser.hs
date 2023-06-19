@@ -1332,7 +1332,7 @@ qualifiedMethodName = do
       try
         ( do
             period
-            go loc (nids ++ [i])
+            go loc (i : nids)
         )
         <|> return ((nids, endLoc), i)
 
