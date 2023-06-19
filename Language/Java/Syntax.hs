@@ -1054,6 +1054,7 @@ instance EqualityExtension p => Equality (Exp p) where
 
 instance ShowExtension p => Located (Exp p) where
   sourceSpan (ExpName n) = sourceSpan n
+  sourceSpan (Lit s _) = s
   sourceSpan (PostIncrement s _) = s
   sourceSpan (PostDecrement s _) = s
   sourceSpan (PreIncrement s _) = s
