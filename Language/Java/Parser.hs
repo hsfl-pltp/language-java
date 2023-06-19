@@ -87,6 +87,16 @@ import Text.ParserCombinators.Parsec.Error
 import Prelude hiding (exp, (>>), (>>=))
 import qualified Prelude as P ((>>), (>>=))
 
+#if __GLASGOW_HASKELL__ < 707
+import Control.Applicative ( (<$>), (<$), (<*) )
+-- Since I cba to find the instance Monad m => Applicative m declaration.
+(<*>) :: Monad m => m (a -> b) -> m a -> m b
+(<*>) = ap
+infixl 4 <*>
+#else
+import Control.Applicative ( (<$>), (<$), (<*), (<*>) )
+#endif
+
 mapFst :: (a -> b) -> (a, c) -> (b, c)
 mapFst f (x, y) = (f x, y)
 
