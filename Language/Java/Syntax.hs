@@ -995,8 +995,8 @@ deriving instance ReadExtension p => Read (Exp p)
 deriving instance DataExtension p => Data (Exp p)
 
 instance EqualityExtension p => Equality (Exp p) where
-  eq opt (Lit _ l1) (Lit _ l2) =
-    eq opt l1 l2
+  eq opt (Lit s1 l1) (Lit s2 l2) =
+    eq opt s1 s2 && eq opt l1 l2
   eq opt (ClassLit mt1) (ClassLit mt2) =
     eq opt mt1 mt2
   eq _ This This = True
