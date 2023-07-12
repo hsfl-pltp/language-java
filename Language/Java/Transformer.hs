@@ -284,7 +284,7 @@ instance Transform VarInit where
   analyze scope (InitArray arrayInit) = InitArray (analyze scope arrayInit)
 
 instance Transform BlockStmt where
-  analyze scope (BlockStmt srcspan stmt) = BlockStmt srcspan (analyze scope stmt)
+  analyze scope (BlockStmt stmt) = BlockStmt (analyze scope stmt)
   analyze scope (LocalClass classDecl) = LocalClass (analyze scope classDecl)
   analyze scope (LocalVars srcspan modifiers type_ varDecls) =
     LocalVars
