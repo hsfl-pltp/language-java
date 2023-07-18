@@ -1001,13 +1001,15 @@ stmtExp =
 preIncDec :: P (Exp Parsed, Location)
 preIncDec = do
   op <- noLoc preIncDecOp
-  mapFst op <$> unaryExp
+  (e, eLoc) <- unaryExp
+  return (op eLoc e, eLoc)
 
 postIncDec :: P (Exp Parsed)
 postIncDec = do
+  startLoc <- getLocation
   e <- noLoc postfixExpNES
   ops <- noLoc $ list1 postfixOp
-  return (foldl (\a s -> s a) e ops)
+  return (foldl (\a s -> s startLoc a) e ops)
 
 assignment :: P (Exp Parsed, Location)
 assignment = do
@@ -1074,7 +1076,8 @@ unaryExp =
     <|> try
       ( do
           op <- noLoc prefixOp
-          mapFst op <$> unaryExp
+          (e, eLoc) <- unaryExp
+          return (op eLoc e, eLoc)
       )
     <|> try
       ( do
@@ -1090,7 +1093,9 @@ postfixExpNES =
     <|> mapFst ExpName <$> name
 
 postfixExp :: P (Exp Parsed, Location)
-postfixExp = postfixExpNES |>> postfixOp
+postfixExp = do
+  startLoc <- getLocation
+  postfixExpNES |>> (mapFst (\op -> op startLoc) <$> postfixOp)
 
 primary :: P (Exp Parsed, Location)
 primary = primaryNPS |>> primarySuffix
@@ -1322,7 +1327,7 @@ qualifiedMethodName = do
   mapFst
     ( \case
         ([], _) -> Nothing
-        (is, endLoc) -> Just (Name (startLoc, endLoc) is)
+        (is, endLoc) -> Just (Name (startLoc, endLoc) (reverse is))
     )
     <$> go startLoc []
   where
@@ -1457,17 +1462,18 @@ literal = do
 
 -- Operators
 
-preIncDecOp, prefixOp, postfixOp :: P (Exp Parsed -> Exp Parsed, Location)
+preIncDecOp, prefixOp, postfixOp :: P (Location -> Exp Parsed -> Exp Parsed, Location)
 preIncDecOp = do
   startLoc <- getLocation
   (constr, endLoc) <- attrTok Op_PPlus PreIncrement <|> attrTok Op_MMinus PreDecrement
-  return (constr (startLoc, endLoc), endLoc)
-prefixOp =
-  attrTok Op_Bang PreNot <|> attrTok Op_Tilde PreBitCompl <|> attrTok Op_Plus PrePlus <|> attrTok Op_Minus PreMinus
-postfixOp = do
+  return (\expEndLoc -> constr (startLoc, expEndLoc), endLoc)
+prefixOp = do
   startLoc <- getLocation
+  (constr, endLoc) <- attrTok Op_Bang PreNot <|> attrTok Op_Tilde PreBitCompl <|> attrTok Op_Plus PrePlus <|> attrTok Op_Minus PreMinus
+  return (\expEndLoc -> constr (startLoc, expEndLoc), endLoc)
+postfixOp = do
   (constr, endLoc) <- attrTok Op_PPlus PostIncrement <|> attrTok Op_MMinus PostDecrement
-  return (constr (startLoc, endLoc), endLoc)
+  return (\expStartLoc -> constr (expStartLoc, endLoc), endLoc)
 
 attrTok :: Token -> b -> P (b, Location)
 attrTok t constr =
