@@ -2,10 +2,10 @@ module TransformerTests where
 
 import Data.Generics.Uniplate.Data (universeBi)
 import Data.List (intercalate)
+import Language.Java.Transformer
 import Language.Java.Parser
 import Language.Java.SourceSpan (Located (sourceSpan))
-import Language.Java.Syntax (ClassifiedName (..), isNotExpressionName, isNotPackageName, isNotTypeName)
-import Language.Java.Transformer
+import Language.Java.Syntax (ClassifiedName (..), isExpressionName, isTypeName, isUnknownName)
 import System.FilePath ((</>))
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit
@@ -24,9 +24,9 @@ packageNameFile = basepath </> "PackageName.java"
 
 allTransformerTests :: [TestTree]
 allTransformerTests =
-  [ createTestTree "ExpressionName" expressionFile isNotExpressionName,
-    createTestTree "TypeName" typeNameFile isNotTypeName,
-    createTestTree "PackageName" packageNameFile isNotPackageName
+  [ createTestTree "ExpressionName" expressionFile (not . isExpressionName),
+    createTestTree "TypeName" typeNameFile (not . isTypeName),
+    createTestTree "PackageName" packageNameFile (not . isUnknownName)
   ]
 
 createTestTree :: String -> FilePath -> (ClassifiedName -> Bool) -> TestTree
@@ -38,8 +38,8 @@ createTestTree testName filepath predicate =
         case result of
           Left parseError -> assertFailure (show parseError)
           Right cUnit -> do
-            let classifiedNames = universeBi (analyzeCompilationUnit cUnit)
+            let classifiedNames = universeBi (transformCompilationUnitToAnalyzed cUnit)
             case filter predicate classifiedNames of
               [] -> return ()
-              xs -> assertFailure (intercalate "\n" (map (show . sourceSpan) xs))
+              xs -> assertFailure (intercalate "\n" (map show xs))
     )

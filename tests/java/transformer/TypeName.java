@@ -1,4 +1,4 @@
-
+import package2.ClassFromPackage2;
 public class TypeName {
 
     public static void staticFunc() {
@@ -15,6 +15,7 @@ public class TypeName {
             }
         }
         Foo.funcFoo();
+        ClassFromPackage2.func();
     }
 
 
@@ -47,8 +48,6 @@ public class TypeName {
         InnerClass.staticClassFunc();
         Enum.staticEnumFunc();
 
-        Enum.High.enumFunc();
-
         Record.staticRecordFunc();
 
         staticC.scFunc();
@@ -73,5 +72,29 @@ public class TypeName {
 class staticC {
     static void scFunc() {
 
+    }
+}
+
+class MultiNameTypeName {
+    void func() {
+        outerClass.innerA.func();//TypeName
+    }
+}
+
+class outerClass {
+    static TestB fieldOfOuter = new TestB();
+
+    class innerA {
+        static void func() {
+            innerB.innerInnerB.func();//TypeName
+        }
+    }
+
+    class innerB {
+        class innerInnerB {
+            static void func() {
+
+            }
+        }
     }
 }
