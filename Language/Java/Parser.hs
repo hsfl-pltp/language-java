@@ -1108,10 +1108,12 @@ primaryNPS = try arrayCreation <|> primaryNoNewArrayNPS
 -- primaryNoNewArray = startSuff primaryNoNewArrayNPS primarySuffix
 
 primaryNoNewArrayNPS :: P (Exp Parsed, Location)
-primaryNoNewArrayNPS = do
-  startLoc <- getLocation
-  endLoc <- getEndLoc
-  mapFst (Lit (startLoc, endLoc)) <$> literal
+primaryNoNewArrayNPS =
+  ( do
+      startLoc <- getLocation
+      (lit, endLoc) <- literal
+      return (Lit (startLoc, endLoc) lit, endLoc)
+  )
     <|> attrTok KW_This This
     <|> parens (noLoc exp)
     <|>
