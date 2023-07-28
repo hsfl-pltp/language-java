@@ -795,7 +795,7 @@ instance EqualityExtension p => Equality (TryResource p) where
     eq opt fa1 fa2
   eq _ _ _ = False
 
-data ResourceDecl p
+data ResourceDecl p 
   = ResourceDecl [Modifier p] Type VarDeclId (VarInit p)
   deriving (Typeable, Generic)
 
