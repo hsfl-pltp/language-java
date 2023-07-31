@@ -299,7 +299,7 @@ instance AnalyzedTransformer VarInit where
   transformToAnalyzed scope (InitArray arrayInit) = InitArray (transformToAnalyzed scope arrayInit)
 
 instance AnalyzedTransformer BlockStmt where
-  transformToAnalyzed scope (BlockStmt srcspan stmt) = BlockStmt srcspan (transformToAnalyzed scope stmt)
+  transformToAnalyzed scope (BlockStmt stmt) = BlockStmt (transformToAnalyzed scope stmt)
   transformToAnalyzed scope (LocalClass classDecl) = LocalClass (transformToAnalyzed scope classDecl)
   transformToAnalyzed scope (LocalVars srcspan modifiers type_ varDecls) =
     LocalVars

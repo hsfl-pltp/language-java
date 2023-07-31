@@ -310,6 +310,10 @@ instance EqualityExtension p => Equality (Decl p) where
     b1 == b2 && eq opt bl1 bl2
   eq _ _ _ = False
 
+instance ShowExtension p => Located (Decl p) where
+  sourceSpan (MemberDecl md) = sourceSpan md
+  sourceSpan d = error ("No SourceSpan implemented for Declaration: " ++ show d)
+
 -- | A class or interface member can be an inner class or interface, a field or
 --   constant, or a method or constructor. An interface may only have as members
 --   constants (not fields), abstract methods, and no constructors.
@@ -415,6 +419,10 @@ instance EqualityExtension p => Equality (VarInit p) where
   eq opt (InitArray ai1) (InitArray ai2) =
     eq opt ai1 ai2
   eq _ _ _ = False
+
+instance ShowExtension p => Located (VarInit p) where
+  sourceSpan (InitExp e) = sourceSpan e
+  sourceSpan vi = error ("No SourceSpan implemented for VarInit: " ++ show vi)
 
 -- | A formal parameter in method declaration. The last parameter
 --   for a given declaration may be marked as variable arity,
@@ -607,6 +615,10 @@ instance EqualityExtension p => Equality (ElementValue p) where
     eq opt a1 a2
   eq _ _ _ = False
 
+instance ShowExtension p => Located (ElementValue p) where
+  sourceSpan (EVVal vi) = sourceSpan vi
+  sourceSpan (EVAnn ann) = sourceSpan ann
+
 -----------------------------------------------------------------------
 -- Statements
 
@@ -628,7 +640,7 @@ instance EqualityExtension p => Equality (Block p) where
 -- | A block statement is either a normal statement, a local
 --   class declaration or a local variable declaration.
 data BlockStmt p
-  = BlockStmt SourceSpan (Stmt p)
+  = BlockStmt (Stmt p)
   | LocalClass (ClassDecl p)
   | LocalVars SourceSpan [Modifier p] Type [VarDecl p]
   deriving (Typeable, Generic)
@@ -640,16 +652,16 @@ deriving instance ReadExtension p => Read (BlockStmt p)
 deriving instance DataExtension p => Data (BlockStmt p)
 
 instance EqualityExtension p => Equality (BlockStmt p) where
-  eq opt (BlockStmt s1 stmt1) (BlockStmt s2 stmt2) =
-    eq opt s1 s2 && eq opt stmt1 stmt2
+  eq opt (BlockStmt stmt1) (BlockStmt stmt2) =
+    eq opt stmt1 stmt2
   eq opt (LocalClass cd1) (LocalClass cd2) =
     eq opt cd1 cd2
   eq opt (LocalVars s1 ms1 t1 vds1) (LocalVars s2 ms2 t2 vds2) =
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt t1 t2 && eq opt vds1 vds2
   eq _ _ _ = False
 
-instance Located (BlockStmt p) where
-  sourceSpan (BlockStmt s _) = s
+instance ShowExtension p => Located (BlockStmt p) where
+  sourceSpan (BlockStmt s) = sourceSpan s
   sourceSpan (LocalClass cd) = sourceSpan cd
   sourceSpan (LocalVars s _ _ _) = s
 
@@ -795,7 +807,11 @@ instance EqualityExtension p => Equality (TryResource p) where
     eq opt fa1 fa2
   eq _ _ _ = False
 
-data ResourceDecl p 
+instance ShowExtension p => Located (TryResource p) where
+  sourceSpan (TryResourceVarAccess i) = sourceSpan i
+  sourceSpan tr = error ("No SourceSpan implemented for Try Resource: " ++ show tr)
+
+data ResourceDecl p
   = ResourceDecl [Modifier p] Type VarDeclId (VarInit p)
   deriving (Typeable, Generic)
 
@@ -1053,6 +1069,7 @@ instance EqualityExtension p => Equality (Exp p) where
   eq _ _ _ = False
 
 instance ShowExtension p => Located (Exp p) where
+  sourceSpan (Lit l) = sourceSpan l
   sourceSpan (ExpName n) = sourceSpan n
   sourceSpan (PostIncrement s _) = s
   sourceSpan (PostDecrement s _) = s
