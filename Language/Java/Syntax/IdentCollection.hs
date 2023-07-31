@@ -1,7 +1,7 @@
 module Language.Java.Syntax.IdentCollection
   ( IdentCollection (..),
     addToLocalVars,
-    addToClassTrees,
+    addToClassInfos,
     addToFields,
     addToFormalParams,
     isExpressionIdent,
@@ -40,8 +40,8 @@ addToLocalVars idents identCollection = identCollection {icLocalVars = idents ++
 addToImportedClasses :: [Ident] -> IdentCollection -> IdentCollection
 addToImportedClasses idents identCollection = identCollection {icImportedClasses = idents ++ icImportedClasses identCollection}
 
-addToClassTrees :: [ClassInfo] -> IdentCollection -> IdentCollection
-addToClassTrees classTreesNew identCollection = identCollection {icClassInfos = classTreesNew ++ icClassInfos identCollection}
+addToClassInfos :: [ClassInfo] -> IdentCollection -> IdentCollection
+addToClassInfos classTreesNew identCollection = identCollection {icClassInfos = classTreesNew ++ icClassInfos identCollection}
 
 isExpressionIdent :: Ident -> IdentCollection -> Bool
 isExpressionIdent idnt ic =

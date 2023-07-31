@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Language.Java.Transformer (transformCompilationUnitToAnalyzed) where
 
 import Data.Bifunctor (Bifunctor (second))
@@ -9,7 +11,7 @@ import qualified Language.Java.Syntax.Decl as Decl
 import qualified Language.Java.Syntax.FormalParam as FormalParam
 import Language.Java.Syntax.IdentCollection as IdentCollection
   ( IdentCollection (..),
-    addToClassTrees,
+    addToClassInfos,
     addToFields,
     addToFormalParams,
     addToImportedClasses,
@@ -18,7 +20,6 @@ import Language.Java.Syntax.IdentCollection as IdentCollection
     isExpressionIdent,
     isImportedClass,
   )
-import qualified Language.Java.Syntax.ImportDecl as ImportDecl
 import qualified Language.Java.Syntax.TryResource as TryResource
 import qualified Language.Java.Syntax.TypeDecl as TypeDecl
 import qualified Language.Java.Syntax.VarDecl as VarDecl
@@ -57,9 +58,16 @@ instance AnalyzedTransformer MethodInvocation where
 instance AnalyzedTransformer CompilationUnit where
   transformToAnalyzed scope (CompilationUnit mbPackageDecl importDecls typeDecls) =
     let newscope =
-          ( IdentCollection.addToClassTrees
+          ( IdentCollection.addToClassInfos
               (map ClassInfo.fromClassDecl (mapMaybe TypeDecl.classDecl typeDecls))
-              . IdentCollection.addToImportedClasses (mapMaybe ImportDecl.classIdent importDecls)
+              . IdentCollection.addToImportedClasses
+                ( mapMaybe
+                    ( \case
+                        (ImportDecl _ False (Name _ idents) False) -> Just (last idents)
+                        _ -> Nothing
+                    )
+                    importDecls
+                )
           )
             scope
      in CompilationUnit
@@ -70,7 +78,7 @@ instance AnalyzedTransformer CompilationUnit where
 instance AnalyzedTransformer ClassDecl where
   transformToAnalyzed scope (ClassDecl src modifiers idnt typeParams mbRefType refTypes classBody@(ClassBody decls)) =
     let newScope =
-          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
+          ( IdentCollection.addToClassInfos (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
               . IdentCollection.addToFields (concat (mapMaybe Decl.fieldIdents decls))
           )
             scope
@@ -84,7 +92,7 @@ instance AnalyzedTransformer ClassDecl where
           (transformToAnalyzed newScope classBody)
   transformToAnalyzed scope (RecordDecl src modifiers idnt typeParams recordFieldDecls refTypes classBody@(ClassBody decls)) =
     let newScope =
-          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
+          ( IdentCollection.addToClassInfos (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
               . IdentCollection.addToFields (concat (mapMaybe Decl.fieldIdents decls))
           )
             scope
@@ -98,7 +106,7 @@ instance AnalyzedTransformer ClassDecl where
           (transformToAnalyzed newScope classBody)
   transformToAnalyzed scope (EnumDecl src modifiers idnt refTypes enumBody@(EnumBody cons decls)) =
     let newScope =
-          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
+          ( IdentCollection.addToClassInfos (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
               . IdentCollection.addToFields (concat (mapMaybe Decl.fieldIdents decls) ++ map (\(EnumConstant idnt' _ _) -> idnt') cons)
           )
             scope
@@ -150,7 +158,7 @@ transformBlockStmtsToAnalyzed scope (blckStmt@(LocalVars _ _ _ varDecls) : rest)
   let newscope = IdentCollection.addToLocalVars (map VarDecl.ident varDecls) scope
    in transformToAnalyzed newscope blckStmt : transformBlockStmtsToAnalyzed newscope rest
 transformBlockStmtsToAnalyzed scope (blckStmt@(LocalClass classDecl) : rest) =
-  let newscope = IdentCollection.addToClassTrees [ClassInfo.fromClassDecl classDecl] scope
+  let newscope = IdentCollection.addToClassInfos [ClassInfo.fromClassDecl classDecl] scope
    in transformToAnalyzed newscope blckStmt : transformBlockStmtsToAnalyzed newscope rest
 transformBlockStmtsToAnalyzed scope (blckStmt : rest) = transformToAnalyzed scope blckStmt : transformBlockStmtsToAnalyzed scope rest
 

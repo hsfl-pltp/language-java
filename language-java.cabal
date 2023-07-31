@@ -54,7 +54,6 @@ Library
                         Language.Java.Syntax.FormalParam
                         Language.Java.Syntax.ResourceDecl
                         Language.Java.Syntax.TryResource
-                        Language.Java.Syntax.ImportDecl
 
 Test-Suite test-java-parse
   type:              exitcode-stdio-1.0
