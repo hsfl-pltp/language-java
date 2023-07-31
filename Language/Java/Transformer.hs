@@ -4,23 +4,21 @@ import Data.Bifunctor (Bifunctor (second))
 import Data.List (find)
 import Data.Maybe (mapMaybe)
 import Language.Java.Syntax
-import qualified Language.Java.Syntax.ClassDecl as ClassDecl
 import Language.Java.Syntax.ClassInfo as ClassInfo (ClassInfo (..), fromClassDecl, hasField, hasIdent)
 import qualified Language.Java.Syntax.Decl as Decl
 import qualified Language.Java.Syntax.FormalParam as FormalParam
 import Language.Java.Syntax.IdentCollection as IdentCollection
   ( IdentCollection (..),
-    addLocalVars,
     addToClassTrees,
     addToFields,
     addToFormalParams,
-    addToTypeNames,
+    addToImportedClasses,
+    addToLocalVars,
     empty,
     isExpressionIdent,
-    isTypeIdent,
+    isImportedClass,
   )
-import qualified Language.Java.Syntax.MemberDecl as MemberDecl
-import qualified Language.Java.Syntax.ResourceDecl as ResourceDecl
+import qualified Language.Java.Syntax.ImportDecl as ImportDecl
 import qualified Language.Java.Syntax.TryResource as TryResource
 import qualified Language.Java.Syntax.TypeDecl as TypeDecl
 import qualified Language.Java.Syntax.VarDecl as VarDecl
@@ -31,12 +29,11 @@ transformCompilationUnitToAnalyzed = transformToAnalyzed IdentCollection.empty
 
 classifyName :: [Ident] -> IdentCollection -> Name -> ClassifiedName
 classifyName [] _ name = Unknown name
-classifyName [idnt] ic name
-  | IdentCollection.isExpressionIdent idnt ic = ExpressionName name
-  | IdentCollection.isTypeIdent idnt ic = TypeName name
-  | otherwise = Unknown name
 classifyName (idnt : rest) ic name
   | IdentCollection.isExpressionIdent idnt ic = ExpressionName name
+  | IdentCollection.isImportedClass idnt ic = case rest of
+      [] -> TypeName name
+      _ -> Unknown name
   | otherwise = maybe (Unknown name) (classifyIdentFromTree rest name) (find (ClassInfo.hasIdent idnt) (icClassInfos ic))
 
 classifyIdentFromTree :: [Ident] -> Name -> ClassInfo -> ClassifiedName
@@ -60,8 +57,9 @@ instance AnalyzedTransformer MethodInvocation where
 instance AnalyzedTransformer CompilationUnit where
   transformToAnalyzed scope (CompilationUnit mbPackageDecl importDecls typeDecls) =
     let newscope =
-          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe TypeDecl.classDecl typeDecls))
-              . IdentCollection.addToTypeNames (mapMaybe typeDeclClassDeclIdent typeDecls ++ mapMaybe importDeclSingleClassIdent importDecls)
+          ( IdentCollection.addToClassTrees
+              (map ClassInfo.fromClassDecl (mapMaybe TypeDecl.classDecl typeDecls))
+              . IdentCollection.addToImportedClasses (mapMaybe ImportDecl.classIdent importDecls)
           )
             scope
      in CompilationUnit
@@ -72,9 +70,8 @@ instance AnalyzedTransformer CompilationUnit where
 instance AnalyzedTransformer ClassDecl where
   transformToAnalyzed scope (ClassDecl src modifiers idnt typeParams mbRefType refTypes classBody@(ClassBody decls)) =
     let newScope =
-          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe declClassDecl decls))
-              . IdentCollection.addToTypeNames (idnt : mapMaybe declClassDeclIdent decls)
-              . IdentCollection.addToFields (concat (mapMaybe declFieldIdents decls))
+          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
+              . IdentCollection.addToFields (concat (mapMaybe Decl.fieldIdents decls))
           )
             scope
      in ClassDecl
@@ -87,9 +84,8 @@ instance AnalyzedTransformer ClassDecl where
           (transformToAnalyzed newScope classBody)
   transformToAnalyzed scope (RecordDecl src modifiers idnt typeParams recordFieldDecls refTypes classBody@(ClassBody decls)) =
     let newScope =
-          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe declClassDecl decls))
-              . IdentCollection.addToTypeNames (idnt : mapMaybe declClassDeclIdent decls)
-              . IdentCollection.addToFields (concat (mapMaybe declFieldIdents decls))
+          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
+              . IdentCollection.addToFields (concat (mapMaybe Decl.fieldIdents decls))
           )
             scope
      in RecordDecl
@@ -102,9 +98,8 @@ instance AnalyzedTransformer ClassDecl where
           (transformToAnalyzed newScope classBody)
   transformToAnalyzed scope (EnumDecl src modifiers idnt refTypes enumBody@(EnumBody cons decls)) =
     let newScope =
-          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe declClassDecl decls))
-              . IdentCollection.addToTypeNames (idnt : mapMaybe declClassDeclIdent decls)
-              . IdentCollection.addToFields (concat (mapMaybe declFieldIdents decls) ++ map (\(EnumConstant idnt' _ _) -> idnt') cons)
+          ( IdentCollection.addToClassTrees (map ClassInfo.fromClassDecl (mapMaybe Decl.classDecl decls))
+              . IdentCollection.addToFields (concat (mapMaybe Decl.fieldIdents decls) ++ map (\(EnumConstant idnt' _ _) -> idnt') cons)
           )
             scope
      in EnumDecl
@@ -152,10 +147,10 @@ instance AnalyzedTransformer Block where
 transformBlockStmtsToAnalyzed :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
 transformBlockStmtsToAnalyzed _ [] = []
 transformBlockStmtsToAnalyzed scope (blckStmt@(LocalVars _ _ _ varDecls) : rest) =
-  let newscope = IdentCollection.addLocalVars (map VarDecl.ident varDecls) scope
+  let newscope = IdentCollection.addToLocalVars (map VarDecl.ident varDecls) scope
    in transformToAnalyzed newscope blckStmt : transformBlockStmtsToAnalyzed newscope rest
 transformBlockStmtsToAnalyzed scope (blckStmt@(LocalClass classDecl) : rest) =
-  let newscope = IdentCollection.addToTypeNames [ClassDecl.ident classDecl] scope
+  let newscope = IdentCollection.addToClassTrees [ClassInfo.fromClassDecl classDecl] scope
    in transformToAnalyzed newscope blckStmt : transformBlockStmtsToAnalyzed newscope rest
 transformBlockStmtsToAnalyzed scope (blckStmt : rest) = transformToAnalyzed scope blckStmt : transformBlockStmtsToAnalyzed scope rest
 
@@ -166,7 +161,7 @@ instance AnalyzedTransformer Stmt where
   transformToAnalyzed scope (While srcspan expr stmt) = While srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope stmt)
   transformToAnalyzed scope (BasicFor srcspan mbForInit mbExp mbExps stmt) =
     let newScope = case mbForInit of
-          Just (ForLocalVars _ _ varDecls) -> IdentCollection.addLocalVars (map VarDecl.ident varDecls) scope
+          Just (ForLocalVars _ _ varDecls) -> IdentCollection.addToLocalVars (map VarDecl.ident varDecls) scope
           _ -> scope
      in BasicFor
           srcspan
@@ -181,7 +176,7 @@ instance AnalyzedTransformer Stmt where
       type_
       idnt
       (transformToAnalyzed scope expr)
-      (transformToAnalyzed (IdentCollection.addLocalVars [idnt] scope) stmt)
+      (transformToAnalyzed (IdentCollection.addToLocalVars [idnt] scope) stmt)
   transformToAnalyzed _ Empty = Empty
   transformToAnalyzed scope (ExpStmt srcspan expr) = ExpStmt srcspan (transformToAnalyzed scope expr)
   transformToAnalyzed scope (Assert expr mbExp) = Assert (transformToAnalyzed scope expr) (fmap (transformToAnalyzed scope) mbExp)
@@ -196,40 +191,10 @@ instance AnalyzedTransformer Stmt where
     Try
       srcspan
       (map (transformToAnalyzed scope) tryResources)
-      (transformToAnalyzed (IdentCollection.addLocalVars (mapMaybe tryResourceResourceDeclIdent tryResources) scope) block)
+      (transformToAnalyzed (IdentCollection.addToLocalVars (mapMaybe TryResource.resourceDeclIdent tryResources) scope) block)
       (map (transformToAnalyzed scope) catches)
       (fmap (transformToAnalyzed scope) mbBlock)
   transformToAnalyzed scope (Labeled idnt stmt) = Labeled idnt (transformToAnalyzed scope stmt)
-
--- helper functions
-
-declClassDecl :: Decl p -> Maybe (ClassDecl p)
-declClassDecl decl =
-  Decl.memberDecl decl
-    >>= MemberDecl.classDecl
-
-declClassDeclIdent :: Decl p -> Maybe Ident
-declClassDeclIdent decl = fmap ClassDecl.ident (declClassDecl decl)
-
-typeDeclClassDeclIdent :: TypeDecl p -> Maybe Ident
-typeDeclClassDeclIdent typedecl =
-  fmap ClassDecl.ident (TypeDecl.classDecl typedecl)
-
--- Ident of the single class imported by the statement
-importDeclSingleClassIdent :: ImportDecl -> Maybe Ident
-importDeclSingleClassIdent (ImportDecl _ False (Name _ idents) False) = Just (last idents)
-importDeclSingleClassIdent _ = Nothing
-
-declFieldIdents :: Decl p -> Maybe [Ident]
-declFieldIdents decl =
-  fmap
-    (map VarDecl.ident)
-    ( Decl.memberDecl decl
-        >>= MemberDecl.fields
-    )
-
-tryResourceResourceDeclIdent :: TryResource p -> Maybe Ident
-tryResourceResourceDeclIdent tr = fmap ResourceDecl.ident (TryResource.resourceDecl tr)
 
 -- boiler plate cases
 

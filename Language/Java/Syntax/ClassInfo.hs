@@ -6,11 +6,9 @@ module Language.Java.Syntax.ClassInfo
   )
 where
 
-import Data.Maybe ( mapMaybe )
+import Data.Maybe (mapMaybe)
 import Language.Java.Syntax
-import Language.Java.Syntax.Decl as Decl (memberDecl)
-import Language.Java.Syntax.MemberDecl as MemberDecl (classDecl, fields)
-import Language.Java.Syntax.VarDecl as VarDecl (ident)
+import Language.Java.Syntax.Decl as Decl (classDecl, fieldIdents)
 
 -- | data type used to pass down icClassInfos structure in the file
 -- Vielleicht classInfo oder javaClass {ciFields: :, ciInnerClasses}
@@ -19,6 +17,7 @@ data ClassInfo = ClassInfo
     ciInnerClasses :: [ClassInfo],
     ciIdent :: Ident
   }
+  deriving (Show)
 
 hasField :: Ident -> ClassInfo -> Bool
 hasField idnt classInfo = any (eq IgnoreSourceSpan idnt) (ciFields classInfo)
@@ -29,29 +28,16 @@ hasIdent idnt classInfo = eq IgnoreSourceSpan idnt (ciIdent classInfo)
 fromClassDecl :: ClassDecl p -> ClassInfo
 fromClassDecl (ClassDecl _ _ idnt _ _ _ (ClassBody decls)) =
   ClassInfo
-    ((concat . mapMaybe declFieldIdents) decls)
-    (map fromClassDecl (mapMaybe declClassDecl decls))
+    ((concat . mapMaybe Decl.fieldIdents) decls)
+    (map fromClassDecl (mapMaybe Decl.classDecl decls))
     idnt
 fromClassDecl (RecordDecl _ _ idnt _ _ _ (ClassBody decls)) =
   ClassInfo
-    ((concat . mapMaybe declFieldIdents) decls)
-    (map fromClassDecl (mapMaybe declClassDecl decls))
+    ((concat . mapMaybe Decl.fieldIdents) decls)
+    (map fromClassDecl (mapMaybe Decl.classDecl decls))
     idnt
 fromClassDecl (EnumDecl _ _ idnt _ (EnumBody cons decls)) =
   ClassInfo
-    ((concat . mapMaybe declFieldIdents) decls ++ map (\(EnumConstant idnt' _ _) -> idnt') cons)
-    (map fromClassDecl (mapMaybe declClassDecl decls))
+    ((concat . mapMaybe Decl.fieldIdents) decls ++ map (\(EnumConstant idnt' _ _) -> idnt') cons)
+    (map fromClassDecl (mapMaybe Decl.classDecl decls))
     idnt
-
-declClassDecl :: Decl p -> Maybe (ClassDecl p)
-declClassDecl decl =
-  Decl.memberDecl decl
-    >>= MemberDecl.classDecl
-
-declFieldIdents :: Decl p -> Maybe [Ident]
-declFieldIdents decl =
-  fmap
-    (map VarDecl.ident)
-    ( Decl.memberDecl decl
-        >>= MemberDecl.fields
-    )

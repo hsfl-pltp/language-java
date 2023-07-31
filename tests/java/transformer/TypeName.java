@@ -1,22 +1,41 @@
-import package2.ClassFromPackage2;
+import ImportedPackage.ImportedClass;
 public class TypeName {
 
-    public static void staticFunc() {
-
-    }
-
     public void func() {
-
+        //test for call of static function
         TypeName.staticFunc();
+
+        //test for influence of declaration order
         var TypeName = 0;
+
+
+        // test for static function call of class declarated in methodbody
         class Foo {
             static void funcFoo() {
 
             }
         }
         Foo.funcFoo();
-        ClassFromPackage2.func();
+
+        // test for function call from imported class
+        ImportedClass.func();
+
+        // test for static function from inner class
+        InnerClass.staticClassFunc();
+
+        //test for static function from enum class
+        Enum.staticEnumFunc();
+
+        //test for static function from record
+        Record.staticRecordFunc();
+
+
     }
+
+    public static void staticFunc() {
+
+    }
+
 
 
     static class InnerClass {
@@ -45,17 +64,7 @@ public class TypeName {
 
 
     void func3() {
-        InnerClass.staticClassFunc();
-        Enum.staticEnumFunc();
-
-        Record.staticRecordFunc();
-
-        staticC.scFunc();
-        class staticC {
-            static void scFunc() {
-
-            }
-        }
+        
 
     }
 
@@ -69,11 +78,6 @@ public class TypeName {
 
 }
 
-class staticC {
-    static void scFunc() {
-
-    }
-}
 
 class MultiNameTypeName {
     void func() {

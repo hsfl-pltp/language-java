@@ -1,13 +1,13 @@
 module Language.Java.Syntax.IdentCollection
   ( IdentCollection (..),
-    addLocalVars,
+    addToLocalVars,
     addToClassTrees,
     addToFields,
     addToFormalParams,
-    addToTypeNames,
     isExpressionIdent,
-    isTypeIdent,
     empty,
+    addToImportedClasses,
+    isImportedClass,
   )
 where
 
@@ -20,12 +20,13 @@ import Language.Java.Syntax.Types (Ident)
 
 -- | data type used to collect the identifiers that are currently in scope
 data IdentCollection = IdentCollection
-  { icFields :: [Ident],
+  { icLocalVars :: [Ident],
     icFormalParams :: [Ident],
-    icLocalVars :: [Ident],
-    icTypeNames :: [Ident],
+    icFields :: [Ident],
+    icImportedClasses :: [Ident],
     icClassInfos :: [ClassInfo]
   }
+  deriving (Show)
 
 addToFields :: [Ident] -> IdentCollection -> IdentCollection
 addToFields idents identCollection = identCollection {icFields = idents ++ icFields identCollection}
@@ -33,20 +34,23 @@ addToFields idents identCollection = identCollection {icFields = idents ++ icFie
 addToFormalParams :: [Ident] -> IdentCollection -> IdentCollection
 addToFormalParams idents identCollection = identCollection {icFormalParams = idents ++ icFormalParams identCollection}
 
-addLocalVars :: [Ident] -> IdentCollection -> IdentCollection
-addLocalVars idents identCollection = identCollection {icLocalVars = idents ++ icLocalVars identCollection}
+addToLocalVars :: [Ident] -> IdentCollection -> IdentCollection
+addToLocalVars idents identCollection = identCollection {icLocalVars = idents ++ icLocalVars identCollection}
 
-addToTypeNames :: [Ident] -> IdentCollection -> IdentCollection
-addToTypeNames idents identCollection = identCollection {icTypeNames = idents ++ icTypeNames identCollection}
+addToImportedClasses :: [Ident] -> IdentCollection -> IdentCollection
+addToImportedClasses idents identCollection = identCollection {icImportedClasses = idents ++ icImportedClasses identCollection}
 
 addToClassTrees :: [ClassInfo] -> IdentCollection -> IdentCollection
 addToClassTrees classTreesNew identCollection = identCollection {icClassInfos = classTreesNew ++ icClassInfos identCollection}
 
 isExpressionIdent :: Ident -> IdentCollection -> Bool
-isExpressionIdent idnt (IdentCollection cfields fp vars _ _) = any (eq IgnoreSourceSpan idnt) (cfields ++ fp ++ vars)
+isExpressionIdent idnt ic =
+  any (eq IgnoreSourceSpan idnt) (icLocalVars ic)
+    || any (eq IgnoreSourceSpan idnt) (icFormalParams ic)
+    || any (eq IgnoreSourceSpan idnt) (icFields ic)
 
-isTypeIdent :: Ident -> IdentCollection -> Bool
-isTypeIdent idnt (IdentCollection _ _ _ typeVars _) = any (eq IgnoreSourceSpan idnt) typeVars
+isImportedClass :: Ident -> IdentCollection -> Bool
+isImportedClass idnt ic = any (eq IgnoreSourceSpan idnt) (icImportedClasses ic)
 
 empty :: IdentCollection
 empty = IdentCollection [] [] [] [] []
