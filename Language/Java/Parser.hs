@@ -653,9 +653,7 @@ blockStmt =
           return (LocalVars (startLoc, endLoc) m t vds, endLoc)
       )
     <|> do
-      startLoc <- getLocation
-      (s, endLoc) <- stmt
-      return (BlockStmt (startLoc, endLoc) s, endLoc)
+      mapFst BlockStmt <$> stmt
 
 stmt :: P (Stmt Parsed, Location)
 stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
@@ -1448,19 +1446,20 @@ arrayCreation = do
 
 literal :: P (Literal, Location)
 literal = do
-  loc <- getEndLoc
+  startLoc <- getLocation
+  endLoc <- getEndLoc
   lit <-
     javaToken $ \case
-      IntTok i -> Just (Int i)
-      LongTok l -> Just (Word l)
-      DoubleTok d -> Just (Double d)
-      FloatTok f -> Just (Float f)
-      CharTok c -> Just (Char c)
-      StringTok s -> Just (String s)
-      BoolTok b -> Just (Boolean b)
-      NullTok -> Just Null
+      IntTok i -> Just (Int (startLoc, endLoc) i)
+      LongTok l -> Just (Word (startLoc, endLoc) l)
+      DoubleTok d -> Just (Double (startLoc, endLoc) d)
+      FloatTok f -> Just (Float (startLoc, endLoc) f)
+      CharTok c -> Just (Char (startLoc, endLoc) c)
+      StringTok s -> Just (String (startLoc, endLoc) s)
+      BoolTok b -> Just (Boolean (startLoc, endLoc) b)
+      NullTok -> Just (Null (startLoc, endLoc))
       _ -> Nothing
-  return (lit, loc)
+  return (lit, endLoc)
 
 -- Operators
 

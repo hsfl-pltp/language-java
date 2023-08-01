@@ -5,30 +5,49 @@ module Language.Java.Syntax.Exp where
 
 import Data.Data
 import GHC.Generics (Generic)
+import Language.Java.SourceSpan (Located (..), SourceSpan)
 import Language.Java.Syntax.Equality (Equality (..))
 
 -- | A literal denotes a fixed, unchanging value.
 data Literal
-  = Int Integer
-  | Word Integer
-  | Float Double
-  | Double Double
-  | Boolean Bool
-  | Char Char
-  | String String
-  | Null
+  = Int SourceSpan Integer
+  | Word SourceSpan Integer
+  | Float SourceSpan Double
+  | Double SourceSpan Double
+  | Boolean SourceSpan Bool
+  | Char SourceSpan Char
+  | String SourceSpan String
+  | Null SourceSpan
   deriving (Show, Read, Typeable, Generic, Data)
 
 instance Equality Literal where
-  eq _ (Int n1) (Int n2) = n1 == n2
-  eq _ (Word n1) (Word n2) = n1 == n2
-  eq _ (Float x1) (Float x2) = x1 == x2
-  eq _ (Double x1) (Double x2) = x1 == x2
-  eq _ (Boolean b1) (Boolean b2) = b1 == b2
-  eq _ (Char c1) (Char c2) = c1 == c2
-  eq _ (String str1) (String str2) = str1 == str2
-  eq _ Null Null = True
+  eq opt (Int s1 n1) (Int s2 n2) =
+    eq opt s1 s2 && n1 == n2
+  eq opt (Word s1 n1) (Word s2 n2) =
+    eq opt s1 s2 && n1 == n2
+  eq opt (Float s1 x1) (Float s2 x2) =
+    eq opt s1 s2 && x1 == x2
+  eq opt (Double s1 x1) (Double s2 x2) =
+    eq opt s1 s2 && x1 == x2
+  eq opt (Boolean s1 b1) (Boolean s2 b2) =
+    eq opt s1 s2 && b1 == b2
+  eq opt (Char s1 c1) (Char s2 c2) =
+    eq opt s1 s2 && c1 == c2
+  eq opt (String s1 str1) (String s2 str2) =
+    eq opt s1 s2 && str1 == str2
+  eq opt (Null s1) (Null s2) =
+    eq opt s1 s2
   eq _ _ _ = False
+
+instance Located Literal where
+  sourceSpan (Int s _) = s
+  sourceSpan (Word s _) = s
+  sourceSpan (Float s _) = s
+  sourceSpan (Double s _) = s
+  sourceSpan (Boolean s _) = s
+  sourceSpan (Char s _) = s
+  sourceSpan (String s _) = s
+  sourceSpan (Null s) = s
 
 -- | A binary infix operator.
 data Op

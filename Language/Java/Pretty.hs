@@ -243,7 +243,7 @@ instance PrettyExtension p => Pretty (Block p) where
   prettyPrec p (Block stmts) = braceBlock $ map (prettyPrec p) stmts
 
 instance PrettyExtension p => Pretty (BlockStmt p) where
-  prettyPrec p (BlockStmt _ stmt) = prettyPrec p stmt
+  prettyPrec p (BlockStmt stmt) = prettyPrec p stmt
   prettyPrec p (LocalClass cd) = prettyPrec p cd
   prettyPrec p (LocalVars _ mods t vds) =
     hsep (map (prettyPrec p) mods)
@@ -438,14 +438,14 @@ instance PrettyExtension p => Pretty (LambdaExpression p) where
   prettyPrec p (LambdaBlock block) = prettyPrec p block
 
 instance Pretty Literal where
-  prettyPrec _ (Int i) = text (show i)
-  prettyPrec _ (Word i) = text (show i) <> char 'L'
-  prettyPrec _ (Float f) = text (show f) <> char 'F'
-  prettyPrec _ (Double d) = text (show d)
-  prettyPrec _ (Boolean b) = text . map toLower $ show b
-  prettyPrec _ (Char c) = quotes $ text (escapeChar c)
-  prettyPrec _ (String s) = doubleQuotes $ text (concatMap escapeString s)
-  prettyPrec _ Null = text "null"
+  prettyPrec _ (Int _ i) = text (show i)
+  prettyPrec _ (Word _ i) = text (show i) <> char 'L'
+  prettyPrec _ (Float _ f) = text (show f) <> char 'F'
+  prettyPrec _ (Double _ d) = text (show d)
+  prettyPrec _ (Boolean _ b) = text . map toLower $ show b
+  prettyPrec _ (Char _ c) = quotes $ text (escapeChar c)
+  prettyPrec _ (String _ s) = doubleQuotes $ text (concatMap escapeString s)
+  prettyPrec _ (Null _) = text "null"
 
 instance Pretty Op where
   prettyPrec _ op = text $ case op of
