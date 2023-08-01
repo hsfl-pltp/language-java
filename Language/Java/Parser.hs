@@ -61,6 +61,8 @@ module Language.Java.Parser
 where
 
 import Data.Functor ((<&>))
+import Data.List.NonEmpty (NonEmpty ((:|)), (<|))
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Language.Java.Lexer (L1 (..), Token (..), lexer)
 import Language.Java.SourceSpan (Location (..), dummyLocation, locationEof)
@@ -238,26 +240,26 @@ normalClassDecl :: P (Mod (ClassDecl Parsed), Location)
 normalClassDecl = do
   tok KW_Class
   i <- noLoc ident
-  tps <- lopt typeParams
+  tps <- neoptList typeParams
   mex <- opt extends
-  imp <- lopt implements
+  imp <- neoptList implements
   (bod, endLoc) <- classBody
-  return (\loc ms -> ClassDecl (loc, endLoc) ms i tps (fmap head mex) imp bod, endLoc)
+  return (\loc ms -> ClassDecl (loc, endLoc) ms i tps (fmap NonEmpty.head mex) imp bod, endLoc)
 
-extends :: P [RefType]
+extends :: P (NonEmpty RefType)
 extends = tok KW_Extends >> refTypeList
 
-permits :: P [RefType]
+permits :: P (NonEmpty RefType)
 permits = fixedIdent "permits" () >> refTypeList
 
-implements :: P [RefType]
+implements :: P (NonEmpty RefType)
 implements = tok KW_Implements >> refTypeList
 
 enumClassDecl :: P (Mod (ClassDecl Parsed), Location)
 enumClassDecl = do
   tok KW_Enum
   i <- noLoc ident
-  imp <- lopt implements
+  imp <- neoptList implements
   (bod, endLoc) <- enumBody
   return (\loc ms -> EnumDecl (loc, endLoc) ms i imp bod, endLoc)
 
@@ -265,9 +267,9 @@ recordClassDecl :: P (Mod (ClassDecl Parsed), Location)
 recordClassDecl = do
   tok KW_Record
   i <- noLoc ident
-  tps <- lopt typeParams
+  tps <- neoptList typeParams
   fields <- noLoc $ parens (seplist recordField comma)
-  imp <- lopt implements
+  imp <- neoptList implements
   (bod, endLoc) <- classBody
   return (\loc ms -> RecordDecl (loc, endLoc) ms i tps fields imp bod, endLoc)
   where
@@ -307,9 +309,9 @@ annInterfaceDecl :: P (Mod (InterfaceDecl Parsed))
 annInterfaceDecl = do
   tok KW_AnnInterface
   i <- noLoc ident
-  tps <- lopt typeParams
-  exs <- lopt extends
-  ps <- lopt permits
+  tps <- neoptList typeParams
+  exs <- neoptList extends
+  ps <- neoptList permits
   (bod, endLoc) <- interfaceBody
   return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceAnnotation ms i tps exs ps bod
 
@@ -317,9 +319,9 @@ interfaceDecl :: P (Mod (InterfaceDecl Parsed))
 interfaceDecl = do
   tok KW_Interface
   i <- noLoc ident
-  tps <- lopt typeParams
-  exs <- lopt extends
-  ps <- lopt permits
+  tps <- neoptList typeParams
+  exs <- neoptList extends
+  ps <- neoptList permits
   (bod, endLoc) <- interfaceBody
   return $ \loc ms -> InterfaceDecl (loc, endLoc) InterfaceNormal ms i tps exs ps bod
 
@@ -373,11 +375,11 @@ fieldDecl = do
 
 methodDecl :: P (Mod (MemberDecl Parsed))
 methodDecl = do
-  tps <- lopt typeParams
+  tps <- neoptList typeParams
   rt <- resultType
   i <- noLoc ident
   fps <- formalParams
-  thr <- lopt throws
+  thr <- neoptList throws
   (bod, endLoc) <- methodBody
   return $ \loc ms -> MethodDecl (loc, endLoc) ms tps rt i fps thr Nothing bod
 
@@ -391,10 +393,10 @@ methodBody = onlySemi <|> fullBody
 
 constrDecl :: P (Mod (MemberDecl Parsed))
 constrDecl = do
-  tps <- lopt typeParams
+  tps <- neoptList typeParams
   i <- noLoc ident
-  fps <- optList formalParams -- record constructors omit the argument list
-  thr <- lopt throws
+  fps <- lopt formalParams -- record constructors omit the argument list
+  thr <- neoptList throws
   (bod, endLoc) <- constrBody
   return $ \loc ms -> ConstructorDecl (loc, endLoc) ms tps i fps thr bod
 
@@ -412,20 +414,20 @@ explConstrInv =
   noLoc . endSemi $
     try
       ( do
-          tas <- lopt refTypeArgs
+          tas <- neoptList refTypeArgs
           tok KW_This
           ThisInvoke tas <$> noLoc args
       )
       <|> try
         ( do
-            tas <- lopt refTypeArgs
+            tas <- neoptList refTypeArgs
             tok KW_Super
             SuperInvoke tas <$> noLoc args
         )
       <|> ( do
               pri <- noLoc primary
               period
-              tas <- lopt refTypeArgs
+              tas <- neoptList refTypeArgs
               tok KW_Super
               PrimarySuperInvoke pri tas <$> noLoc args
           )
@@ -457,11 +459,11 @@ interfaceMemberDecl =
 
 absMethodDecl :: P (Mod (MemberDecl Parsed))
 absMethodDecl = do
-  tps <- lopt typeParams
+  tps <- neoptList typeParams
   rt <- resultType
   i <- noLoc ident
   fps <- formalParams
-  thr <- lopt throws
+  thr <- neoptList throws
   def <- opt defaultValue
   endLoc <- getEndLoc
   semiColon
@@ -470,7 +472,7 @@ absMethodDecl = do
 defaultValue :: P (Exp Parsed)
 defaultValue = tok KW_Default >> noLoc exp
 
-throws :: P [RefType]
+throws :: P (NonEmpty RefType)
 throws = tok KW_Throws >> refTypeList
 
 -- Formal parameters
@@ -546,7 +548,7 @@ annotation = do
       )
     <|> return (MarkerAnnotation (startLoc, nLoc) n)
 
-evlist :: P [(Ident, ElementValue Parsed)]
+evlist :: P (NonEmpty (Ident, ElementValue Parsed))
 evlist = seplist1 elementValuePair comma
 
 elementValuePair :: P (Ident, ElementValue Parsed)
@@ -564,7 +566,7 @@ elementValue =
 ----------------------------------------------------------------------------
 -- Variable declarations
 
-varDecls :: P [VarDecl Parsed]
+varDecls :: P (NonEmpty (VarDecl Parsed))
 varDecls = seplist1 varDecl comma
 
 varDecl :: P (VarDecl Parsed)
@@ -587,7 +589,7 @@ varDeclId = do
         _ -> snd (last ebs)
   return (foldl (\f (_, loc) -> VarDeclArray (startLoc, loc) . f) VarId ebs i, endLoc)
 
-localVarDecl :: P (Location, [Modifier Parsed], Type, [VarDecl Parsed])
+localVarDecl :: P (Location, [Modifier Parsed], Type, NonEmpty (VarDecl Parsed))
 localVarDecl = do
   startLoc <- getLocation
   ms <- list modifier
@@ -691,7 +693,7 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                   semiColon
                   e <- opt (noLoc exp)
                   semiColon
-                  fu <- opt forUp
+                  fu <- forUp
                   return (\loc -> BasicFor (startLoc, loc) fi e fu)
               )
               <|> ( do
@@ -739,7 +741,7 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
                   semiColon
                   e <- opt (noLoc exp)
                   semiColon
-                  fu <- opt forUp
+                  fu <- forUp
                   return (\loc -> BasicFor (startLoc, loc) fi e fu)
               )
               <|> ( do
@@ -876,7 +878,7 @@ forInit =
     <|> (seplist1 stmtExp comma <&> ForInitExps)
 
 forUp :: P [Exp Parsed]
-forUp = seplist1 stmtExp comma
+forUp = seplist stmtExp comma
 
 -- Switches
 
@@ -906,7 +908,7 @@ switchLabelOld =
   (tok KW_Default >> attrTok Op_Colon Default)
     <|> ( do
             tok KW_Case
-            es <- seplist (noLoc condExp) comma
+            es <- seplist1 (noLoc condExp) comma
             attrTok Op_Colon (SwitchCase es)
         )
 
@@ -922,7 +924,7 @@ switchLabelNew =
   (tok KW_Default >> tok LambdaArrow >> return Default)
     <|> ( do
             tok KW_Case
-            es <- seplist (noLoc condExp) comma
+            es <- seplist1 (noLoc condExp) comma
             tok LambdaArrow
             return $ SwitchCase es
         )
@@ -934,14 +936,14 @@ switchExp = do
   (branches, loc) <- braces switchExpBody
   return (SwitchExp e branches, loc)
   where
-    switchExpBody = many switchExpBodyBranch
+    switchExpBody = NonEmpty.fromList <$> many1 switchExpBodyBranch
     switchExpBodyBranch = do
       lbl <- switchLabelNew
       body <-
         (SwitchExpBranchBlock <$> noLoc (braces (list (noLoc blockStmt))))
           <|> (SwitchExpBranchBlock <$> try (blockStmt >>= \s -> return [fst s]))
           <|> (SwitchExpBranchExp <$> branchExp)
-      return $ SwitchExpBranch lbl body
+      return (SwitchExpBranch lbl body)
     branchExp = do
       e <- noLoc exp
       semiColon
@@ -1141,7 +1143,7 @@ instanceCreationNPS :: P (Exp Parsed, Location)
 instanceCreationNPS =
   do
     tok KW_New
-    tas <- lopt (noLoc typeArgs)
+    tas <- neoptList (noLoc typeArgs)
     tds <- typeDeclSpecifier
     (as, argsLoc) <- args
     mcbLoc <- opt classBody
@@ -1175,7 +1177,7 @@ instanceCreationSuffix :: P (Exp Parsed -> Exp Parsed, Location)
 instanceCreationSuffix =
   do
     period >> tok KW_New
-    tas <- lopt (noLoc typeArgs)
+    tas <- neoptList (noLoc typeArgs)
     i <- noLoc ident
     (as, argsLoc) <- args
     mcbLoc <- opt classBody
@@ -1303,7 +1305,7 @@ methodInvocationNPS :: P (MethodInvocation Parsed, Location)
 methodInvocationNPS =
   ( do
       tok KW_Super >> period
-      rts <- lopt refTypeArgs
+      rts <- neoptList refTypeArgs
       i <- noLoc ident
       mapFst (SuperMethodCall rts i) <$> args
   )
@@ -1315,7 +1317,7 @@ methodInvocationNPS =
             n <- noLoc name
             period
             msp <- opt (tok KW_Super >> period)
-            rts <- lopt refTypeArgs
+            rts <- neoptList refTypeArgs
             i <- noLoc ident
             let constr = maybe TypeMethodCall (const ClassMethodCall) msp
             mapFst (constr n rts i) <$> args
@@ -1327,7 +1329,7 @@ qualifiedMethodName = do
   mapFst
     ( \case
         ([], _) -> Nothing
-        (is, endLoc) -> Just (Name (startLoc, endLoc) (reverse is))
+        (is, endLoc) -> Just (Name (startLoc, endLoc) (NonEmpty.fromList (reverse is)))
     )
     <$> go startLoc []
   where
@@ -1344,7 +1346,7 @@ qualifiedMethodName = do
 methodInvocationSuffix :: P (Exp Parsed -> MethodInvocation Parsed, Location)
 methodInvocationSuffix = do
   period
-  _ <- lopt refTypeArgs
+  _ <- neoptList refTypeArgs
   i <- noLoc ident
   (as, loc) <- args
   return (\p -> PrimaryMethodCall p [] i as, loc)
@@ -1559,7 +1561,7 @@ refType :: P (RefType, Location)
 refType =
   ( do
       pt <- primType
-      (_ : bs, loc) <- list1 emptyBrackets
+      (_ :| bs, loc) <- list1 emptyBrackets
       return
         ( foldl
             (\f _ -> ArrayType . RefType . f)
@@ -1592,39 +1594,39 @@ nonArrayType =
 classType :: P (ClassType, Location)
 classType = do
   ctss <- seplist1 classTypeSpec period
-  let cts = map fst ctss
-      loc = snd (last ctss)
+  let cts = NonEmpty.map fst ctss
+      loc = snd (NonEmpty.last ctss)
   return (ClassType cts, loc)
 
 classTypeSpec :: P ((Ident, [TypeArgument]), Location)
 classTypeSpec = do
   (i, iLoc) <- ident
   mtas <- opt typeArgs
-  let (tas, loc) = fromMaybe ([], iLoc) mtas
+  let (tas, loc) = maybe ([], iLoc) (mapFst NonEmpty.toList) mtas
   return ((i, tas), loc)
 
 resultType :: P (Maybe Type)
 resultType = tok KW_Void >> return Nothing <|> Just <$> ttype <?> "resultType"
 
-refTypeList :: P [RefType]
+refTypeList :: P (NonEmpty RefType)
 refTypeList = seplist1 (noLoc refType) comma
 
 ----------------------------------------------------------------------------
 -- Type parameters and arguments
 
-typeParams :: P [TypeParam]
+typeParams :: P (NonEmpty TypeParam)
 typeParams = noLoc $ angles (seplist1 typeParam comma)
 
 typeParam :: P TypeParam
 typeParam = do
   i <- noLoc ident
-  bs <- lopt bounds
+  bs <- neoptList bounds
   return $ TypeParam i bs
 
-bounds :: P [RefType]
+bounds :: P (NonEmpty RefType)
 bounds = tok KW_Extends >> seplist1 (noLoc refType) (tok Op_And)
 
-typeArgs :: P ([TypeArgument], Location)
+typeArgs :: P (NonEmpty TypeArgument, Location)
 typeArgs = angles (seplist1 typeArg comma)
 
 typeArg :: P TypeArgument
@@ -1640,7 +1642,7 @@ wildcardBound =
       <|> tok KW_Super
     >> SuperBound <$> noLoc refType
 
-refTypeArgs :: P [RefType]
+refTypeArgs :: P (NonEmpty RefType)
 refTypeArgs = noLoc $ angles refTypeList
 
 ----------------------------------------------------------------------------
@@ -1650,8 +1652,8 @@ name :: P (Name, Location)
 name = do
   startLoc <- getLocation
   n <- seplist1 ident period
-  let idents = map fst n
-      endLoc = snd (last n)
+  let idents = NonEmpty.map fst n
+      endLoc = snd (NonEmpty.last n)
   return (Name (startLoc, endLoc) idents, endLoc)
 
 ident :: P (Ident, Location)
@@ -1680,12 +1682,12 @@ opt = optionMaybe
 bopt :: P a -> P Bool
 bopt p = opt p >>= \ma -> return $ isJust ma
 
-optList :: P [a] -> P [a]
-optList p = do
-  mx <- opt p
-  case mx of
-    Just l -> return l
+neoptList :: P (NonEmpty a) -> P [a]
+neoptList p = do
+  mas <- opt p
+  case mas of
     Nothing -> return []
+    Just as -> return (NonEmpty.toList as)
 
 lopt :: P [a] -> P [a]
 lopt p = do
@@ -1697,18 +1699,18 @@ lopt p = do
 list :: P a -> P [a]
 list = option [] . many1
 
-list1 :: P (a, Location) -> P ([a], Location)
+list1 :: P (a, Location) -> P (NonEmpty a, Location)
 list1 p = do
   ll <- many1 p
-  let l = map fst ll
+  let l = NonEmpty.fromList (map fst ll)
       loc = snd (last ll)
   return (l, loc)
 
 seplist :: P a -> P sep -> P [a]
 -- seplist = sepBy
-seplist p sep = option [] $ seplist1 p sep
+seplist p sep = option [] $ NonEmpty.toList <$> seplist1 p sep
 
-seplist1 :: P a -> P sep -> P [a]
+seplist1 :: P a -> P sep -> P (NonEmpty a)
 -- seplist1 = sepBy1
 seplist1 p sep =
   p >>= \a ->
@@ -1716,9 +1718,9 @@ seplist1 p sep =
       ( do
           _ <- sep
           as <- seplist1 p sep
-          return (a : as)
+          return (a <| as)
       )
-      <|> return [a]
+      <|> return (a :| [])
 
 (|>>) :: P (a, Location) -> P (a -> a, Location) -> P (a, Location)
 start |>> suffix = do

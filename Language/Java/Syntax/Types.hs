@@ -4,6 +4,7 @@
 module Language.Java.Syntax.Types where
 
 import Data.Data
+import Data.List.NonEmpty (NonEmpty)
 import GHC.Generics (Generic)
 import Language.Java.SourceSpan (Located (..), SourceSpan)
 import Language.Java.Syntax.Equality (Equality (..))
@@ -41,7 +42,7 @@ instance Equality RefType where
 -- | A class or interface type consists of a type declaration specifier,
 --   optionally followed by type arguments (in which case it is a parameterized type).
 newtype ClassType
-  = ClassType [(Ident, [TypeArgument])]
+  = ClassType (NonEmpty (Ident, [TypeArgument]))
   deriving (Show, Read, Typeable, Generic, Data)
 
 instance Equality ClassType where
@@ -142,7 +143,7 @@ instance Located Ident where
   sourceSpan (Ident s _) = s
 
 -- | A name, i.e. a period-separated list of identifiers.
-data Name = Name SourceSpan [Ident]
+data Name = Name SourceSpan (NonEmpty Ident)
   deriving (Show, Read, Typeable, Generic, Data)
 
 instance Equality Name where

@@ -30,8 +30,8 @@ module Language.Java.Syntax
     ExplConstrInv (..),
     Modifier (..),
     Annotation (..),
-    desugarAnnotation,
-    desugarAnnotation',
+    -- desugarAnnotation,
+    -- desugarAnnotation',
     ElementValue (..),
     Block (..),
     BlockStmt (..),
@@ -66,6 +66,7 @@ module Language.Java.Syntax
 where
 
 import Data.Data
+import Data.List.NonEmpty (NonEmpty)
 import GHC.Generics (Generic)
 import Language.Java.SourceSpan
 import Language.Java.Syntax.Equality
@@ -315,7 +316,7 @@ instance EqualityExtension p => Equality (Decl p) where
 --   constants (not fields), abstract methods, and no constructors.
 data MemberDecl p
   = -- | The variables of a class type are introduced by field declarations.
-    FieldDecl SourceSpan [Modifier p] Type [VarDecl p]
+    FieldDecl SourceSpan [Modifier p] Type (NonEmpty (VarDecl p))
   | -- | A method declares executable code that can be invoked, passing a fixed number of values as arguments.
     MethodDecl SourceSpan [Modifier p] [TypeParam] (Maybe Type) Ident [FormalParam p] [ExceptionType] (Maybe (Exp p)) (MethodBody p)
   | -- | A constructor is used in the creation of an object that is an instance of a class.
@@ -545,7 +546,7 @@ data Annotation p
   = NormalAnnotation
       { span :: SourceSpan,
         annName :: Name, -- Not type because not type generics not allowed
-        annKV :: [(Ident, ElementValue p)]
+        annKV :: NonEmpty (Ident, ElementValue p)
       }
   | SingleElementAnnotation
       { span :: SourceSpan,
@@ -578,15 +579,15 @@ instance Located (Annotation p) where
   sourceSpan (SingleElementAnnotation s _ _) = s
   sourceSpan (MarkerAnnotation s _) = s
 
-desugarAnnotation (MarkerAnnotation s n) = (s, n, [])
--- TODO: check span for ident
-desugarAnnotation (SingleElementAnnotation s n e) = (s, n, [(Ident dummySourceSpan "value", e)])
-desugarAnnotation (NormalAnnotation s n kv) = (s, n, kv)
+-- desugarAnnotation (MarkerAnnotation s n) = (s, n, [])
+-- -- TODO: check span for ident
+-- desugarAnnotation (SingleElementAnnotation s n e) = (s, n, [(Ident dummySourceSpan "value", e)])
+-- desugarAnnotation (NormalAnnotation s n kv) = (s, n, kv)
 
-desugarAnnotation' (MarkerAnnotation s n) = NormalAnnotation s n []
--- TODO: check span for ident
-desugarAnnotation' (SingleElementAnnotation s n e) = NormalAnnotation s n [(Ident dummySourceSpan "value", e)]
-desugarAnnotation' normal = normal
+-- desugarAnnotation' (MarkerAnnotation s n) = NormalAnnotation s n []
+-- -- TODO: check span for ident
+-- desugarAnnotation' (SingleElementAnnotation s n e) = NormalAnnotation s n [(Ident dummySourceSpan "value", e)]
+-- desugarAnnotation' normal = normal
 
 -- | Annotations may contain  annotations or (loosely) expressions
 data ElementValue p
@@ -630,7 +631,7 @@ instance EqualityExtension p => Equality (Block p) where
 data BlockStmt p
   = BlockStmt SourceSpan (Stmt p)
   | LocalClass (ClassDecl p)
-  | LocalVars SourceSpan [Modifier p] Type [VarDecl p]
+  | LocalVars SourceSpan [Modifier p] Type (NonEmpty (VarDecl p))
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (BlockStmt p)
@@ -665,7 +666,7 @@ data Stmt p
     While SourceSpan (Exp p) (Stmt p)
   | -- | The basic @for@ statement executes some initialization code, then executes an expression, a statement, and some
     --   update code repeatedly until the value of the expression is false.
-    BasicFor SourceSpan (Maybe (ForInit p)) (Maybe (Exp p)) (Maybe [Exp p]) (Stmt p)
+    BasicFor SourceSpan (Maybe (ForInit p)) (Maybe (Exp p)) [Exp p] (Stmt p)
   | -- | The enhanced @for@ statement iterates over an array or a value of a class that implements the @iterator@ interface.
     EnhancedFor SourceSpan [Modifier p] Type Ident (Exp p) (Stmt p)
   | -- | An empty statement does nothing.
@@ -841,7 +842,7 @@ instance Equality SwitchStyle where
 data SwitchLabel p
   = -- | The expressions contained in the @case@ must be a 'Lit' or an @enum@ constant.
     -- The list must be non-empty.
-    SwitchCase [Exp p]
+    SwitchCase (NonEmpty (Exp p))
   | Default
   deriving (Typeable, Generic)
 
@@ -891,8 +892,8 @@ instance EqualityExtension p => Equality (SwitchExpBranchBody p) where
 
 -- | Initialization code for a basic @for@ statement.
 data ForInit p
-  = ForLocalVars [Modifier p] Type [VarDecl p]
-  | ForInitExps [Exp p]
+  = ForLocalVars [Modifier p] Type (NonEmpty (VarDecl p))
+  | ForInitExps (NonEmpty (Exp p))
   deriving (Generic, Typeable)
 
 deriving instance ShowExtension p => Show (ForInit p)
@@ -936,7 +937,7 @@ data Exp p
     QualInstanceCreation (Exp p) [TypeArgument] Ident [Argument p] (Maybe (ClassBody p))
   | -- | An array instance creation expression is used to create new arrays. The last argument denotes the number
     --   of dimensions that have no explicit length given. These dimensions must be given last.
-    ArrayCreate Type [Exp p] Int
+    ArrayCreate Type (NonEmpty (Exp p)) Int
   | -- | An array instance creation expression may come with an explicit initializer. Such expressions may not
     --   be given explicit lengths for any of its dimensions.
     ArrayCreateInit Type Int (ArrayInit p)
@@ -985,7 +986,7 @@ data Exp p
   | -- | Method reference
     MethodRef Name MethodRefTarget
   | -- | New-style switch expression (JEP 361)
-    SwitchExp (Exp p) [SwitchExpBranch p]
+    SwitchExp (Exp p) (NonEmpty (SwitchExpBranch p))
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (Exp p)
@@ -1096,7 +1097,7 @@ instance EqualityExtension p => Equality (Lhs p) where
 -- | Array access
 data ArrayIndex p
   = -- | Index into an array
-    ArrayIndex (Exp p) [Exp p]
+    ArrayIndex (Exp p) (NonEmpty (Exp p))
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (ArrayIndex p)
