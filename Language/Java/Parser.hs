@@ -63,7 +63,7 @@ where
 import Data.Functor ((<&>))
 import Data.List.NonEmpty (NonEmpty ((:|)), (<|))
 import qualified Data.List.NonEmpty as NonEmpty
-import Data.Maybe (catMaybes, fromMaybe, isJust)
+import Data.Maybe (catMaybes, isJust)
 import Language.Java.Lexer (L1 (..), Token (..), lexer)
 import Language.Java.SourceSpan (Location (..), dummyLocation, locationEof)
 import Language.Java.Syntax
@@ -73,7 +73,6 @@ import Text.Parsec
     eof,
     getParserState,
     getState,
-    many,
     many1,
     option,
     optionMaybe,
