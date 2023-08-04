@@ -39,3 +39,47 @@ public class TestA {
 
 
 }
+
+class MultiNameExpressionName {
+    void func() {
+        outer.fieldOfOuter.funcB(); //ExpressionName
+
+        var node = new Node();
+        node.next.objectFunc(); //ExpressionName
+        node.next.last.next.next.objectFunc(); //ExpressionName
+
+        Node.staticSelfField.staticFunc();//ExpressionName
+        Node.staticSelfField.staticSelfField.staticFunc();//ExpressionName
+
+        EnumType.High.enumFunc();//ExpressionName
+    }
+}
+
+class outer {
+    static TestB fieldOfOuter = new TestB();
+
+
+}
+
+class Node {
+    Node next = new Node();
+    Node last = new Node();
+
+    static Node staticSelfField = new Node();
+
+    static void staticFunc() {
+
+    }
+
+    void objectFunc() {
+
+    }
+}
+
+enum EnumType {
+    High;
+
+    void enumFunc() {
+
+    }
+}

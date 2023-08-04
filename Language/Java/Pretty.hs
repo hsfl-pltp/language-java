@@ -652,7 +652,7 @@ instance Pretty Name where
 instance Pretty ClassifiedName where
   prettyPrec p (ExpressionName name) = prettyPrec p name
   prettyPrec p (TypeName name) = prettyPrec p name
-  prettyPrec p (PackageName name) = prettyPrec p name
+  prettyPrec p (Unknown name) = prettyPrec p name
 
 instance Pretty Ident where
   prettyPrec _ (Ident _ s) = text s
