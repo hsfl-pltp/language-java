@@ -4,6 +4,8 @@ module Language.Java.Transformer (transformCompilationUnitToAnalyzed) where
 
 import Data.Bifunctor (Bifunctor (second))
 import Data.List (find)
+import Data.List.NonEmpty (NonEmpty ((:|)))
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (mapMaybe)
 import Language.Java.Syntax
 import Language.Java.Syntax.ClassInfo as ClassInfo (ClassInfo (..), fromClassDecl, hasField, hasIdent)
@@ -28,9 +30,8 @@ import qualified Language.Java.Syntax.VarDecl as VarDecl
 transformCompilationUnitToAnalyzed :: CompilationUnit Parsed -> CompilationUnit Analyzed
 transformCompilationUnitToAnalyzed = transformToAnalyzed IdentCollection.empty
 
-classifyName :: [Ident] -> IdentCollection -> Name -> ClassifiedName
-classifyName [] _ name = Unknown name
-classifyName (idnt : rest) ic name
+classifyName :: NonEmpty Ident -> IdentCollection -> Name -> ClassifiedName
+classifyName (idnt :| rest) ic name
   | IdentCollection.isExpressionIdent idnt ic = ExpressionName name
   | IdentCollection.isImportedClass idnt ic = case rest of
       [] -> TypeName name
@@ -63,7 +64,7 @@ instance AnalyzedTransformer CompilationUnit where
               . IdentCollection.addToImportedClasses
                 ( mapMaybe
                     ( \case
-                        (ImportDecl _ False (Name _ idents) False) -> Just (last idents)
+                        (ImportDecl _ False (Name _ idents) False) -> Just (NonEmpty.last idents)
                         _ -> Nothing
                     )
                     importDecls
@@ -119,7 +120,7 @@ instance AnalyzedTransformer ClassDecl where
 
 instance AnalyzedTransformer MemberDecl where
   transformToAnalyzed scope (FieldDecl srcspan modifiers type_ varDecls) =
-    FieldDecl srcspan (map (transformToAnalyzed scope) modifiers) type_ (map (transformToAnalyzed scope) varDecls)
+    FieldDecl srcspan (map (transformToAnalyzed scope) modifiers) type_ (NonEmpty.map (transformToAnalyzed scope) varDecls)
   transformToAnalyzed scope (MethodDecl srcspan modifiers typeParams mbType idnt fp exceptionTypes mbExp methodBody) =
     MethodDecl
       srcspan
@@ -155,7 +156,7 @@ instance AnalyzedTransformer Block where
 transformBlockStmtsToAnalyzed :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
 transformBlockStmtsToAnalyzed _ [] = []
 transformBlockStmtsToAnalyzed scope (blckStmt@(LocalVars _ _ _ varDecls) : rest) =
-  let newscope = IdentCollection.addToLocalVars (map VarDecl.ident varDecls) scope
+  let newscope = IdentCollection.addToLocalVars (map VarDecl.ident (NonEmpty.toList varDecls)) scope
    in transformToAnalyzed newscope blckStmt : transformBlockStmtsToAnalyzed newscope rest
 transformBlockStmtsToAnalyzed scope (blckStmt@(LocalClass classDecl) : rest) =
   let newscope = IdentCollection.addToClassInfos [ClassInfo.fromClassDecl classDecl] scope
@@ -167,15 +168,15 @@ instance AnalyzedTransformer Stmt where
   transformToAnalyzed scope (IfThen srcspan expr stmt) = IfThen srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope stmt)
   transformToAnalyzed scope (IfThenElse srcspan expr stmt1 stmt2) = IfThenElse srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope stmt1) (transformToAnalyzed scope stmt2)
   transformToAnalyzed scope (While srcspan expr stmt) = While srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope stmt)
-  transformToAnalyzed scope (BasicFor srcspan mbForInit mbExp mbExps stmt) =
+  transformToAnalyzed scope (BasicFor srcspan mbForInit mbExp exps stmt) =
     let newScope = case mbForInit of
-          Just (ForLocalVars _ _ varDecls) -> IdentCollection.addToLocalVars (map VarDecl.ident varDecls) scope
+          Just (ForLocalVars _ _ varDecls) -> IdentCollection.addToLocalVars (map VarDecl.ident (NonEmpty.toList varDecls)) scope
           _ -> scope
      in BasicFor
           srcspan
           (fmap (transformToAnalyzed scope) mbForInit)
           (fmap (transformToAnalyzed newScope) mbExp)
-          (fmap (map (transformToAnalyzed newScope)) mbExps)
+          (map (transformToAnalyzed newScope) exps)
           (transformToAnalyzed newScope stmt)
   transformToAnalyzed scope (EnhancedFor srcspan mods type_ idnt expr stmt) =
     EnhancedFor
@@ -242,7 +243,7 @@ instance AnalyzedTransformer Annotation where
     NormalAnnotation
       srcspan
       annoName
-      (map (second (transformToAnalyzed scope)) annkV)
+      (NonEmpty.map (second (transformToAnalyzed scope)) annkV)
   transformToAnalyzed scope (SingleElementAnnotation srcspan annoName annoValue) =
     SingleElementAnnotation srcspan annoName (transformToAnalyzed scope annoValue)
   transformToAnalyzed _ (MarkerAnnotation srcspan annoName) = MarkerAnnotation srcspan annoName
@@ -279,7 +280,7 @@ instance AnalyzedTransformer BlockStmt where
       srcspan
       (map (transformToAnalyzed scope) modifiers)
       type_
-      (map (transformToAnalyzed scope) varDecls)
+      (NonEmpty.map (transformToAnalyzed scope) varDecls)
 
 instance AnalyzedTransformer Exp where
   transformToAnalyzed _ (Lit literal) = Lit literal
@@ -299,7 +300,7 @@ instance AnalyzedTransformer Exp where
       idnt
       (map (transformToAnalyzed scope) arguments)
       (fmap (transformToAnalyzed scope) mbClassBody)
-  transformToAnalyzed scope (ArrayCreate type_ exps int) = ArrayCreate type_ (map (transformToAnalyzed scope) exps) int
+  transformToAnalyzed scope (ArrayCreate type_ exps int) = ArrayCreate type_ (NonEmpty.map (transformToAnalyzed scope) exps) int
   transformToAnalyzed scope (ArrayCreateInit type_ int arrayInit) = ArrayCreateInit type_ int (transformToAnalyzed scope arrayInit)
   transformToAnalyzed scope (FieldAccess fieldAccess) = FieldAccess (transformToAnalyzed scope fieldAccess)
   transformToAnalyzed scope (MethodInv methodInv) = MethodInv (transformToAnalyzed scope methodInv)
@@ -320,7 +321,7 @@ instance AnalyzedTransformer Exp where
   transformToAnalyzed scope (Assign srcspan lhs assignOp expr) = Assign srcspan (transformToAnalyzed scope lhs) assignOp (transformToAnalyzed scope expr)
   transformToAnalyzed scope (Lambda lambdaParams lambdaExp) = Lambda (transformToAnalyzed scope lambdaParams) (transformToAnalyzed scope lambdaExp)
   transformToAnalyzed _ (MethodRef name target) = MethodRef name target
-  transformToAnalyzed scope (SwitchExp expr branches) = SwitchExp (transformToAnalyzed scope expr) (map (transformToAnalyzed scope) branches)
+  transformToAnalyzed scope (SwitchExp expr branches) = SwitchExp (transformToAnalyzed scope expr) (NonEmpty.map (transformToAnalyzed scope) branches)
 
 instance AnalyzedTransformer FormalParam where
   transformToAnalyzed scope (FormalParam srcspan modifiers type_ bool varDeclId) = FormalParam srcspan (map (transformToAnalyzed scope) modifiers) type_ bool varDeclId
@@ -343,7 +344,7 @@ instance AnalyzedTransformer FieldAccess where
   transformToAnalyzed _ (ClassFieldAccess name idnt) = ClassFieldAccess name idnt
 
 instance AnalyzedTransformer ArrayIndex where
-  transformToAnalyzed scope (ArrayIndex expr exps) = ArrayIndex (transformToAnalyzed scope expr) (map (transformToAnalyzed scope) exps)
+  transformToAnalyzed scope (ArrayIndex expr exps) = ArrayIndex (transformToAnalyzed scope expr) (NonEmpty.map (transformToAnalyzed scope) exps)
 
 instance AnalyzedTransformer Lhs where
   transformToAnalyzed _ (NameLhs name) = NameLhs name
@@ -360,14 +361,14 @@ instance AnalyzedTransformer LambdaExpression where
   transformToAnalyzed scope (LambdaBlock block) = LambdaBlock (transformToAnalyzed scope block)
 
 instance AnalyzedTransformer ForInit where
-  transformToAnalyzed scope (ForLocalVars modifiers type_ varDecls) = ForLocalVars (map (transformToAnalyzed scope) modifiers) type_ (map (transformToAnalyzed scope) varDecls)
-  transformToAnalyzed scope (ForInitExps exps) = ForInitExps (map (transformToAnalyzed scope) exps)
+  transformToAnalyzed scope (ForLocalVars modifiers type_ varDecls) = ForLocalVars (map (transformToAnalyzed scope) modifiers) type_ (NonEmpty.map (transformToAnalyzed scope) varDecls)
+  transformToAnalyzed scope (ForInitExps exps) = ForInitExps (NonEmpty.map (transformToAnalyzed scope) exps)
 
 instance AnalyzedTransformer SwitchExpBranch where
   transformToAnalyzed scope (SwitchExpBranch label body) = SwitchExpBranch (transformToAnalyzed scope label) (transformToAnalyzed scope body)
 
 instance AnalyzedTransformer SwitchLabel where
-  transformToAnalyzed scope (SwitchCase exps) = SwitchCase (map (transformToAnalyzed scope) exps)
+  transformToAnalyzed scope (SwitchCase exps) = SwitchCase (NonEmpty.map (transformToAnalyzed scope) exps)
   transformToAnalyzed _ Default = Default
 
 instance AnalyzedTransformer SwitchExpBranchBody where
