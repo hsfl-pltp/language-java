@@ -588,10 +588,6 @@ instance Located (Annotation p) where
   sourceSpan (MarkerAnnotation s _) = s
 
 
--- desugarAnnotation' (MarkerAnnotation s n) = NormalAnnotation s n []
--- -- TODO: check span for ident
--- desugarAnnotation' (SingleElementAnnotation s n e) = NormalAnnotation s n [(Ident dummySourceSpan "value", e)]
--- desugarAnnotation' normal = normal
 
 -- | Annotations may contain  annotations or (loosely) expressions
 data ElementValue p
