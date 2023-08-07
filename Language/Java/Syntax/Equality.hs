@@ -1,5 +1,7 @@
 module Language.Java.Syntax.Equality where
 
+import Data.List.NonEmpty (NonEmpty ((:|)))
+
 data EqOptions
   = IgnoreSourceSpan
   | IncludeSourceSpan
@@ -12,6 +14,10 @@ instance Equality a => Equality [a] where
   eq _ [] _ = False
   eq _ _ [] = False
   eq opt (a1 : as1) (a2 : as2) =
+    eq opt a1 a2 && eq opt as1 as2
+
+instance Equality a => Equality (NonEmpty a) where
+  eq opt (a1 :| as1) (a2 :| as2) =
     eq opt a1 a2 && eq opt as1 as2
 
 instance Equality a => Equality (Maybe a) where

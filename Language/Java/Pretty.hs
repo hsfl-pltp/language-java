@@ -13,6 +13,7 @@ import Text.Printf (printf)
 
 #if MIN_VERSION_base(4,11,0)
 import Prelude hiding ((<>))
+import qualified Data.List.NonEmpty as NonEmpty
 #endif
 
 prettyPrint :: Pretty a => a -> String
@@ -137,7 +138,7 @@ instance PrettyExtension p => Pretty (Decl p) where
 
 instance PrettyExtension p => Pretty (MemberDecl p) where
   prettyPrec p (FieldDecl _loc mods t vds) =
-    hsep (map (prettyPrec p) mods ++ prettyPrec p t : punctuate (text ",") (map (prettyPrec p) vds)) <> semi
+    hsep (map (prettyPrec p) mods ++ prettyPrec p t : punctuate (text ",") (map (prettyPrec p) (NonEmpty.toList vds))) <> semi
   prettyPrec p (MethodDecl _loc mods tParams mt ident fParams throws def body) =
     hsep
       [ hsep (map (prettyPrec p) mods),
@@ -227,7 +228,7 @@ instance PrettyExtension p => Pretty (Annotation p) where
     text "@" <> prettyPrec p (annName x) <> case x of
       MarkerAnnotation {} -> text ""
       SingleElementAnnotation {} -> text "(" <> prettyPrec p (annValue x) <> text ")"
-      NormalAnnotation {} -> text "(" <> ppEVList p (annKV x) <> text ")"
+      NormalAnnotation {} -> text "(" <> ppEVList p (NonEmpty.toList (annKV x)) <> text ")"
 
 ppEVList p = hsep . punctuate comma . map (\(k, v) -> prettyPrec p k <+> text "=" <+> prettyPrec p v)
 
@@ -247,7 +248,7 @@ instance PrettyExtension p => Pretty (BlockStmt p) where
   prettyPrec p (LocalVars _ mods t vds) =
     hsep (map (prettyPrec p) mods)
       <+> prettyPrec p t
-      <+> hsep (punctuate comma $ map (prettyPrec p) vds) <> semi
+      <+> hsep (punctuate comma $ map (prettyPrec p) (NonEmpty.toList vds)) <> semi
 
 instance PrettyExtension p => Pretty (Stmt p) where
   prettyPrec p (StmtBlock block) = prettyPrec p block
@@ -257,7 +258,7 @@ instance PrettyExtension p => Pretty (Stmt p) where
     text "if" <+> parens (prettyPrec p c) $+$ prettyNestedStmt 0 th $+$ text "else" $+$ prettyNestedStmt 0 el
   prettyPrec p (While _ c stmt) =
     text "while" <+> parens (prettyPrec p c) $+$ prettyNestedStmt 0 stmt
-  prettyPrec p (BasicFor _ mInit mE mUp stmt) =
+  prettyPrec p (BasicFor _ mInit mE up stmt) =
     text "for"
       <+> parens
         ( hsep
@@ -265,7 +266,7 @@ instance PrettyExtension p => Pretty (Stmt p) where
               semi,
               maybePP p mE,
               semi,
-              maybe empty (hsep . punctuate comma . map (prettyPrec p)) mUp
+              (hsep . punctuate comma . map (prettyPrec p)) up
             ]
         )
       $+$ prettyNestedStmt p stmt
@@ -325,7 +326,7 @@ instance PrettyExtension p => Pretty (SwitchBlock p) where
 
 instance PrettyExtension p => Pretty (SwitchLabel p) where
   prettyPrec _p (SwitchCase e) =
-    text "case" <+> hsep (intersperse comma $ map (prettyPrec 0) e)
+    text "case" <+> hsep (intersperse comma $ map (prettyPrec 0) (NonEmpty.toList e))
   prettyPrec _p Default = text "default"
 
 instance PrettyExtension p => Pretty (SwitchExpBranch p) where
@@ -340,9 +341,9 @@ instance PrettyExtension p => Pretty (ForInit p) where
     hsep $
       map (prettyPrec p) mods
         ++ prettyPrec p t
-        : punctuate comma (map (prettyPrec p) vds)
+        : punctuate comma (map (prettyPrec p) (NonEmpty.toList vds))
   prettyPrec p (ForInitExps es) =
-    hsep $ punctuate comma (map (prettyPrec p) es)
+    hsep $ punctuate comma (map (prettyPrec p) (NonEmpty.toList es))
 
 -----------------------------------------------------------------------
 -- Expressions
@@ -372,7 +373,7 @@ instance PrettyExtension p => Pretty (Exp p) where
     text "new"
       <+> hcat
         ( prettyPrec p t
-            : map (brackets . prettyPrec p) es
+            : map (brackets . prettyPrec p) (NonEmpty.toList es)
             ++ replicate k (text "[]")
         )
   prettyPrec p (ArrayCreateInit t k i) =
@@ -424,7 +425,7 @@ instance PrettyExtension p => Pretty (Exp p) where
     hsep
       [ text "switch",
         parens (prettyPrec p e),
-        braceBlock (map (prettyPrec p) branches)
+        braceBlock (map (prettyPrec p) (NonEmpty.toList branches))
       ]
 
 instance PrettyExtension p => Pretty (LambdaParams p) where
@@ -489,7 +490,7 @@ instance PrettyExtension p => Pretty (Lhs p) where
   prettyPrec p (ArrayLhs ain) = prettyPrec p ain
 
 instance PrettyExtension p => Pretty (ArrayIndex p) where
-  prettyPrec p (ArrayIndex ref e) = prettyPrec p ref <> hcat (map (brackets . prettyPrec p) e)
+  prettyPrec p (ArrayIndex ref e) = prettyPrec p ref <> hcat (map (brackets . prettyPrec p) (NonEmpty.toList e))
 
 instance PrettyExtension p => Pretty (FieldAccess p) where
   prettyPrec p (PrimaryFieldAccess e ident) =
@@ -565,7 +566,7 @@ instance Pretty RefType where
 instance Pretty ClassType where
   prettyPrec p (ClassType itas) =
     hcat . punctuate (char '.') $
-      map (\(i, tas) -> prettyPrec p i <> ppTypeParams p tas) itas
+      map (\(i, tas) -> prettyPrec p i <> ppTypeParams p tas) (NonEmpty.toList itas)
 
 instance Pretty TypeArgument where
   prettyPrec p (ActualType rt) = prettyPrec p rt
@@ -647,7 +648,7 @@ ppResultType p (Just a) = prettyPrec p a
 
 instance Pretty Name where
   prettyPrec p (Name _ is) =
-    hcat (punctuate (char '.') $ map (prettyPrec p) is)
+    hcat (punctuate (char '.') $ map (prettyPrec p) (NonEmpty.toList is))
 
 instance Pretty ClassifiedName where
   prettyPrec p (ExpressionName name) = prettyPrec p name
