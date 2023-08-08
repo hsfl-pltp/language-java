@@ -3,6 +3,7 @@
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -295,7 +296,7 @@ instance EqualityExtension p => Equality (InterfaceBody p) where
 --   initializer, which may be static.
 data Decl p
   = MemberDecl (MemberDecl p)
-  | InitDecl Bool (Block p)
+  | InitDecl SourceSpan Bool (Block p)
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (Decl p)
@@ -307,13 +308,13 @@ deriving instance DataExtension p => Data (Decl p)
 instance EqualityExtension p => Equality (Decl p) where
   eq opt (MemberDecl md1) (MemberDecl md2) =
     eq opt md1 md2
-  eq opt (InitDecl b1 bl1) (InitDecl b2 bl2) =
-    b1 == b2 && eq opt bl1 bl2
+  eq opt (InitDecl s1 b1 bl1) (InitDecl s2 b2 bl2) =
+    eq opt s1 s2 && b1 == b2 && eq opt bl1 bl2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (Decl p) where
+instance Located (Decl p) where
   sourceSpan (MemberDecl md) = sourceSpan md
-  sourceSpan d = error ("No SourceSpan implemented for Declaration: " ++ show d)
+  sourceSpan (InitDecl s _ _) = s
 
 -- | A class or interface member can be an inner class or interface, a field or
 --   constant, or a method or constructor. An interface may only have as members
@@ -421,9 +422,9 @@ instance EqualityExtension p => Equality (VarInit p) where
     eq opt ai1 ai2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (VarInit p) where
+instance Located (VarInit p) where
   sourceSpan (InitExp e) = sourceSpan e
-  sourceSpan vi = error ("No SourceSpan implemented for VarInit: " ++ show vi)
+  sourceSpan (InitArray ai) = sourceSpan ai
 
 -- | A formal parameter in method declaration. The last parameter
 --   for a given declaration may be marked as variable arity,
@@ -504,18 +505,18 @@ instance EqualityExtension p => Equality (ExplConstrInv p) where
 --   a member type declaration may only specify one of public, private or protected.
 data Modifier p
   = Public SourceSpan
-  | Private
-  | Protected
+  | Private SourceSpan
+  | Protected SourceSpan
   | Abstract SourceSpan
-  | Final
-  | Static
-  | StrictFP
-  | Transient
-  | Volatile
-  | Native
+  | Final SourceSpan
+  | Static SourceSpan
+  | StrictFP SourceSpan
+  | Transient SourceSpan
+  | Volatile SourceSpan
+  | Native SourceSpan
   | Annotation (Annotation p)
-  | Synchronized_
-  | Sealed
+  | Synchronized_ SourceSpan
+  | Sealed SourceSpan
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (Modifier p)
@@ -527,27 +528,46 @@ deriving instance DataExtension p => Data (Modifier p)
 instance EqualityExtension p => Equality (Modifier p) where
   eq opt (Public s1) (Public s2) =
     eq opt s1 s2
-  eq _ Private Private = True
-  eq _ Protected Protected = True
+  eq opt (Private s1) (Private s2) =
+    eq opt s1 s2
+  eq opt (Protected s1) (Protected s2) =
+    eq opt s1 s2
   eq opt (Abstract s1) (Abstract s2) =
     eq opt s1 s2
-  eq _ Final Final = True
-  eq _ Static Static = True
-  eq _ StrictFP StrictFP = True
-  eq _ Transient Transient = True
-  eq _ Volatile Volatile = True
-  eq _ Native Native = True
+  eq opt (Final s1) (Final s2) =
+    eq opt s1 s2
+  eq opt (Static s1) (Static s2) =
+    eq opt s1 s2
+  eq opt (StrictFP s1) (StrictFP s2) =
+    eq opt s1 s2
+  eq opt (Transient s1) (Transient s2) =
+    eq opt s1 s2
+  eq opt (Volatile s1) (Volatile s2) =
+    eq opt s1 s2
+  eq opt (Native s1) (Native s2) =
+    eq opt s1 s2
   eq opt (Annotation a1) (Annotation a2) =
     eq opt a1 a2
-  eq _ Synchronized_ Synchronized_ = True
-  eq _ Sealed Sealed = True
+  eq opt (Synchronized_ s1) (Synchronized_ s2) =
+    eq opt s1 s2
+  eq opt (Sealed s1) (Sealed s2) =
+    eq opt s1 s2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (Modifier p) where
+instance Located (Modifier p) where
   sourceSpan (Public s) = s
+  sourceSpan (Private s) = s
+  sourceSpan (Protected s) = s
   sourceSpan (Abstract s) = s
+  sourceSpan (Final s) = s
+  sourceSpan (Static s) = s
+  sourceSpan (StrictFP s) = s
+  sourceSpan (Transient s) = s
+  sourceSpan (Volatile s) = s
+  sourceSpan (Native s) = s
   sourceSpan (Annotation a) = sourceSpan a
-  sourceSpan m = error ("No SourceSpan implemented for Modifier: " ++ show m)
+  sourceSpan (Synchronized_ s) = s
+  sourceSpan (Sealed s) = s
 
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation p
@@ -587,8 +607,6 @@ instance Located (Annotation p) where
   sourceSpan (SingleElementAnnotation s _ _) = s
   sourceSpan (MarkerAnnotation s _) = s
 
-
-
 -- | Annotations may contain  annotations or (loosely) expressions
 data ElementValue p
   = EVVal (VarInit p)
@@ -608,7 +626,7 @@ instance EqualityExtension p => Equality (ElementValue p) where
     eq opt a1 a2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (ElementValue p) where
+instance Located (ElementValue p) where
   sourceSpan (EVVal vi) = sourceSpan vi
   sourceSpan (EVAnn ann) = sourceSpan ann
 
@@ -617,7 +635,7 @@ instance ShowExtension p => Located (ElementValue p) where
 
 -- | A block is a sequence of statements, local class declarations
 --   and local variable declaration statements within braces.
-newtype Block p = Block [BlockStmt p]
+data Block p = Block SourceSpan [BlockStmt p]
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (Block p)
@@ -627,8 +645,11 @@ deriving instance ReadExtension p => Read (Block p)
 deriving instance DataExtension p => Data (Block p)
 
 instance EqualityExtension p => Equality (Block p) where
-  eq opt (Block bss1) (Block bss2) =
-    eq opt bss1 bss2
+  eq opt (Block s1 bss1) (Block s2 bss2) =
+    eq opt s1 s2 && eq opt bss1 bss2
+
+instance Located (Block p) where
+  sourceSpan (Block s _) = s
 
 -- | A block statement is either a normal statement, a local
 --   class declaration or a local variable declaration.
@@ -653,7 +674,7 @@ instance EqualityExtension p => Equality (BlockStmt p) where
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt t1 t2 && eq opt vds1 vds2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (BlockStmt p) where
+instance Located (BlockStmt p) where
   sourceSpan (BlockStmt s) = sourceSpan s
   sourceSpan (LocalClass cd) = sourceSpan cd
   sourceSpan (LocalVars s _ _ _) = s
@@ -674,37 +695,37 @@ data Stmt p
   | -- | The enhanced @for@ statement iterates over an array or a value of a class that implements the @iterator@ interface.
     EnhancedFor SourceSpan [Modifier p] Type Ident (Exp p) (Stmt p)
   | -- | An empty statement does nothing.
-    Empty
+    Empty SourceSpan
   | -- | Certain kinds of expressions may be used as statements by following them with semicolons:
     --   assignments, pre- or post-inc- or decrementation, method invocation or class instance
     --   creation expressions.
     ExpStmt SourceSpan (Exp p)
   | -- | An assertion is a statement containing a boolean expression, where an error is reported if the expression
     --   evaluates to false.
-    Assert (Exp p) (Maybe (Exp p))
+    Assert SourceSpan (Exp p) (Maybe (Exp p))
   | -- | The switch statement transfers control to one of several statements depending on the value of an expression.
-    Switch SwitchStyle (Exp p) [SwitchBlock p]
+    Switch SourceSpan SwitchStyle (Exp p) [SwitchBlock p]
   | -- | The @do@ statement executes a statement and an expression repeatedly until the value of the expression is false.
     Do SourceSpan (Stmt p) (Exp p)
   | -- | A @break@ statement transfers control out of an enclosing statement.
     Break SourceSpan (Maybe Ident)
   | -- | A @continue@ statement may occur only in a while, do, or for statement. Control passes to the loop-continuation
     --   point of that statement.
-    Continue (Maybe Ident)
+    Continue SourceSpan (Maybe Ident)
   | -- A @return@ statement returns control to the invoker of a method or constructor.
     Return SourceSpan (Maybe (Exp p))
   | -- | A @synchronized@ statement acquires a mutual-exclusion lock on behalf of the executing thread, executes a block,
     --   then releases the lock. While the executing thread owns the lock, no other thread may acquire the lock.
-    Synchronized (Exp p) (Block p)
+    Synchronized SourceSpan (Exp p) (Block p)
   | -- | A @throw@ statement causes an exception to be thrown.
-    Throw (Exp p)
+    Throw SourceSpan (Exp p)
   | -- | A try statement executes a block. If a value is thrown and the try statement has one or more catch clauses that
     --   can catch it, then control will be transferred to the first such catch clause. If the try statement has a finally
     --   clause, then another block of code is executed, no matter whether the try block completes normally or abruptly,
     --   and no matter whether a catch clause is first given control.
     Try SourceSpan [TryResource p] (Block p) [Catch p] (Maybe {- finally -} (Block p))
   | -- | Statements may have label prefixes.
-    Labeled Ident (Stmt p)
+    Labeled SourceSpan Ident (Stmt p)
   deriving (Generic, Typeable)
 
 deriving instance ShowExtension p => Show (Stmt p)
@@ -726,43 +747,51 @@ instance EqualityExtension p => Equality (Stmt p) where
     eq opt s1 s2 && eq opt mfi1 mfi2 && eq opt me1 me2 && eq opt mes1 mes2 && eq opt stmt1 stmt2
   eq opt (EnhancedFor s1 ms1 t1 i1 e1 stmt1) (EnhancedFor s2 ms2 t2 i2 e2 stmt2) =
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt t1 t2 && eq opt i1 i2 && eq opt e1 e2 && eq opt stmt1 stmt2
-  eq _ Empty Empty = True
+  eq opt (Empty s1) (Empty s2) =
+    eq opt s1 s2
   eq opt (ExpStmt s1 e1) (ExpStmt s2 e2) =
     eq opt s1 s2 && eq opt e1 e2
-  eq opt (Assert e1 me1) (Assert e2 me2) =
-    eq opt e1 e2 && eq opt me1 me2
-  eq opt (Switch ss1 e1 sbs1) (Switch ss2 e2 sbs2) =
-    eq opt ss1 ss2 && eq opt e1 e2 && eq opt sbs1 sbs2
+  eq opt (Assert s1 e1 me1) (Assert s2 e2 me2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt me1 me2
+  eq opt (Switch s1 ss1 e1 sbs1) (Switch s2 ss2 e2 sbs2) =
+    eq opt s1 s2 && eq opt ss1 ss2 && eq opt e1 e2 && eq opt sbs1 sbs2
   eq opt (Do s1 stmt1 e1) (Do s2 stmt2 e2) =
     eq opt s1 s2 && eq opt stmt1 stmt2 && eq opt e1 e2
   eq opt (Break s1 mi1) (Break s2 mi2) =
     eq opt s1 s2 && eq opt mi1 mi2
-  eq opt (Continue mi1) (Continue mi2) =
-    eq opt mi1 mi2
+  eq opt (Continue s1 mi1) (Continue s2 mi2) =
+    eq opt s1 s2 && eq opt mi1 mi2
   eq opt (Return s1 me1) (Return s2 me2) =
     eq opt s1 s2 && eq opt me1 me2
-  eq opt (Synchronized e1 b1) (Synchronized e2 b2) =
-    eq opt e1 e2 && eq opt b1 b2
-  eq opt (Throw e1) (Throw e2) =
-    eq opt e1 e2
+  eq opt (Synchronized s1 e1 b1) (Synchronized s2 e2 b2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt b1 b2
+  eq opt (Throw s1 e1) (Throw s2 e2) =
+    eq opt s1 s2 && eq opt e1 e2
   eq opt (Try s1 trs1 b1 cs1 mb1) (Try s2 trs2 b2 cs2 mb2) =
     eq opt s1 s2 && eq opt trs1 trs2 && eq opt b1 b2 && eq opt cs1 cs2 && eq opt mb1 mb2
-  eq opt (Labeled i1 stmt1) (Labeled i2 stmt2) =
-    eq opt i1 i2 && eq opt stmt1 stmt2
+  eq opt (Labeled s1 i1 stmt1) (Labeled s2 i2 stmt2) =
+    eq opt s1 s2 && eq opt i1 i2 && eq opt stmt1 stmt2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (Stmt p) where
+instance Located (Stmt p) where
+  sourceSpan (StmtBlock b) = sourceSpan b
   sourceSpan (IfThen s _ _) = s
   sourceSpan (IfThenElse s _ _ _) = s
   sourceSpan (While s _ _) = s
   sourceSpan (BasicFor s _ _ _ _) = s
   sourceSpan (EnhancedFor s _ _ _ _ _) = s
+  sourceSpan (Empty s) = s
   sourceSpan (ExpStmt s _) = s
+  sourceSpan (Assert s _ _) = s
+  sourceSpan (Switch s _ _ _) = s
   sourceSpan (Do s _ _) = s
   sourceSpan (Break s _) = s
+  sourceSpan (Continue s _) = s
   sourceSpan (Return s _) = s
+  sourceSpan (Synchronized s _ _) = s
+  sourceSpan (Throw s _) = s
   sourceSpan (Try s _ _ _ _) = s
-  sourceSpan stmt = error ("No SourceSpan implemented for statement: " ++ show stmt)
+  sourceSpan (Labeled s _ _) = s
 
 -- | If a value is thrown and the try statement has one or more catch clauses that can catch it, then control will be
 --   transferred to the first such catch clause.
@@ -799,10 +828,6 @@ instance EqualityExtension p => Equality (TryResource p) where
   eq opt (TryResourceQualAccess fa1) (TryResourceQualAccess fa2) =
     eq opt fa1 fa2
   eq _ _ _ = False
-
-instance ShowExtension p => Located (TryResource p) where
-  sourceSpan (TryResourceVarAccess i) = sourceSpan i
-  sourceSpan tr = error ("No SourceSpan implemented for Try Resource: " ++ show tr)
 
 data ResourceDecl p
   = ResourceDecl [Modifier p] Type VarDeclId (VarInit p)
@@ -929,26 +954,26 @@ data Exp p
     Lit Literal
   | -- | A class literal, which is an expression consisting of the name of a class, interface, array,
     --   or primitive type, or the pseudo-type void (modelled by 'Nothing'), followed by a `.' and the token class.
-    ClassLit (Maybe Type)
+    ClassLit SourceSpan (Maybe Type)
   | -- | The keyword @this@ denotes a value that is a reference to the object for which the instance method
     --   was invoked, or to the object being constructed.
-    This
+    This SourceSpan
   | -- | Any lexically enclosing instance can be referred to by explicitly qualifying the keyword this.
-    ThisClass Name
+    ThisClass SourceSpan Name
   | -- | A class instance creation expression is used to create new objects that are instances of classes.
     -- | The first argument is a list of non-wildcard type arguments to a generic constructor.
     --   What follows is the type to be instantiated, the list of arguments passed to the constructor, and
     --   optionally a class body that makes the constructor result in an object of an /anonymous/ class.
-    InstanceCreation [TypeArgument] TypeDeclSpecifier [Argument p] (Maybe (ClassBody p))
+    InstanceCreation SourceSpan [TypeArgument] TypeDeclSpecifier [Argument p] (Maybe (ClassBody p))
   | -- | A qualified class instance creation expression enables the creation of instances of inner member classes
     --   and their anonymous subclasses.
-    QualInstanceCreation (Exp p) [TypeArgument] Ident [Argument p] (Maybe (ClassBody p))
+    QualInstanceCreation SourceSpan (Exp p) [TypeArgument] Ident [Argument p] (Maybe (ClassBody p))
   | -- | An array instance creation expression is used to create new arrays. The last argument denotes the number
     --   of dimensions that have no explicit length given. These dimensions must be given last.
-    ArrayCreate Type (NonEmpty (Exp p)) Int
+    ArrayCreate SourceSpan Type (NonEmpty (Exp p)) Int
   | -- | An array instance creation expression may come with an explicit initializer. Such expressions may not
     --   be given explicit lengths for any of its dimensions.
-    ArrayCreateInit Type Int (ArrayInit p)
+    ArrayCreateInit SourceSpan Type Int (ArrayInit p)
   | -- | A field access expression.
     FieldAccess (FieldAccess p)
   | -- | A method invocation expression.
@@ -979,22 +1004,22 @@ data Exp p
     --   numeric type; or confirms, at compile time, that the type of an expression is boolean; or checks,
     --   at run time, that a reference value refers to an object whose class is compatible with a specified
     --   reference type.
-    Cast Type (Exp p)
+    Cast SourceSpan Type (Exp p)
   | -- | The application of a binary operator to two operand expressions.
-    BinOp (Exp p) Op (Exp p)
+    BinOp SourceSpan (Exp p) Op (Exp p)
   | -- | Testing whether the result of an expression is an instance of some reference type.
-    InstanceOf (Exp p) RefType (Maybe Name)
+    InstanceOf SourceSpan (Exp p) RefType (Maybe Name)
   | -- | The conditional operator @? :@ uses the boolean value of one expression to decide which of two other
     --   expressions should be evaluated.
     Cond SourceSpan (Exp p) (Exp p) (Exp p)
   | -- | Assignment of the result of an expression to a variable.
     Assign SourceSpan (Lhs p) AssignOp (Exp p)
   | -- | Lambda expression
-    Lambda (LambdaParams p) (LambdaExpression p)
+    Lambda SourceSpan (LambdaParams p) (LambdaExpression p)
   | -- | Method reference
-    MethodRef Name MethodRefTarget
+    MethodRef SourceSpan Name MethodRefTarget
   | -- | New-style switch expression (JEP 361)
-    SwitchExp (Exp p) (NonEmpty (SwitchExpBranch p))
+    SwitchExp SourceSpan (Exp p) (NonEmpty (SwitchExpBranch p))
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (Exp p)
@@ -1006,19 +1031,20 @@ deriving instance DataExtension p => Data (Exp p)
 instance EqualityExtension p => Equality (Exp p) where
   eq opt (Lit l1) (Lit l2) =
     eq opt l1 l2
-  eq opt (ClassLit mt1) (ClassLit mt2) =
-    eq opt mt1 mt2
-  eq _ This This = True
-  eq opt (ThisClass n1) (ThisClass n2) =
-    eq opt n1 n2
-  eq opt (InstanceCreation tas1 tds1 as1 mcb1) (InstanceCreation tas2 tds2 as2 mcb2) =
-    eq opt tas1 tas2 && eq opt tds1 tds2 && eq opt as1 as2 && eq opt mcb1 mcb2
-  eq opt (QualInstanceCreation e1 tas1 i1 as1 mcb1) (QualInstanceCreation e2 tas2 i2 as2 mcb2) =
-    eq opt e1 e2 && eq opt tas1 tas2 && eq opt i1 i2 && eq opt as1 as2 && eq opt mcb1 mcb2
-  eq opt (ArrayCreate t1 es1 int1) (ArrayCreate t2 es2 int2) =
-    eq opt t1 t2 && eq opt es1 es2 && int1 == int2
-  eq opt (ArrayCreateInit t1 int1 ai1) (ArrayCreateInit t2 int2 ai2) =
-    eq opt t1 t2 && eq opt ai1 ai2 && int1 == int2
+  eq opt (ClassLit s1 mt1) (ClassLit s2 mt2) =
+    eq opt s1 s2 && eq opt mt1 mt2
+  eq opt (This s1) (This s2) =
+    eq opt s1 s2
+  eq opt (ThisClass s1 n1) (ThisClass s2 n2) =
+    eq opt s1 s2 && eq opt n1 n2
+  eq opt (InstanceCreation s1 tas1 tds1 as1 mcb1) (InstanceCreation s2 tas2 tds2 as2 mcb2) =
+    eq opt s1 s2 && eq opt tas1 tas2 && eq opt tds1 tds2 && eq opt as1 as2 && eq opt mcb1 mcb2
+  eq opt (QualInstanceCreation s1 e1 tas1 i1 as1 mcb1) (QualInstanceCreation s2 e2 tas2 i2 as2 mcb2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt tas1 tas2 && eq opt i1 i2 && eq opt as1 as2 && eq opt mcb1 mcb2
+  eq opt (ArrayCreate s1 t1 es1 int1) (ArrayCreate s2 t2 es2 int2) =
+    eq opt s1 s2 && eq opt t1 t2 && eq opt es1 es2 && int1 == int2
+  eq opt (ArrayCreateInit s1 t1 int1 ai1) (ArrayCreateInit s2 t2 int2 ai2) =
+    eq opt s1 s2 && eq opt t1 t2 && eq opt ai1 ai2 && int1 == int2
   eq opt (FieldAccess fa1) (FieldAccess fa2) =
     eq opt fa1 fa2
   eq opt (MethodInv mi1) (MethodInv mi2) =
@@ -1043,38 +1069,53 @@ instance EqualityExtension p => Equality (Exp p) where
     eq opt s1 s2 && eq opt e1 e2
   eq opt (PreNot s1 e1) (PreNot s2 e2) =
     eq opt s1 s2 && eq opt e1 e2
-  eq opt (Cast t1 e1) (Cast t2 e2) =
-    eq opt t1 t2 && eq opt e1 e2
-  eq opt (BinOp e11 o1 e12) (BinOp e21 o2 e22) =
-    eq opt e11 e21 && eq opt o1 o2 && eq opt e12 e22
-  eq opt (InstanceOf e1 rt1 mn1) (InstanceOf e2 rt2 mn2) =
-    eq opt e1 e2 && eq opt rt1 rt2 && eq opt mn1 mn2
+  eq opt (Cast s1 t1 e1) (Cast s2 t2 e2) =
+    eq opt s1 s2 && eq opt t1 t2 && eq opt e1 e2
+  eq opt (BinOp s1 e11 o1 e12) (BinOp s2 e21 o2 e22) =
+    eq opt s1 s2 && eq opt e11 e21 && eq opt o1 o2 && eq opt e12 e22
+  eq opt (InstanceOf s1 e1 rt1 mn1) (InstanceOf s2 e2 rt2 mn2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt rt1 rt2 && eq opt mn1 mn2
   eq opt (Cond s1 e11 e12 e13) (Cond s2 e21 e22 e23) =
     eq opt s1 s2 && eq opt e11 e21 && eq opt e12 e22 && eq opt e13 e23
   eq opt (Assign s1 lhs1 ao1 e1) (Assign s2 lhs2 ao2 e2) =
     eq opt s1 s2 && eq opt lhs1 lhs2 && eq opt ao1 ao2 && eq opt e1 e2
-  eq opt (Lambda lp1 le1) (Lambda lp2 le2) =
-    eq opt lp1 lp2 && eq opt le1 le2
-  eq opt (MethodRef n1 mrt1) (MethodRef n2 mrt2) =
-    eq opt n1 n2 && eq opt mrt1 mrt2
-  eq opt (SwitchExp e1 sebs1) (SwitchExp e2 sebs2) =
-    eq opt e1 e2 && eq opt sebs1 sebs2
+  eq opt (Lambda s1 lp1 le1) (Lambda s2 lp2 le2) =
+    eq opt s1 s2 && eq opt lp1 lp2 && eq opt le1 le2
+  eq opt (MethodRef s1 n1 mrt1) (MethodRef s2 n2 mrt2) =
+    eq opt s1 s2 && eq opt n1 n2 && eq opt mrt1 mrt2
+  eq opt (SwitchExp s1 e1 sebs1) (SwitchExp s2 e2 sebs2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt sebs1 sebs2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (Exp p) where
+instance Located (Exp p) where
   sourceSpan (Lit l) = sourceSpan l
+  sourceSpan (ClassLit s _) = s
+  sourceSpan (This s) = s
+  sourceSpan (ThisClass s _) = s
+  sourceSpan (InstanceCreation s _ _ _ _) = s
+  sourceSpan (QualInstanceCreation s _ _ _ _ _) = s
+  sourceSpan (ArrayCreate s _ _ _) = s
+  sourceSpan (ArrayCreateInit s _ _ _) = s
+  sourceSpan (FieldAccess fa) = sourceSpan fa
+  sourceSpan (MethodInv mi) = sourceSpan mi
+  sourceSpan (ArrayAccess ai) = sourceSpan ai
   sourceSpan (ExpName n) = sourceSpan n
   sourceSpan (PostIncrement s _) = s
   sourceSpan (PostDecrement s _) = s
   sourceSpan (PreIncrement s _) = s
   sourceSpan (PreDecrement s _) = s
-  sourceSpan (Cond s _ _ _) = s
-  sourceSpan (Assign s _ _ _) = s
   sourceSpan (PrePlus s _) = s
   sourceSpan (PreMinus s _) = s
   sourceSpan (PreBitCompl s _) = s
   sourceSpan (PreNot s _) = s
-  sourceSpan e = error ("No SourceSpan implemented for expression: " ++ show e)
+  sourceSpan (Cast s _ _) = s
+  sourceSpan (BinOp s _ _ _) = s
+  sourceSpan (InstanceOf s _ _ _) = s
+  sourceSpan (Cond s _ _ _) = s
+  sourceSpan (Assign s _ _ _) = s
+  sourceSpan (Lambda s _ _) = s
+  sourceSpan (MethodRef s _ _) = s
+  sourceSpan (SwitchExp s _ _) = s
 
 -- | The left-hand side of an assignment expression. This operand may be a named variable, such as a local
 --   variable or a field of the current object or class, or it may be a computed variable, as can result from
@@ -1106,7 +1147,7 @@ instance EqualityExtension p => Equality (Lhs p) where
 -- | Array access
 data ArrayIndex p
   = -- | Index into an array
-    ArrayIndex (Exp p) (NonEmpty (Exp p))
+    ArrayIndex SourceSpan (Exp p) (NonEmpty (Exp p))
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (ArrayIndex p)
@@ -1116,18 +1157,21 @@ deriving instance ReadExtension p => Read (ArrayIndex p)
 deriving instance DataExtension p => Data (ArrayIndex p)
 
 instance EqualityExtension p => Equality (ArrayIndex p) where
-  eq opt (ArrayIndex e1 es1) (ArrayIndex e2 es2) =
-    eq opt e1 e2 && eq opt es1 es2
+  eq opt (ArrayIndex s1 e1 es1) (ArrayIndex s2 e2 es2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt es1 es2
+
+instance Located (ArrayIndex p) where
+  sourceSpan (ArrayIndex s _ _) = s
 
 -- | A field access expression may access a field of an object or array, a reference to which is the value
 --   of either an expression or the special keyword super.
 data FieldAccess p
   = -- | Accessing a field of an object or array computed from an expression.
-    PrimaryFieldAccess (Exp p) Ident
+    PrimaryFieldAccess SourceSpan (Exp p) Ident
   | -- | Accessing a field of the superclass.
-    SuperFieldAccess Ident
+    SuperFieldAccess SourceSpan Ident
   | -- | Accessing a (static) field of a named class.
-    ClassFieldAccess Name Ident
+    ClassFieldAccess SourceSpan Name Ident
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (FieldAccess p)
@@ -1137,13 +1181,18 @@ deriving instance ReadExtension p => Read (FieldAccess p)
 deriving instance DataExtension p => Data (FieldAccess p)
 
 instance EqualityExtension p => Equality (FieldAccess p) where
-  eq opt (PrimaryFieldAccess e1 i1) (PrimaryFieldAccess e2 i2) =
-    eq opt e1 e2 && eq opt i1 i2
-  eq opt (SuperFieldAccess i1) (SuperFieldAccess i2) =
-    eq opt i1 i2
-  eq opt (ClassFieldAccess n1 i1) (ClassFieldAccess n2 i2) =
-    eq opt n1 n2 && eq opt i1 i2
+  eq opt (PrimaryFieldAccess s1 e1 i1) (PrimaryFieldAccess s2 e2 i2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt i1 i2
+  eq opt (SuperFieldAccess s1 i1) (SuperFieldAccess s2 i2) =
+    eq opt s1 s2 && eq opt i1 i2
+  eq opt (ClassFieldAccess s1 n1 i1) (ClassFieldAccess s2 n2 i2) =
+    eq opt s1 s2 && eq opt n1 n2 && eq opt i1 i2
   eq _ _ _ = False
+
+instance Located (FieldAccess p) where
+  sourceSpan (PrimaryFieldAccess s _ _) = s
+  sourceSpan (SuperFieldAccess s _) = s
+  sourceSpan (ClassFieldAccess s _ _) = s
 
 -- ¦ A lambda parameter can be a single parameter, or mulitple formal or mulitple inferred parameters
 data LambdaParams p
@@ -1193,15 +1242,15 @@ instance EqualityExtension p => Equality (LambdaExpression p) where
 -- | A method invocation expression is used to invoke a class or instance method.
 data MethodInvocation p
   = -- | Invoking a specific named method.
-    MethodCall (Maybe (XNameClassification p)) Ident [Argument p]
+    MethodCall SourceSpan (Maybe (XNameClassification p)) Ident [Argument p]
   | -- | Invoking a method of a class computed from a primary expression, giving arguments for any generic type parameters.
-    PrimaryMethodCall (Exp p) [RefType] Ident [Argument p]
+    PrimaryMethodCall SourceSpan (Exp p) [RefType] Ident [Argument p]
   | -- | Invoking a method of the super class, giving arguments for any generic type parameters.
-    SuperMethodCall [RefType] Ident [Argument p]
+    SuperMethodCall SourceSpan [RefType] Ident [Argument p]
   | -- | Invoking a method of the superclass of a named class, giving arguments for any generic type parameters.
-    ClassMethodCall Name [RefType] Ident [Argument p]
+    ClassMethodCall SourceSpan Name [RefType] Ident [Argument p]
   | -- | Invoking a method of a named type, giving arguments for any generic type parameters.
-    TypeMethodCall Name [RefType] Ident [Argument p]
+    TypeMethodCall SourceSpan Name [RefType] Ident [Argument p]
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (MethodInvocation p)
@@ -1211,22 +1260,29 @@ deriving instance ReadExtension p => Read (MethodInvocation p)
 deriving instance DataExtension p => Data (MethodInvocation p)
 
 instance EqualityExtension p => Equality (MethodInvocation p) where
-  eq opt (MethodCall mn1 i1 as1) (MethodCall mn2 i2 as2) =
-    eq opt mn1 mn2 && eq opt i1 i2 && eq opt as1 as2
-  eq opt (PrimaryMethodCall e1 rts1 i1 as1) (PrimaryMethodCall e2 rts2 i2 as2) =
-    eq opt e1 e2 && eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
-  eq opt (SuperMethodCall rts1 i1 as1) (SuperMethodCall rts2 i2 as2) =
-    eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
-  eq opt (ClassMethodCall n1 rts1 i1 as1) (ClassMethodCall n2 rts2 i2 as2) =
-    eq opt n1 n2 && eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
-  eq opt (TypeMethodCall n1 rts1 i1 as1) (TypeMethodCall n2 rts2 i2 as2) =
-    eq opt n1 n2 && eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
+  eq opt (MethodCall s1 mn1 i1 as1) (MethodCall s2 mn2 i2 as2) =
+    eq opt s1 s2 && eq opt mn1 mn2 && eq opt i1 i2 && eq opt as1 as2
+  eq opt (PrimaryMethodCall s1 e1 rts1 i1 as1) (PrimaryMethodCall s2 e2 rts2 i2 as2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
+  eq opt (SuperMethodCall s1 rts1 i1 as1) (SuperMethodCall s2 rts2 i2 as2) =
+    eq opt s1 s2 && eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
+  eq opt (ClassMethodCall s1 n1 rts1 i1 as1) (ClassMethodCall s2 n2 rts2 i2 as2) =
+    eq opt s1 s2 && eq opt n1 n2 && eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
+  eq opt (TypeMethodCall s1 n1 rts1 i1 as1) (TypeMethodCall s2 n2 rts2 i2 as2) =
+    eq opt s1 s2 && eq opt n1 n2 && eq opt rts1 rts2 && eq opt i1 i2 && eq opt as1 as2
   eq _ _ _ = False
+
+instance Located (MethodInvocation p) where
+  sourceSpan (MethodCall s _ _ _) = s
+  sourceSpan (PrimaryMethodCall s _ _ _ _) = s
+  sourceSpan (SuperMethodCall s _ _ _) = s
+  sourceSpan (ClassMethodCall s _ _ _ _) = s
+  sourceSpan (TypeMethodCall s _ _ _ _) = s
 
 -- | An array initializer may be specified in a declaration, or as part of an array creation expression, creating an
 --   array and providing some initial values
-newtype ArrayInit p
-  = ArrayInit [VarInit p]
+data ArrayInit p
+  = ArrayInit SourceSpan [VarInit p]
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (ArrayInit p)
@@ -1236,8 +1292,11 @@ deriving instance ReadExtension p => Read (ArrayInit p)
 deriving instance DataExtension p => Data (ArrayInit p)
 
 instance EqualityExtension p => Equality (ArrayInit p) where
-  eq opt (ArrayInit vis1) (ArrayInit vis2) =
-    eq opt vis1 vis2
+  eq opt (ArrayInit s1 vis1) (ArrayInit s2 vis2) =
+    eq opt s1 s2 && eq opt vis1 vis2
+
+instance Located (ArrayInit p) where
+  sourceSpan (ArrayInit s _) = s
 
 data MethodRefTarget
   = MethodRefIdent Ident

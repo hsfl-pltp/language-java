@@ -49,12 +49,12 @@ class AnalyzedTransformer a where
   transformToAnalyzed :: IdentCollection -> a Parsed -> a Analyzed
 
 instance AnalyzedTransformer MethodInvocation where
-  transformToAnalyzed scope (MethodCall Nothing idnt args) = MethodCall Nothing idnt (map (transformToAnalyzed scope) args)
-  transformToAnalyzed scope (MethodCall (Just name@(Name _ idents)) idnt args) = MethodCall (Just (classifyName idents scope name)) idnt (map (transformToAnalyzed scope) args)
-  transformToAnalyzed scope (PrimaryMethodCall expr refTypes idnt args) = PrimaryMethodCall (transformToAnalyzed scope expr) refTypes idnt (map (transformToAnalyzed scope) args)
-  transformToAnalyzed scope (SuperMethodCall refTypes idnt args) = SuperMethodCall refTypes idnt (map (transformToAnalyzed scope) args)
-  transformToAnalyzed scope (ClassMethodCall name refTypes idnt args) = ClassMethodCall name refTypes idnt (map (transformToAnalyzed scope) args)
-  transformToAnalyzed scope (TypeMethodCall name refTypes idnt args) = TypeMethodCall name refTypes idnt (map (transformToAnalyzed scope) args)
+  transformToAnalyzed scope (MethodCall srcspan Nothing idnt args) = MethodCall srcspan Nothing idnt (map (transformToAnalyzed scope) args)
+  transformToAnalyzed scope (MethodCall srcspan (Just name@(Name _ idents)) idnt args) = MethodCall srcspan (Just (classifyName idents scope name)) idnt (map (transformToAnalyzed scope) args)
+  transformToAnalyzed scope (PrimaryMethodCall srcspan expr refTypes idnt args) = PrimaryMethodCall srcspan (transformToAnalyzed scope expr) refTypes idnt (map (transformToAnalyzed scope) args)
+  transformToAnalyzed scope (SuperMethodCall srcspan refTypes idnt args) = SuperMethodCall srcspan refTypes idnt (map (transformToAnalyzed scope) args)
+  transformToAnalyzed scope (ClassMethodCall srcspan name refTypes idnt args) = ClassMethodCall srcspan name refTypes idnt (map (transformToAnalyzed scope) args)
+  transformToAnalyzed scope (TypeMethodCall srcspan name refTypes idnt args) = TypeMethodCall srcspan name refTypes idnt (map (transformToAnalyzed scope) args)
 
 instance AnalyzedTransformer CompilationUnit where
   transformToAnalyzed scope (CompilationUnit mbPackageDecl importDecls typeDecls) =
@@ -151,7 +151,7 @@ instance AnalyzedTransformer Catch where
       (transformToAnalyzed (IdentCollection.addToFormalParams [FormalParam.ident formalParam] scope) block)
 
 instance AnalyzedTransformer Block where
-  transformToAnalyzed scope (Block blockstmts) = Block (transformBlockStmtsToAnalyzed scope blockstmts)
+  transformToAnalyzed scope (Block srcspan blockstmts) = Block srcspan (transformBlockStmtsToAnalyzed scope blockstmts)
 
 transformBlockStmtsToAnalyzed :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
 transformBlockStmtsToAnalyzed _ [] = []
@@ -186,16 +186,16 @@ instance AnalyzedTransformer Stmt where
       idnt
       (transformToAnalyzed scope expr)
       (transformToAnalyzed (IdentCollection.addToLocalVars [idnt] scope) stmt)
-  transformToAnalyzed _ Empty = Empty
+  transformToAnalyzed _ (Empty srcspan) = Empty srcspan
   transformToAnalyzed scope (ExpStmt srcspan expr) = ExpStmt srcspan (transformToAnalyzed scope expr)
-  transformToAnalyzed scope (Assert expr mbExp) = Assert (transformToAnalyzed scope expr) (fmap (transformToAnalyzed scope) mbExp)
-  transformToAnalyzed scope (Switch switchStyle expr switchBlocks) = Switch switchStyle (transformToAnalyzed scope expr) (map (transformToAnalyzed scope) switchBlocks)
+  transformToAnalyzed scope (Assert srcspan expr mbExp) = Assert srcspan (transformToAnalyzed scope expr) (fmap (transformToAnalyzed scope) mbExp)
+  transformToAnalyzed scope (Switch srcspan switchStyle expr switchBlocks) = Switch srcspan switchStyle (transformToAnalyzed scope expr) (map (transformToAnalyzed scope) switchBlocks)
   transformToAnalyzed scope (Do srcspan expr stmt) = Do srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope stmt)
   transformToAnalyzed _ (Break srcspan mbIdent) = Break srcspan mbIdent
-  transformToAnalyzed _ (Continue mbIdent) = Continue mbIdent
+  transformToAnalyzed _ (Continue srcspan mbIdent) = Continue srcspan mbIdent
   transformToAnalyzed scope (Return srcspan mbExp) = Return srcspan (fmap (transformToAnalyzed scope) mbExp)
-  transformToAnalyzed scope (Synchronized expr block) = Synchronized (transformToAnalyzed scope expr) (transformToAnalyzed scope block)
-  transformToAnalyzed scope (Throw expr) = Throw (transformToAnalyzed scope expr)
+  transformToAnalyzed scope (Synchronized srcspan expr block) = Synchronized srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope block)
+  transformToAnalyzed scope (Throw srcspan expr) = Throw srcspan (transformToAnalyzed scope expr)
   transformToAnalyzed scope (Try srcspan tryResources block catches mbBlock) =
     Try
       srcspan
@@ -203,7 +203,7 @@ instance AnalyzedTransformer Stmt where
       (transformToAnalyzed (IdentCollection.addToLocalVars (mapMaybe TryResource.resourceDeclIdent tryResources) scope) block)
       (map (transformToAnalyzed scope) catches)
       (fmap (transformToAnalyzed scope) mbBlock)
-  transformToAnalyzed scope (Labeled idnt stmt) = Labeled idnt (transformToAnalyzed scope stmt)
+  transformToAnalyzed scope (Labeled srcspan idnt stmt) = Labeled srcspan idnt (transformToAnalyzed scope stmt)
 
 -- boiler plate cases
 
@@ -225,18 +225,18 @@ instance AnalyzedTransformer InterfaceDecl where
 
 instance AnalyzedTransformer Modifier where
   transformToAnalyzed _ (Public src) = Public src
-  transformToAnalyzed _ Private = Private
-  transformToAnalyzed _ Protected = Protected
+  transformToAnalyzed _ (Private src) = Private src
+  transformToAnalyzed _ (Protected src) = Protected src
   transformToAnalyzed _ (Abstract src) = Abstract src
-  transformToAnalyzed _ Final = Final
-  transformToAnalyzed _ Static = Static
-  transformToAnalyzed _ StrictFP = StrictFP
-  transformToAnalyzed _ Transient = Transient
-  transformToAnalyzed _ Volatile = Volatile
-  transformToAnalyzed _ Native = Native
+  transformToAnalyzed _ (Final src) = Final src
+  transformToAnalyzed _ (Static src) = Static src
+  transformToAnalyzed _ (StrictFP src) = StrictFP src
+  transformToAnalyzed _ (Transient src) = Transient src
+  transformToAnalyzed _ (Volatile src) = Volatile src
+  transformToAnalyzed _ (Native src) = Native src
   transformToAnalyzed scope (Annotation anno) = Annotation (transformToAnalyzed scope anno)
-  transformToAnalyzed _ Synchronized_ = Synchronized_
-  transformToAnalyzed _ Sealed = Sealed
+  transformToAnalyzed _ (Synchronized_ src) = Synchronized_ src
+  transformToAnalyzed _ (Sealed src) = Sealed src
 
 instance AnalyzedTransformer Annotation where
   transformToAnalyzed scope (NormalAnnotation srcspan annoName annkV) =
@@ -263,7 +263,7 @@ instance AnalyzedTransformer ElementValue where
 
 instance AnalyzedTransformer Decl where
   transformToAnalyzed scope (MemberDecl memberDecl) = MemberDecl (transformToAnalyzed scope memberDecl)
-  transformToAnalyzed scope (InitDecl static block) = InitDecl static (transformToAnalyzed scope block)
+  transformToAnalyzed scope (InitDecl srcspan static block) = InitDecl srcspan static (transformToAnalyzed scope block)
 
 instance AnalyzedTransformer EnumConstant where
   transformToAnalyzed scope (EnumConstant idnt arguments mbClassBody) = EnumConstant idnt (map (transformToAnalyzed scope) arguments) (fmap (transformToAnalyzed scope) mbClassBody)
@@ -284,24 +284,26 @@ instance AnalyzedTransformer BlockStmt where
 
 instance AnalyzedTransformer Exp where
   transformToAnalyzed _ (Lit literal) = Lit literal
-  transformToAnalyzed _ (ClassLit mbType) = ClassLit mbType
-  transformToAnalyzed _ This = This
-  transformToAnalyzed _ (ThisClass name) = ThisClass name
-  transformToAnalyzed scope (InstanceCreation typeArgs typeDeclSpec arguments mbClassBody) =
+  transformToAnalyzed _ (ClassLit srcspan mbType) = ClassLit srcspan mbType
+  transformToAnalyzed _ (This srcspan) = This srcspan
+  transformToAnalyzed _ (ThisClass srcspan name) = ThisClass srcspan name
+  transformToAnalyzed scope (InstanceCreation srcspan typeArgs typeDeclSpec arguments mbClassBody) =
     InstanceCreation
+      srcspan
       typeArgs
       typeDeclSpec
       (map (transformToAnalyzed scope) arguments)
       (fmap (transformToAnalyzed scope) mbClassBody)
-  transformToAnalyzed scope (QualInstanceCreation expr typeArgs idnt arguments mbClassBody) =
+  transformToAnalyzed scope (QualInstanceCreation srcspan expr typeArgs idnt arguments mbClassBody) =
     QualInstanceCreation
+      srcspan
       (transformToAnalyzed scope expr)
       typeArgs
       idnt
       (map (transformToAnalyzed scope) arguments)
       (fmap (transformToAnalyzed scope) mbClassBody)
-  transformToAnalyzed scope (ArrayCreate type_ exps int) = ArrayCreate type_ (NonEmpty.map (transformToAnalyzed scope) exps) int
-  transformToAnalyzed scope (ArrayCreateInit type_ int arrayInit) = ArrayCreateInit type_ int (transformToAnalyzed scope arrayInit)
+  transformToAnalyzed scope (ArrayCreate srcspan type_ exps int) = ArrayCreate srcspan type_ (NonEmpty.map (transformToAnalyzed scope) exps) int
+  transformToAnalyzed scope (ArrayCreateInit srcspan type_ int arrayInit) = ArrayCreateInit srcspan type_ int (transformToAnalyzed scope arrayInit)
   transformToAnalyzed scope (FieldAccess fieldAccess) = FieldAccess (transformToAnalyzed scope fieldAccess)
   transformToAnalyzed scope (MethodInv methodInv) = MethodInv (transformToAnalyzed scope methodInv)
   transformToAnalyzed scope (ArrayAccess arrayIndex) = ArrayAccess (transformToAnalyzed scope arrayIndex)
@@ -314,14 +316,14 @@ instance AnalyzedTransformer Exp where
   transformToAnalyzed scope (PreMinus srcspan expr) = PreMinus srcspan (transformToAnalyzed scope expr)
   transformToAnalyzed scope (PreBitCompl srcspan expr) = PreBitCompl srcspan (transformToAnalyzed scope expr)
   transformToAnalyzed scope (PreNot srcspan expr) = PreNot srcspan (transformToAnalyzed scope expr)
-  transformToAnalyzed scope (Cast type_ expr) = Cast type_ (transformToAnalyzed scope expr)
-  transformToAnalyzed scope (BinOp exp1 op exp2) = BinOp (transformToAnalyzed scope exp1) op (transformToAnalyzed scope exp2)
-  transformToAnalyzed scope (InstanceOf expr refType mbName) = InstanceOf (transformToAnalyzed scope expr) refType mbName
+  transformToAnalyzed scope (Cast srcspan type_ expr) = Cast srcspan type_ (transformToAnalyzed scope expr)
+  transformToAnalyzed scope (BinOp srcspan exp1 op exp2) = BinOp srcspan (transformToAnalyzed scope exp1) op (transformToAnalyzed scope exp2)
+  transformToAnalyzed scope (InstanceOf srcspan expr refType mbName) = InstanceOf srcspan (transformToAnalyzed scope expr) refType mbName
   transformToAnalyzed scope (Cond srcspan exp1 exp2 exp3) = Cond srcspan (transformToAnalyzed scope exp1) (transformToAnalyzed scope exp2) (transformToAnalyzed scope exp3)
   transformToAnalyzed scope (Assign srcspan lhs assignOp expr) = Assign srcspan (transformToAnalyzed scope lhs) assignOp (transformToAnalyzed scope expr)
-  transformToAnalyzed scope (Lambda lambdaParams lambdaExp) = Lambda (transformToAnalyzed scope lambdaParams) (transformToAnalyzed scope lambdaExp)
-  transformToAnalyzed _ (MethodRef name target) = MethodRef name target
-  transformToAnalyzed scope (SwitchExp expr branches) = SwitchExp (transformToAnalyzed scope expr) (NonEmpty.map (transformToAnalyzed scope) branches)
+  transformToAnalyzed scope (Lambda srcspan lambdaParams lambdaExp) = Lambda srcspan (transformToAnalyzed scope lambdaParams) (transformToAnalyzed scope lambdaExp)
+  transformToAnalyzed _ (MethodRef srcspan name target) = MethodRef srcspan name target
+  transformToAnalyzed scope (SwitchExp srcspan expr branches) = SwitchExp srcspan (transformToAnalyzed scope expr) (NonEmpty.map (transformToAnalyzed scope) branches)
 
 instance AnalyzedTransformer FormalParam where
   transformToAnalyzed scope (FormalParam srcspan modifiers type_ bool varDeclId) = FormalParam srcspan (map (transformToAnalyzed scope) modifiers) type_ bool varDeclId
@@ -336,15 +338,15 @@ instance AnalyzedTransformer ConstructorBody where
   transformToAnalyzed scope (ConstructorBody mbInv blockStmts) = ConstructorBody (fmap (transformToAnalyzed scope) mbInv) (map (transformToAnalyzed scope) blockStmts)
 
 instance AnalyzedTransformer ArrayInit where
-  transformToAnalyzed scope (ArrayInit varInits) = ArrayInit (map (transformToAnalyzed scope) varInits)
+  transformToAnalyzed scope (ArrayInit srcspan varInits) = ArrayInit srcspan (map (transformToAnalyzed scope) varInits)
 
 instance AnalyzedTransformer FieldAccess where
-  transformToAnalyzed scope (PrimaryFieldAccess expr idnt) = PrimaryFieldAccess (transformToAnalyzed scope expr) idnt
-  transformToAnalyzed _ (SuperFieldAccess idnt) = SuperFieldAccess idnt
-  transformToAnalyzed _ (ClassFieldAccess name idnt) = ClassFieldAccess name idnt
+  transformToAnalyzed scope (PrimaryFieldAccess srcspan expr idnt) = PrimaryFieldAccess srcspan (transformToAnalyzed scope expr) idnt
+  transformToAnalyzed _ (SuperFieldAccess srcspan idnt) = SuperFieldAccess srcspan idnt
+  transformToAnalyzed _ (ClassFieldAccess srcspan name idnt) = ClassFieldAccess srcspan name idnt
 
 instance AnalyzedTransformer ArrayIndex where
-  transformToAnalyzed scope (ArrayIndex expr exps) = ArrayIndex (transformToAnalyzed scope expr) (NonEmpty.map (transformToAnalyzed scope) exps)
+  transformToAnalyzed scope (ArrayIndex srcspan expr exps) = ArrayIndex srcspan (transformToAnalyzed scope expr) (NonEmpty.map (transformToAnalyzed scope) exps)
 
 instance AnalyzedTransformer Lhs where
   transformToAnalyzed _ (NameLhs name) = NameLhs name

@@ -133,7 +133,7 @@ instance PrettyExtension p => Pretty (InterfaceBody p) where
 
 instance PrettyExtension p => Pretty (Decl p) where
   prettyPrec p (MemberDecl md) = prettyPrec p md
-  prettyPrec p (InitDecl b bl) =
+  prettyPrec p (InitDecl _ b bl) =
     opt b (text "static") <+> prettyPrec p bl
 
 instance PrettyExtension p => Pretty (MemberDecl p) where
@@ -177,7 +177,7 @@ instance Pretty VarDeclId where
 
 instance PrettyExtension p => Pretty (VarInit p) where
   prettyPrec p (InitExp e) = prettyPrec p e
-  prettyPrec p (InitArray (ArrayInit ai)) =
+  prettyPrec p (InitArray (ArrayInit _ ai)) =
     text "{" <+> hsep (punctuate comma (map (prettyPrec p) ai)) <+> text "}"
 
 instance PrettyExtension p => Pretty (FormalParam p) where
@@ -211,17 +211,17 @@ instance PrettyExtension p => Pretty (ExplConstrInv p) where
 instance PrettyExtension p => Pretty (Modifier p) where
   prettyPrec p (Annotation ann) = prettyPrec p ann $+$ nest (-1) (text "")
   prettyPrec _ (Public _) = text "public"
-  prettyPrec _ Private = text "private"
-  prettyPrec _ Protected = text "protected"
+  prettyPrec _ (Private _) = text "private"
+  prettyPrec _ (Protected _) = text "protected"
   prettyPrec _ (Abstract _) = text "abstract"
-  prettyPrec _ Final = text "final"
-  prettyPrec _ Static = text "static"
-  prettyPrec _ StrictFP = text "strictfp"
-  prettyPrec _ Transient = text "transient"
-  prettyPrec _ Volatile = text "volatile"
-  prettyPrec _ Native = text "native"
-  prettyPrec _ Synchronized_ = text "synchronized"
-  prettyPrec _ Sealed = text "sealed"
+  prettyPrec _ (Final _) = text "final"
+  prettyPrec _ (Static _) = text "static"
+  prettyPrec _ (StrictFP _) = text "strictfp"
+  prettyPrec _ (Transient _) = text "transient"
+  prettyPrec _ (Volatile _) = text "volatile"
+  prettyPrec _ (Native _) = text "native"
+  prettyPrec _ (Synchronized_ _) = text "synchronized"
+  prettyPrec _ (Sealed _) = text "sealed"
 
 instance PrettyExtension p => Pretty (Annotation p) where
   prettyPrec p x =
@@ -240,7 +240,7 @@ instance PrettyExtension p => Pretty (ElementValue p) where
 -- Statements
 
 instance PrettyExtension p => Pretty (Block p) where
-  prettyPrec p (Block stmts) = braceBlock $ map (prettyPrec p) stmts
+  prettyPrec p (Block _ stmts) = braceBlock $ map (prettyPrec p) stmts
 
 instance PrettyExtension p => Pretty (BlockStmt p) where
   prettyPrec p (BlockStmt stmt) = prettyPrec p stmt
@@ -283,13 +283,13 @@ instance PrettyExtension p => Pretty (Stmt p) where
             ],
         prettyPrec p stmt
       ]
-  prettyPrec _ Empty = semi
+  prettyPrec _ (Empty _) = semi
   prettyPrec p (ExpStmt _ e) = prettyPrec p e <> semi
-  prettyPrec p (Assert ass mE) =
+  prettyPrec p (Assert _ ass mE) =
     text "assert"
       <+> prettyPrec p ass
       <+> maybe empty ((colon <>) . prettyPrec p) mE <> semi
-  prettyPrec p (Switch _style e sBlocks) =
+  prettyPrec p (Switch _ _style e sBlocks) =
     text "switch"
       <+> parens (prettyPrec p e)
       $$ braceBlock (map (prettyPrec p) sBlocks)
@@ -297,13 +297,13 @@ instance PrettyExtension p => Pretty (Stmt p) where
     text "do" $+$ prettyPrec p stmt <+> text "while" <+> parens (prettyPrec p e) <> semi
   prettyPrec p (Break _ mIdent) =
     text "break" <+> maybePP p mIdent <> semi
-  prettyPrec p (Continue mIdent) =
+  prettyPrec p (Continue _ mIdent) =
     text "continue" <+> maybePP p mIdent <> semi
   prettyPrec p (Return _ mE) =
     text "return" <+> maybePP p mE <> semi
-  prettyPrec p (Synchronized e block) =
+  prettyPrec p (Synchronized _ e block) =
     text "synchronized" <+> parens (prettyPrec p e) $$ prettyPrec p block
-  prettyPrec p (Throw e) =
+  prettyPrec p (Throw _ e) =
     text "throw" <+> prettyPrec p e <> semi
   prettyPrec p (Try _ _resources block catches mFinally) =
     -- FIXME: do not ignore resources
@@ -313,7 +313,7 @@ instance PrettyExtension p => Pretty (Stmt p) where
     where
       ppFinally Nothing = empty
       ppFinally (Just bl) = text "finally" <+> prettyPrec p bl
-  prettyPrec p (Labeled ident stmt) =
+  prettyPrec p (Labeled _ ident stmt) =
     prettyPrec p ident <> colon <+> prettyPrec p stmt
 
 instance PrettyExtension p => Pretty (Catch p) where
@@ -350,33 +350,33 @@ instance PrettyExtension p => Pretty (ForInit p) where
 
 instance PrettyExtension p => Pretty (Exp p) where
   prettyPrec p (Lit l) = prettyPrec p l
-  prettyPrec p (ClassLit mT) =
+  prettyPrec p (ClassLit _ mT) =
     ppResultType p mT <> text ".class"
-  prettyPrec _ This = text "this"
-  prettyPrec p (ThisClass name) =
+  prettyPrec _ (This _) = text "this"
+  prettyPrec p (ThisClass _ name) =
     prettyPrec p name <> text ".this"
-  prettyPrec p (InstanceCreation tArgs tds args mBody) =
+  prettyPrec p (InstanceCreation _ tArgs tds args mBody) =
     hsep
       [ text "new",
         ppTypeParams p tArgs,
         prettyPrec p tds <> ppArgs p args
       ]
       $$ maybePP p mBody
-  prettyPrec p (QualInstanceCreation e tArgs ident args mBody) =
+  prettyPrec p (QualInstanceCreation _ e tArgs ident args mBody) =
     hsep
       [ prettyPrec p e <> char '.' <> text "new",
         ppTypeParams p tArgs,
         prettyPrec p ident <> ppArgs p args
       ]
       $$ maybePP p mBody
-  prettyPrec p (ArrayCreate t es k) =
+  prettyPrec p (ArrayCreate _ t es k) =
     text "new"
       <+> hcat
         ( prettyPrec p t
             : map (brackets . prettyPrec p) (NonEmpty.toList es)
             ++ replicate k (text "[]")
         )
-  prettyPrec p (ArrayCreateInit t k i) =
+  prettyPrec p (ArrayCreateInit _ t k i) =
     text "new"
       <+> hcat (prettyPrec p t : replicate k (text "[]"))
       <+> prettyPrec p i
@@ -392,11 +392,11 @@ instance PrettyExtension p => Pretty (Exp p) where
   prettyPrec p (PreMinus _ e) = parenPrec p 2 $ char '-' <> prettyPrec 2 e
   prettyPrec p (PreBitCompl _ e) = parenPrec p 2 $ char '~' <> prettyPrec 2 e
   prettyPrec p (PreNot _ e) = parenPrec p 2 $ char '!' <> prettyPrec 2 e
-  prettyPrec p (Cast t e) = parenPrec p 2 $ parens (prettyPrec p t) <+> prettyPrec 2 e
-  prettyPrec p (BinOp e1 op e2) =
+  prettyPrec p (Cast _ t e) = parenPrec p 2 $ parens (prettyPrec p t) <+> prettyPrec 2 e
+  prettyPrec p (BinOp _ e1 op e2) =
     let prec = opPrec op
      in parenPrec p prec (prettyPrec prec e1 <+> prettyPrec p op <+> prettyPrec prec e2)
-  prettyPrec p (InstanceOf e rt mName) =
+  prettyPrec p (InstanceOf _ e rt mName) =
     let cp = opPrec LThan
         prettyName =
           case mName of
@@ -415,13 +415,13 @@ instance PrettyExtension p => Pretty (Exp p) where
         <+> prettyPrec 13 el
   prettyPrec p (Assign _ lhs aop e) =
     hsep [prettyPrec p lhs, prettyPrec p aop, prettyPrec p e]
-  prettyPrec p (Lambda params body) =
+  prettyPrec p (Lambda _ params body) =
     prettyPrec p params <+> text "->" <+> prettyPrec p body
-  prettyPrec p (MethodRef i1 (MethodRefIdent i2)) =
+  prettyPrec p (MethodRef _ i1 (MethodRefIdent i2)) =
     prettyPrec p i1 <+> text "::" <+> prettyPrec p i2
-  prettyPrec p (MethodRef i1 MethodRefConstructor) =
+  prettyPrec p (MethodRef _ i1 MethodRefConstructor) =
     prettyPrec p i1 <+> text "::new"
-  prettyPrec p (SwitchExp e branches) =
+  prettyPrec p (SwitchExp _ e branches) =
     hsep
       [ text "switch",
         parens (prettyPrec p e),
@@ -490,18 +490,18 @@ instance PrettyExtension p => Pretty (Lhs p) where
   prettyPrec p (ArrayLhs ain) = prettyPrec p ain
 
 instance PrettyExtension p => Pretty (ArrayIndex p) where
-  prettyPrec p (ArrayIndex ref e) = prettyPrec p ref <> hcat (map (brackets . prettyPrec p) (NonEmpty.toList e))
+  prettyPrec p (ArrayIndex _ ref e) = prettyPrec p ref <> hcat (map (brackets . prettyPrec p) (NonEmpty.toList e))
 
 instance PrettyExtension p => Pretty (FieldAccess p) where
-  prettyPrec p (PrimaryFieldAccess e ident) =
+  prettyPrec p (PrimaryFieldAccess _ e ident) =
     prettyPrec p e <> char '.' <> prettyPrec p ident
-  prettyPrec p (SuperFieldAccess ident) =
+  prettyPrec p (SuperFieldAccess _ ident) =
     text "super." <> prettyPrec p ident
-  prettyPrec p (ClassFieldAccess name ident) =
+  prettyPrec p (ClassFieldAccess _ name ident) =
     prettyPrec p name <> text "." <> prettyPrec p ident
 
 instance PrettyExtension p => Pretty (MethodInvocation p) where
-  prettyPrec p (MethodCall mName methodId args) =
+  prettyPrec p (MethodCall _ mName methodId args) =
     case mName of
       Nothing -> prettyPrec p methodId <> ppArgs p args
       Just name ->
@@ -511,7 +511,7 @@ instance PrettyExtension p => Pretty (MethodInvocation p) where
             prettyPrec p methodId,
             ppArgs p args
           ]
-  prettyPrec p (PrimaryMethodCall e tArgs ident args) =
+  prettyPrec p (PrimaryMethodCall _ e tArgs ident args) =
     hcat
       [ prettyPrec p e,
         char '.',
@@ -519,14 +519,14 @@ instance PrettyExtension p => Pretty (MethodInvocation p) where
         prettyPrec p ident,
         ppArgs p args
       ]
-  prettyPrec p (SuperMethodCall tArgs ident args) =
+  prettyPrec p (SuperMethodCall _ tArgs ident args) =
     hcat
       [ text "super.",
         ppTypeParams p tArgs,
         prettyPrec p ident,
         ppArgs p args
       ]
-  prettyPrec p (ClassMethodCall name tArgs ident args) =
+  prettyPrec p (ClassMethodCall _ name tArgs ident args) =
     hcat
       [ prettyPrec p name,
         text ".super.",
@@ -534,7 +534,7 @@ instance PrettyExtension p => Pretty (MethodInvocation p) where
         prettyPrec p ident,
         ppArgs p args
       ]
-  prettyPrec p (TypeMethodCall name tArgs ident args) =
+  prettyPrec p (TypeMethodCall _ name tArgs ident args) =
     hcat
       [ prettyPrec p name,
         char '.',
@@ -544,7 +544,7 @@ instance PrettyExtension p => Pretty (MethodInvocation p) where
       ]
 
 instance PrettyExtension p => Pretty (ArrayInit p) where
-  prettyPrec p (ArrayInit vInits) =
+  prettyPrec p (ArrayInit _ vInits) =
     braceBlock $ map (\v -> prettyPrec p v <> comma) vInits
 
 -- braces $ hsep (punctuate comma (map (prettyPrec p) vInits))
