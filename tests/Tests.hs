@@ -5,6 +5,7 @@ module Main where
 import qualified Control.Exception as E
 import Control.Monad
 import Data.List (isSuffixOf)
+import qualified Data.List.NonEmpty as NonEmpty
 import Language.Java.Parser
 import Language.Java.Pretty
 import Language.Java.SourceSpan
@@ -35,7 +36,7 @@ instance Arbitrary (ClassBody p) where
   arbitrary = pure (ClassBody [])
 
 instance Arbitrary Name where
-  arbitrary = Name dummySourceSpan <$> (choose (1, 3) >>= \len -> replicateM len arbitrary)
+  arbitrary = Name dummySourceSpan <$> (choose (1, 3) >>= \len -> NonEmpty.fromList <$> replicateM len arbitrary)
 
 instance Arbitrary Ident where
   arbitrary = Ident dummySourceSpan . unkeyword <$> (choose (1, 15) >>= \len -> replicateM len (elements (['a' .. 'z'] ++ ['A' .. 'Z'])))

@@ -423,7 +423,7 @@ instance EqualityExtension p => Equality (VarInit p) where
 
 instance ShowExtension p => Located (VarInit p) where
   sourceSpan (InitExp e) = sourceSpan e
-  sourceSpan vi = error ("No SourceSpan implemented for VarInit: " ++ show vi)
+  sourceSpan (InitArray ai) = sourceSpan ai
 
 -- | A formal parameter in method declaration. The last parameter
 --   for a given declaration may be marked as variable arity,
@@ -504,18 +504,18 @@ instance EqualityExtension p => Equality (ExplConstrInv p) where
 --   a member type declaration may only specify one of public, private or protected.
 data Modifier p
   = Public SourceSpan
-  | Private
-  | Protected
+  | Private SourceSpan
+  | Protected SourceSpan
   | Abstract SourceSpan
-  | Final
-  | Static
-  | StrictFP
-  | Transient
-  | Volatile
-  | Native
+  | Final SourceSpan
+  | Static SourceSpan
+  | StrictFP SourceSpan
+  | Transient SourceSpan
+  | Volatile SourceSpan
+  | Native SourceSpan
   | Annotation (Annotation p)
-  | Synchronized_
-  | Sealed
+  | Synchronized_ SourceSpan
+  | Sealed SourceSpan
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (Modifier p)
@@ -527,20 +527,30 @@ deriving instance DataExtension p => Data (Modifier p)
 instance EqualityExtension p => Equality (Modifier p) where
   eq opt (Public s1) (Public s2) =
     eq opt s1 s2
-  eq _ Private Private = True
-  eq _ Protected Protected = True
+  eq opt (Private s1) (Private s2) =
+    eq opt s1 s2
+  eq opt (Protected s1) (Protected s2) =
+    eq opt s1 s2
   eq opt (Abstract s1) (Abstract s2) =
     eq opt s1 s2
-  eq _ Final Final = True
-  eq _ Static Static = True
-  eq _ StrictFP StrictFP = True
-  eq _ Transient Transient = True
-  eq _ Volatile Volatile = True
-  eq _ Native Native = True
+  eq opt (Final s1) (Final s2) =
+    eq opt s1 s2
+  eq opt (Static s1) (Static s2) =
+    eq opt s1 s2
+  eq opt (StrictFP s1) (StrictFP s2) =
+    eq opt s1 s2
+  eq opt (Transient s1) (Transient s2) =
+    eq opt s1 s2
+  eq opt (Volatile s1) (Volatile s2) =
+    eq opt s1 s2
+  eq opt (Native s1) (Native s2) =
+    eq opt s1 s2
   eq opt (Annotation a1) (Annotation a2) =
     eq opt a1 a2
-  eq _ Synchronized_ Synchronized_ = True
-  eq _ Sealed Sealed = True
+  eq opt (Synchronized_ s1) (Synchronized_ s2) =
+    eq opt s1 s2
+  eq opt (Sealed s1) (Sealed s2) =
+    eq opt s1 s2
   eq _ _ _ = False
 
 instance ShowExtension p => Located (Modifier p) where
@@ -1223,8 +1233,8 @@ instance EqualityExtension p => Equality (MethodInvocation p) where
 
 -- | An array initializer may be specified in a declaration, or as part of an array creation expression, creating an
 --   array and providing some initial values
-newtype ArrayInit p
-  = ArrayInit [VarInit p]
+data ArrayInit p
+  = ArrayInit SourceSpan [VarInit p]
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (ArrayInit p)
@@ -1234,8 +1244,11 @@ deriving instance ReadExtension p => Read (ArrayInit p)
 deriving instance DataExtension p => Data (ArrayInit p)
 
 instance EqualityExtension p => Equality (ArrayInit p) where
-  eq opt (ArrayInit vis1) (ArrayInit vis2) =
-    eq opt vis1 vis2
+  eq opt (ArrayInit s1 vis1) (ArrayInit s2 vis2) =
+    eq opt s1 s2 && eq opt vis1 vis2
+
+instance Located (ArrayInit p) where
+  sourceSpan (ArrayInit s _) = s
 
 data MethodRefTarget
   = MethodRefIdent Ident

@@ -225,18 +225,18 @@ instance AnalyzedTransformer InterfaceDecl where
 
 instance AnalyzedTransformer Modifier where
   transformToAnalyzed _ (Public src) = Public src
-  transformToAnalyzed _ Private = Private
-  transformToAnalyzed _ Protected = Protected
+  transformToAnalyzed _ (Private src) = Private src
+  transformToAnalyzed _ (Protected src) = Protected src
   transformToAnalyzed _ (Abstract src) = Abstract src
-  transformToAnalyzed _ Final = Final
-  transformToAnalyzed _ Static = Static
-  transformToAnalyzed _ StrictFP = StrictFP
-  transformToAnalyzed _ Transient = Transient
-  transformToAnalyzed _ Volatile = Volatile
-  transformToAnalyzed _ Native = Native
+  transformToAnalyzed _ (Final src) = Final src
+  transformToAnalyzed _ (Static src) = Static src
+  transformToAnalyzed _ (StrictFP src) = StrictFP src
+  transformToAnalyzed _ (Transient src) = Transient src
+  transformToAnalyzed _ (Volatile src) = Volatile src
+  transformToAnalyzed _ (Native src) = Native src
   transformToAnalyzed scope (Annotation anno) = Annotation (transformToAnalyzed scope anno)
-  transformToAnalyzed _ Synchronized_ = Synchronized_
-  transformToAnalyzed _ Sealed = Sealed
+  transformToAnalyzed _ (Synchronized_ src) = Synchronized_ src
+  transformToAnalyzed _ (Sealed src) = Sealed src
 
 instance AnalyzedTransformer Annotation where
   transformToAnalyzed scope (NormalAnnotation srcspan annoName annkV) =
@@ -336,7 +336,7 @@ instance AnalyzedTransformer ConstructorBody where
   transformToAnalyzed scope (ConstructorBody mbInv blockStmts) = ConstructorBody (fmap (transformToAnalyzed scope) mbInv) (map (transformToAnalyzed scope) blockStmts)
 
 instance AnalyzedTransformer ArrayInit where
-  transformToAnalyzed scope (ArrayInit varInits) = ArrayInit (map (transformToAnalyzed scope) varInits)
+  transformToAnalyzed scope (ArrayInit srcspan varInits) = ArrayInit srcspan (map (transformToAnalyzed scope) varInits)
 
 instance AnalyzedTransformer FieldAccess where
   transformToAnalyzed scope (PrimaryFieldAccess expr idnt) = PrimaryFieldAccess (transformToAnalyzed scope expr) idnt

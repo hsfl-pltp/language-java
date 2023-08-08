@@ -267,7 +267,7 @@ recordClassDecl = do
   tok KW_Record
   i <- noLoc ident
   tps <- neoptList typeParams
-  fields <- noLoc $ parens (seplist recordField comma)
+  fields <- noLoc $ parens (seplistNoLoc recordField comma)
   imp <- neoptList implements
   (bod, endLoc) <- classBody
   return (\loc ms -> RecordDecl (loc, endLoc) ms i tps fields imp bod, endLoc)
@@ -284,7 +284,7 @@ classBody = do
 
 enumBody :: P (EnumBody Parsed, Location)
 enumBody = braces $ do
-  ecs <- seplist enumConst comma
+  ecs <- seplistNoLoc enumConst comma
   optional comma
   eds <- lopt enumBodyDecls
   return $ EnumBody ecs eds
@@ -480,7 +480,7 @@ throws = tok KW_Throws >> refTypeList
 
 formalParams :: P [FormalParam Parsed]
 formalParams = noLoc $ parens $ do
-  fps <- seplist formalParam comma
+  fps <- seplistNoLoc formalParam comma
   if validateFPs fps
     then return fps
     else fail "Only the last formal parameter may be of variable arity"
@@ -506,31 +506,24 @@ ellipsis = period >> period >> period
 
 modifier :: P (Modifier Parsed)
 modifier =
-  tok KW_Protected
-    >> return Protected
-      <|> tok KW_Private
-    >> return Private
-      <|> tok KW_Static
-    >> return Static
-      <|> tok KW_Strictfp
-    >> return StrictFP
-      <|> tok KW_Final
-    >> return Final
-      <|> tok KW_Native
-    >> return Native
-      <|> tok KW_Transient
-    >> return Transient
-      <|> tok KW_Volatile
-    >> return Volatile
-      <|> tok KW_Synchronized
-    >> return Synchronized_
-      <|> fixedIdent "sealed" Sealed
-      <|> Annotation <$> annotation
-      <|> ( do
-              startLoc <- getLocation
-              (constr, endLoc) <- attrTok KW_Public Public <|> attrTok KW_Abstract Abstract
-              return (constr (startLoc, endLoc))
-          )
+  Annotation <$> annotation
+    <|> ( do
+            startLoc <- getLocation
+            (constr, endLoc) <-
+              attrTok KW_Public Public
+                <|> attrTok KW_Private Private
+                <|> attrTok KW_Protected Protected
+                <|> attrTok KW_Abstract Abstract
+                <|> attrTok KW_Final Final
+                <|> attrTok KW_Static Static
+                <|> attrTok KW_Strictfp StrictFP
+                <|> attrTok KW_Transient Transient
+                <|> attrTok KW_Volatile Volatile
+                <|> attrTok KW_Native Native
+                <|> attrTok KW_Synchronized Synchronized_
+                <|> attrFixedIdent "sealed" Sealed
+            return (constr (startLoc, endLoc))
+        )
 
 annotation :: P (Annotation Parsed)
 annotation = do
@@ -550,7 +543,7 @@ annotation = do
     <|> return (MarkerAnnotation (startLoc, nLoc) n)
 
 evlist :: P (NonEmpty (Ident, ElementValue Parsed))
-evlist = seplist1 elementValuePair comma
+evlist = seplist1NoLoc elementValuePair comma
 
 elementValuePair :: P (Ident, ElementValue Parsed)
 elementValuePair = (,) <$> noLoc ident <* tok Op_Equal <*> elementValue
@@ -568,7 +561,7 @@ elementValue =
 -- Variable declarations
 
 varDecls :: P (NonEmpty (VarDecl Parsed))
-varDecls = seplist1 varDecl comma
+varDecls = seplist1NoLoc varDecl comma
 
 varDecl :: P (VarDecl Parsed)
 varDecl = do
@@ -605,9 +598,10 @@ varInit =
 
 arrayInit :: P (ArrayInit Parsed, Location)
 arrayInit = braces $ do
-  vis <- seplist (noLoc varInit) comma
-  _ <- opt comma
-  return (ArrayInit vis)
+  startLoc <- getLocation
+  (vis, visLoc) <- seplist varInit comma
+  mtrailing <- opt (tokWithEndLoc Comma)
+  return (ArrayInit (startLoc, maybe visLoc snd mtrailing) vis)
 
 ----------------------------------------------------------------------------
 -- Statements
@@ -622,9 +616,6 @@ block = do
     shallowP = do
       loc <- parseNestedCurly (-1)
       return (Block [], loc)
-
-blockNoLoc :: P (Block Parsed)
-blockNoLoc = fmap fst block
 
 -- | Parses anything between properly balance curly brackets.
 -- level must initially be -1
@@ -874,10 +865,10 @@ forInit =
             return (ForLocalVars m t vds)
         )
   )
-    <|> (seplist1 stmtExp comma <&> ForInitExps)
+    <|> (seplist1NoLoc stmtExp comma <&> ForInitExps)
 
 forUp :: P [Exp Parsed]
-forUp = seplist stmtExp comma
+forUp = seplistNoLoc stmtExp comma
 
 -- Switches
 
@@ -907,7 +898,7 @@ switchLabelOld =
   (tok KW_Default >> attrTok Op_Colon Default)
     <|> ( do
             tok KW_Case
-            es <- seplist1 (noLoc condExp) comma
+            es <- noLoc (seplist1 condExp comma)
             attrTok Op_Colon (SwitchCase es)
         )
 
@@ -923,7 +914,7 @@ switchLabelNew =
   (tok KW_Default >> tok LambdaArrow >> return Default)
     <|> ( do
             tok KW_Case
-            es <- seplist1 (noLoc condExp) comma
+            es <- noLoc (seplist1 condExp comma)
             tok LambdaArrow
             return $ SwitchCase es
         )
@@ -963,7 +954,7 @@ tryResourceList = do
     opt
       ( noLoc
           ( parens $ do
-              l <- seplist tryResource semiColon
+              l <- seplistNoLoc tryResource semiColon
               _ <- opt semiColon
               return l
           )
@@ -1202,8 +1193,8 @@ instanceCreation =
 lambdaParams :: P (LambdaParams Parsed)
 lambdaParams =
   try (LambdaSingleParam <$> noLoc ident)
-    <|> try (noLoc (parens (LambdaFormalParams <$> seplist formalParam comma)))
-    <|> noLoc (parens (LambdaInferredParams <$> seplist (noLoc ident) comma))
+    <|> try (noLoc (parens (LambdaFormalParams <$> seplistNoLoc formalParam comma)))
+    <|> noLoc (parens (LambdaInferredParams <$> noLoc (seplist ident comma)))
 
 lambdaExp :: P (Exp Parsed, Location)
 lambdaExp = do
@@ -1391,7 +1382,7 @@ methodInvocation =
 -}
 
 args :: P ([Argument Parsed], Location)
-args = parens (seplist (noLoc exp) comma)
+args = parens (noLoc (seplist exp comma))
 
 -- Arrays
 
@@ -1476,10 +1467,6 @@ prefixOp = do
 postfixOp = do
   (constr, endLoc) <- attrTok Op_PPlus PostIncrement <|> attrTok Op_MMinus PostDecrement
   return (\expStartLoc -> constr (expStartLoc, endLoc), endLoc)
-
-attrTok :: Token -> b -> P (b, Location)
-attrTok t constr =
-  fmap (\(_, endLoc) -> (constr, endLoc)) (tokWithEndLoc t)
 
 assignOp :: P AssignOp
 assignOp =
@@ -1593,9 +1580,7 @@ nonArrayType =
 
 classType :: P (ClassType, Location)
 classType = do
-  ctss <- seplist1 classTypeSpec period
-  let cts = NonEmpty.map fst ctss
-      loc = snd (NonEmpty.last ctss)
+  (cts, loc) <- seplist1 classTypeSpec period
   return (ClassType cts, loc)
 
 classTypeSpec :: P ((Ident, [TypeArgument]), Location)
@@ -1609,13 +1594,13 @@ resultType :: P (Maybe Type)
 resultType = tok KW_Void >> return Nothing <|> Just <$> ttype <?> "resultType"
 
 refTypeList :: P (NonEmpty RefType)
-refTypeList = seplist1 (noLoc refType) comma
+refTypeList = noLoc (seplist1 refType comma)
 
 ----------------------------------------------------------------------------
 -- Type parameters and arguments
 
 typeParams :: P (NonEmpty TypeParam)
-typeParams = noLoc $ angles (seplist1 typeParam comma)
+typeParams = noLoc $ angles (seplist1NoLoc typeParam comma)
 
 typeParam :: P TypeParam
 typeParam = do
@@ -1624,10 +1609,10 @@ typeParam = do
   return $ TypeParam i bs
 
 bounds :: P (NonEmpty RefType)
-bounds = tok KW_Extends >> seplist1 (noLoc refType) (tok Op_And)
+bounds = tok KW_Extends >> noLoc (seplist1 refType (tok Op_And))
 
 typeArgs :: P (NonEmpty TypeArgument, Location)
-typeArgs = angles (seplist1 typeArg comma)
+typeArgs = angles (seplist1NoLoc typeArg comma)
 
 typeArg :: P TypeArgument
 typeArg =
@@ -1651,9 +1636,7 @@ refTypeArgs = noLoc $ angles refTypeList
 name :: P (Name, Location)
 name = do
   startLoc <- getLocation
-  n <- seplist1 ident period
-  let idents = NonEmpty.map fst n
-      endLoc = snd (NonEmpty.last n)
+  (idents, endLoc) <- seplist1 ident period
   return (Name (startLoc, endLoc) idents, endLoc)
 
 ident :: P (Ident, Location)
@@ -1670,6 +1653,12 @@ fixedIdent fixed result =
   javaToken $ \case
     IdentTok s | s == fixed -> Just result
     _ -> Nothing
+
+attrFixedIdent :: String -> a -> P (a, Location)
+attrFixedIdent fixed result = do
+  loc <- getEndLoc
+  a <- fixedIdent fixed result
+  return (a, loc)
 
 ------------------------------------------------------------
 
@@ -1706,18 +1695,36 @@ list1 p = do
       loc = snd (last ll)
   return (l, loc)
 
-seplist :: P a -> P sep -> P [a]
+seplist :: P (a, Location) -> P sep -> P ([a], Location)
 -- seplist = sepBy
-seplist p sep = option [] $ NonEmpty.toList <$> seplist1 p sep
+seplist p sep = do
+  startLoc <- getLocation
+  option ([], startLoc) (mapFst NonEmpty.toList <$> seplist1 p sep)
 
-seplist1 :: P a -> P sep -> P (NonEmpty a)
+seplistNoLoc :: P a -> P sep -> P [a]
+-- seplist = sepBy
+seplistNoLoc p sep = option [] $ NonEmpty.toList <$> seplist1NoLoc p sep
+
+seplist1 :: P (a, Location) -> P sep -> P (NonEmpty a, Location)
 -- seplist1 = sepBy1
 seplist1 p sep =
-  p >>= \a ->
+  p >>= \(a, loc) ->
     try
       ( do
           _ <- sep
           as <- seplist1 p sep
+          return (a <| fst as, loc)
+      )
+      <|> return (a :| [], loc)
+
+seplist1NoLoc :: P a -> P sep -> P (NonEmpty a)
+-- seplist1 = sepBy1
+seplist1NoLoc p sep =
+  p >>= \a ->
+    try
+      ( do
+          _ <- sep
+          as <- seplist1NoLoc p sep
           return (a <| as)
       )
       <|> return (a :| [])
@@ -1740,6 +1747,10 @@ javaToken test = token showT posT testT
 tok, matchToken :: Token -> P ()
 tok = matchToken
 matchToken t = javaToken (\r -> if r == t then Just () else Nothing)
+
+attrTok :: Token -> b -> P (b, Location)
+attrTok t constr =
+  fmap (\(_, endLoc) -> (constr, endLoc)) (tokWithEndLoc t)
 
 tokWithEndLoc :: Token -> P ((), Location)
 tokWithEndLoc t = do

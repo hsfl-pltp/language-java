@@ -177,7 +177,7 @@ instance Pretty VarDeclId where
 
 instance PrettyExtension p => Pretty (VarInit p) where
   prettyPrec p (InitExp e) = prettyPrec p e
-  prettyPrec p (InitArray (ArrayInit ai)) =
+  prettyPrec p (InitArray (ArrayInit _ ai)) =
     text "{" <+> hsep (punctuate comma (map (prettyPrec p) ai)) <+> text "}"
 
 instance PrettyExtension p => Pretty (FormalParam p) where
@@ -211,17 +211,17 @@ instance PrettyExtension p => Pretty (ExplConstrInv p) where
 instance PrettyExtension p => Pretty (Modifier p) where
   prettyPrec p (Annotation ann) = prettyPrec p ann $+$ nest (-1) (text "")
   prettyPrec _ (Public _) = text "public"
-  prettyPrec _ Private = text "private"
-  prettyPrec _ Protected = text "protected"
+  prettyPrec _ (Private _) = text "private"
+  prettyPrec _ (Protected _) = text "protected"
   prettyPrec _ (Abstract _) = text "abstract"
-  prettyPrec _ Final = text "final"
-  prettyPrec _ Static = text "static"
-  prettyPrec _ StrictFP = text "strictfp"
-  prettyPrec _ Transient = text "transient"
-  prettyPrec _ Volatile = text "volatile"
-  prettyPrec _ Native = text "native"
-  prettyPrec _ Synchronized_ = text "synchronized"
-  prettyPrec _ Sealed = text "sealed"
+  prettyPrec _ (Final _) = text "final"
+  prettyPrec _ (Static _) = text "static"
+  prettyPrec _ (StrictFP _) = text "strictfp"
+  prettyPrec _ (Transient _) = text "transient"
+  prettyPrec _ (Volatile _) = text "volatile"
+  prettyPrec _ (Native _) = text "native"
+  prettyPrec _ (Synchronized_ _) = text "synchronized"
+  prettyPrec _ (Sealed _) = text "sealed"
 
 instance PrettyExtension p => Pretty (Annotation p) where
   prettyPrec p x =
@@ -544,7 +544,7 @@ instance PrettyExtension p => Pretty (MethodInvocation p) where
       ]
 
 instance PrettyExtension p => Pretty (ArrayInit p) where
-  prettyPrec p (ArrayInit vInits) =
+  prettyPrec p (ArrayInit _ vInits) =
     braceBlock $ map (\v -> prettyPrec p v <> comma) vInits
 
 -- braces $ hsep (punctuate comma (map (prettyPrec p) vInits))
