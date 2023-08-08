@@ -263,7 +263,7 @@ instance AnalyzedTransformer ElementValue where
 
 instance AnalyzedTransformer Decl where
   transformToAnalyzed scope (MemberDecl memberDecl) = MemberDecl (transformToAnalyzed scope memberDecl)
-  transformToAnalyzed scope (InitDecl static block) = InitDecl static (transformToAnalyzed scope block)
+  transformToAnalyzed scope (InitDecl srcspan static block) = InitDecl srcspan static (transformToAnalyzed scope block)
 
 instance AnalyzedTransformer EnumConstant where
   transformToAnalyzed scope (EnumConstant idnt arguments mbClassBody) = EnumConstant idnt (map (transformToAnalyzed scope) arguments) (fmap (transformToAnalyzed scope) mbClassBody)

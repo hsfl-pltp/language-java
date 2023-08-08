@@ -338,8 +338,10 @@ classBodyStatement =
     )
     <|> try
       ( do
+          startLoc <- getLocation
           mst <- bopt (tok KW_Static)
-          Just . InitDecl mst <$> blockNoLoc
+          (bl, endLoc) <- block
+          return (Just (InitDecl (startLoc, endLoc) mst bl))
       )
     <|> ( do
             loc <- getLocation

@@ -133,7 +133,7 @@ instance PrettyExtension p => Pretty (InterfaceBody p) where
 
 instance PrettyExtension p => Pretty (Decl p) where
   prettyPrec p (MemberDecl md) = prettyPrec p md
-  prettyPrec p (InitDecl b bl) =
+  prettyPrec p (InitDecl _ b bl) =
     opt b (text "static") <+> prettyPrec p bl
 
 instance PrettyExtension p => Pretty (MemberDecl p) where

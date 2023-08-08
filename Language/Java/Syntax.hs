@@ -295,7 +295,7 @@ instance EqualityExtension p => Equality (InterfaceBody p) where
 --   initializer, which may be static.
 data Decl p
   = MemberDecl (MemberDecl p)
-  | InitDecl Bool (Block p)
+  | InitDecl SourceSpan Bool (Block p)
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (Decl p)
@@ -307,13 +307,13 @@ deriving instance DataExtension p => Data (Decl p)
 instance EqualityExtension p => Equality (Decl p) where
   eq opt (MemberDecl md1) (MemberDecl md2) =
     eq opt md1 md2
-  eq opt (InitDecl b1 bl1) (InitDecl b2 bl2) =
-    b1 == b2 && eq opt bl1 bl2
+  eq opt (InitDecl s1 b1 bl1) (InitDecl s2 b2 bl2) =
+    eq opt s1 s2 && b1 == b2 && eq opt bl1 bl2
   eq _ _ _ = False
 
 instance ShowExtension p => Located (Decl p) where
   sourceSpan (MemberDecl md) = sourceSpan md
-  sourceSpan d = error ("No SourceSpan implemented for Declaration: " ++ show d)
+  sourceSpan (InitDecl s _ _) = s
 
 -- | A class or interface member can be an inner class or interface, a field or
 --   constant, or a method or constructor. An interface may only have as members
@@ -586,8 +586,6 @@ instance Located (Annotation p) where
   sourceSpan (NormalAnnotation s _ _) = s
   sourceSpan (SingleElementAnnotation s _ _) = s
   sourceSpan (MarkerAnnotation s _) = s
-
-
 
 -- | Annotations may contain  annotations or (loosely) expressions
 data ElementValue p
