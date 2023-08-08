@@ -350,33 +350,33 @@ instance PrettyExtension p => Pretty (ForInit p) where
 
 instance PrettyExtension p => Pretty (Exp p) where
   prettyPrec p (Lit l) = prettyPrec p l
-  prettyPrec p (ClassLit mT) =
+  prettyPrec p (ClassLit _ mT) =
     ppResultType p mT <> text ".class"
-  prettyPrec _ This = text "this"
-  prettyPrec p (ThisClass name) =
+  prettyPrec _ (This _) = text "this"
+  prettyPrec p (ThisClass _ name) =
     prettyPrec p name <> text ".this"
-  prettyPrec p (InstanceCreation tArgs tds args mBody) =
+  prettyPrec p (InstanceCreation _ tArgs tds args mBody) =
     hsep
       [ text "new",
         ppTypeParams p tArgs,
         prettyPrec p tds <> ppArgs p args
       ]
       $$ maybePP p mBody
-  prettyPrec p (QualInstanceCreation e tArgs ident args mBody) =
+  prettyPrec p (QualInstanceCreation _ e tArgs ident args mBody) =
     hsep
       [ prettyPrec p e <> char '.' <> text "new",
         ppTypeParams p tArgs,
         prettyPrec p ident <> ppArgs p args
       ]
       $$ maybePP p mBody
-  prettyPrec p (ArrayCreate t es k) =
+  prettyPrec p (ArrayCreate _ t es k) =
     text "new"
       <+> hcat
         ( prettyPrec p t
             : map (brackets . prettyPrec p) (NonEmpty.toList es)
             ++ replicate k (text "[]")
         )
-  prettyPrec p (ArrayCreateInit t k i) =
+  prettyPrec p (ArrayCreateInit _ t k i) =
     text "new"
       <+> hcat (prettyPrec p t : replicate k (text "[]"))
       <+> prettyPrec p i
@@ -392,11 +392,11 @@ instance PrettyExtension p => Pretty (Exp p) where
   prettyPrec p (PreMinus _ e) = parenPrec p 2 $ char '-' <> prettyPrec 2 e
   prettyPrec p (PreBitCompl _ e) = parenPrec p 2 $ char '~' <> prettyPrec 2 e
   prettyPrec p (PreNot _ e) = parenPrec p 2 $ char '!' <> prettyPrec 2 e
-  prettyPrec p (Cast t e) = parenPrec p 2 $ parens (prettyPrec p t) <+> prettyPrec 2 e
-  prettyPrec p (BinOp e1 op e2) =
+  prettyPrec p (Cast _ t e) = parenPrec p 2 $ parens (prettyPrec p t) <+> prettyPrec 2 e
+  prettyPrec p (BinOp _ e1 op e2) =
     let prec = opPrec op
      in parenPrec p prec (prettyPrec prec e1 <+> prettyPrec p op <+> prettyPrec prec e2)
-  prettyPrec p (InstanceOf e rt mName) =
+  prettyPrec p (InstanceOf _ e rt mName) =
     let cp = opPrec LThan
         prettyName =
           case mName of
@@ -415,13 +415,13 @@ instance PrettyExtension p => Pretty (Exp p) where
         <+> prettyPrec 13 el
   prettyPrec p (Assign _ lhs aop e) =
     hsep [prettyPrec p lhs, prettyPrec p aop, prettyPrec p e]
-  prettyPrec p (Lambda params body) =
+  prettyPrec p (Lambda _ params body) =
     prettyPrec p params <+> text "->" <+> prettyPrec p body
-  prettyPrec p (MethodRef i1 (MethodRefIdent i2)) =
+  prettyPrec p (MethodRef _ i1 (MethodRefIdent i2)) =
     prettyPrec p i1 <+> text "::" <+> prettyPrec p i2
-  prettyPrec p (MethodRef i1 MethodRefConstructor) =
+  prettyPrec p (MethodRef _ i1 MethodRefConstructor) =
     prettyPrec p i1 <+> text "::new"
-  prettyPrec p (SwitchExp e branches) =
+  prettyPrec p (SwitchExp _ e branches) =
     hsep
       [ text "switch",
         parens (prettyPrec p e),
@@ -490,18 +490,18 @@ instance PrettyExtension p => Pretty (Lhs p) where
   prettyPrec p (ArrayLhs ain) = prettyPrec p ain
 
 instance PrettyExtension p => Pretty (ArrayIndex p) where
-  prettyPrec p (ArrayIndex ref e) = prettyPrec p ref <> hcat (map (brackets . prettyPrec p) (NonEmpty.toList e))
+  prettyPrec p (ArrayIndex _ ref e) = prettyPrec p ref <> hcat (map (brackets . prettyPrec p) (NonEmpty.toList e))
 
 instance PrettyExtension p => Pretty (FieldAccess p) where
-  prettyPrec p (PrimaryFieldAccess e ident) =
+  prettyPrec p (PrimaryFieldAccess _ e ident) =
     prettyPrec p e <> char '.' <> prettyPrec p ident
-  prettyPrec p (SuperFieldAccess ident) =
+  prettyPrec p (SuperFieldAccess _ ident) =
     text "super." <> prettyPrec p ident
-  prettyPrec p (ClassFieldAccess name ident) =
+  prettyPrec p (ClassFieldAccess _ name ident) =
     prettyPrec p name <> text "." <> prettyPrec p ident
 
 instance PrettyExtension p => Pretty (MethodInvocation p) where
-  prettyPrec p (MethodCall mName methodId args) =
+  prettyPrec p (MethodCall _ mName methodId args) =
     case mName of
       Nothing -> prettyPrec p methodId <> ppArgs p args
       Just name ->
@@ -511,7 +511,7 @@ instance PrettyExtension p => Pretty (MethodInvocation p) where
             prettyPrec p methodId,
             ppArgs p args
           ]
-  prettyPrec p (PrimaryMethodCall e tArgs ident args) =
+  prettyPrec p (PrimaryMethodCall _ e tArgs ident args) =
     hcat
       [ prettyPrec p e,
         char '.',
@@ -519,14 +519,14 @@ instance PrettyExtension p => Pretty (MethodInvocation p) where
         prettyPrec p ident,
         ppArgs p args
       ]
-  prettyPrec p (SuperMethodCall tArgs ident args) =
+  prettyPrec p (SuperMethodCall _ tArgs ident args) =
     hcat
       [ text "super.",
         ppTypeParams p tArgs,
         prettyPrec p ident,
         ppArgs p args
       ]
-  prettyPrec p (ClassMethodCall name tArgs ident args) =
+  prettyPrec p (ClassMethodCall _ name tArgs ident args) =
     hcat
       [ prettyPrec p name,
         text ".super.",
@@ -534,7 +534,7 @@ instance PrettyExtension p => Pretty (MethodInvocation p) where
         prettyPrec p ident,
         ppArgs p args
       ]
-  prettyPrec p (TypeMethodCall name tArgs ident args) =
+  prettyPrec p (TypeMethodCall _ name tArgs ident args) =
     hcat
       [ prettyPrec p name,
         char '.',

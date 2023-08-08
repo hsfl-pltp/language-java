@@ -936,10 +936,11 @@ switchLabelNew =
 
 switchExp :: P (Exp Parsed, Location)
 switchExp = do
+  startLoc <- getLocation
   tok KW_Switch
   e <- noLoc $ parens (noLoc exp)
   (branches, loc) <- braces switchExpBody
-  return (SwitchExp e branches, loc)
+  return (SwitchExp (startLoc, loc) e branches, loc)
   where
     switchExpBody = NonEmpty.fromList <$> many1 switchExpBodyBranch
     switchExpBodyBranch = do
@@ -1052,19 +1053,21 @@ condExpSuffix startLoc = do
   return (\ce -> Cond (startLoc, endLoc) ce th el, endLoc)
 
 infixExp :: P (Exp Parsed, Location)
-infixExp = unaryExp |>> infixExpSuffix
+infixExp = do
+  startLoc <- getLocation
+  unaryExp |>> infixExpSuffix startLoc
 
-infixExpSuffix :: P (Exp Parsed -> Exp Parsed, Location)
-infixExpSuffix =
+infixExpSuffix :: Location -> P (Exp Parsed -> Exp Parsed, Location)
+infixExpSuffix startLoc =
   ( do
       op <- infixCombineOp
       (ie2, loc) <- infixExp
-      return (\ie1 -> BinOp ie1 op ie2, loc)
+      return (\ie1 -> BinOp (startLoc, loc) ie1 op ie2, loc)
   )
     <|> ( do
             op <- infixOp
             (e2, loc) <- unaryExp
-            return (\e1 -> BinOp e1 op e2, loc)
+            return (\e1 -> BinOp (startLoc, loc) e1 op e2, loc)
         )
     <|> ( do
             tok KW_Instanceof
@@ -1074,7 +1077,7 @@ infixExpSuffix =
                   case mNameLoc of
                     Just (n, l) -> (Just n, l)
                     Nothing -> (Nothing, refLoc)
-            return (\e1 -> InstanceOf e1 t mName, loc)
+            return (\e1 -> InstanceOf (startLoc, loc) e1 t mName, loc)
         )
 
 unaryExp :: P (Exp Parsed, Location)
@@ -1088,8 +1091,10 @@ unaryExp =
       )
     <|> try
       ( do
+          startLoc <- getLocation
           t <- noLoc (parens ttype)
-          mapFst (Cast t) <$> unaryExp
+          (e, loc) <- unaryExp
+          return (Cast (startLoc, loc) t e, loc)
       )
     <|> postfixExp
 
@@ -1114,9 +1119,13 @@ primaryNPS = try arrayCreation <|> primaryNoNewArrayNPS
 -- primaryNoNewArray = startSuff primaryNoNewArrayNPS primarySuffix
 
 primaryNoNewArrayNPS :: P (Exp Parsed, Location)
-primaryNoNewArrayNPS =
+primaryNoNewArrayNPS = do
+  startLoc <- getLocation
   mapFst Lit <$> literal
-    <|> attrTok KW_This This
+    <|> ( do
+            (_, loc) <- tokWithEndLoc KW_This
+            return (This (startLoc, loc), loc)
+        )
     <|> parens (noLoc exp)
     <|>
     -- TODO: These two following should probably be merged more
@@ -1124,13 +1133,15 @@ primaryNoNewArrayNPS =
       ( do
           rt <- resultType
           _ <- period
-          attrTok KW_Class (ClassLit rt)
+          (_, loc) <- tokWithEndLoc KW_Class
+          return (ClassLit (startLoc, loc) rt, loc)
       )
     <|> try
       ( do
           n <- noLoc name
           _ <- period
-          attrTok KW_This (ThisClass n)
+          (_, loc) <- tokWithEndLoc KW_This
+          return (ThisClass (startLoc, loc) n, loc)
       )
     <|> try instanceCreationNPS
     <|> try (mapFst MethodInv <$> methodInvocationNPS)
@@ -1147,6 +1158,7 @@ primarySuffix =
 instanceCreationNPS :: P (Exp Parsed, Location)
 instanceCreationNPS =
   do
+    startLoc <- getLocation
     tok KW_New
     tas <- neoptList (noLoc typeArgs)
     tds <- typeDeclSpecifier
@@ -1156,7 +1168,7 @@ instanceCreationNPS =
           case mcbLoc of
             Just (cb, l) -> (Just cb, l)
             Nothing -> (Nothing, argsLoc)
-    return (InstanceCreation tas tds as mcb, loc)
+    return (InstanceCreation (startLoc, loc) tas tds as mcb, loc)
 
 typeDeclSpecifier :: P TypeDeclSpecifier
 typeDeclSpecifier =
@@ -1181,6 +1193,7 @@ typeDeclSpecifier =
 instanceCreationSuffix :: P (Exp Parsed -> Exp Parsed, Location)
 instanceCreationSuffix =
   do
+    startLoc <- getLocation
     period >> tok KW_New
     tas <- neoptList (noLoc typeArgs)
     i <- noLoc ident
@@ -1190,7 +1203,7 @@ instanceCreationSuffix =
           case mcbLoc of
             Just (cb, l) -> (Just cb, l)
             Nothing -> (Nothing, argsLoc)
-    return (\p -> QualInstanceCreation p tas i as mcb, loc)
+    return (\p -> QualInstanceCreation (startLoc, loc) p tas i as mcb, loc)
 
 instanceCreation :: P (Exp Parsed)
 instanceCreation =
@@ -1213,6 +1226,7 @@ lambdaParams =
 
 lambdaExp :: P (Exp Parsed, Location)
 lambdaExp = do
+  startLoc <- getLocation
   params <- lambdaParams
   tok LambdaArrow
   (e, loc) <-
@@ -1224,16 +1238,15 @@ lambdaExp = do
               (e, loc) <- exp
               return (LambdaExpression e, loc)
           )
-  return (Lambda params e, loc)
+  return (Lambda (startLoc, loc) params e, loc)
 
 methodRef :: P (Exp Parsed, Location)
 methodRef = do
+  startLoc <- getLocation
   n <- noLoc name
   tok MethodRefSep
-  mapFst (MethodRef n)
-    <$> ( attrTok KW_New MethodRefConstructor
-            <|> (mapFst MethodRefIdent <$> ident)
-        )
+  (mrt, loc) <- attrTok KW_New MethodRefConstructor <|> mapFst MethodRefIdent <$> ident
+  return (MethodRef (startLoc, loc) n mrt, loc)
 
 {-
 instanceCreation =
@@ -1253,22 +1266,26 @@ instanceCreation =
 -}
 
 fieldAccessNPS :: P (FieldAccess Parsed, Location)
-fieldAccessNPS =
+fieldAccessNPS = do
+  startLoc <- getLocation
   ( do
       tok KW_Super >> period
-      mapFst SuperFieldAccess <$> ident
-  )
+      (i, loc) <- ident
+      return (SuperFieldAccess (startLoc, loc) i, loc)
+    )
     <|> ( do
             n <- noLoc name
             period >> tok KW_Super >> period
-            mapFst (ClassFieldAccess n) <$> ident
+            (i, loc) <- ident
+            return (ClassFieldAccess (startLoc, loc) n i, loc)
         )
 
 fieldAccessSuffix :: P (Exp Parsed -> FieldAccess Parsed, Location)
 fieldAccessSuffix = do
+  startLoc <- getLocation
   period
   (i, loc) <- ident
-  return (\p -> PrimaryFieldAccess p i, loc)
+  return (\p -> PrimaryFieldAccess (startLoc, loc) p i, loc)
 
 fieldAccess :: P (FieldAccess Parsed)
 fieldAccess =
@@ -1307,16 +1324,19 @@ fieldAccess =
 -}
 
 methodInvocationNPS :: P (MethodInvocation Parsed, Location)
-methodInvocationNPS =
+methodInvocationNPS = do
+  startLoc <- getLocation
   ( do
       tok KW_Super >> period
       rts <- neoptList refTypeArgs
       i <- noLoc ident
-      mapFst (SuperMethodCall rts i) <$> args
-  )
+      (as, loc) <- args
+      return (SuperMethodCall (startLoc, loc) rts i as, loc)
+    )
     <|> ( do
             (mn, i) <- qualifiedMethodName
-            mapFst (MethodCall mn i) <$> args
+            (as, loc) <- args
+            return (MethodCall (startLoc, loc) mn i as, loc)
         )
     <|> ( do
             n <- noLoc name
@@ -1324,8 +1344,9 @@ methodInvocationNPS =
             msp <- opt (tok KW_Super >> period)
             rts <- neoptList refTypeArgs
             i <- noLoc ident
+            (as, loc) <- args
             let constr = maybe TypeMethodCall (const ClassMethodCall) msp
-            mapFst (constr n rts i) <$> args
+            return (constr (startLoc, loc) n rts i as, loc)
         )
 
 qualifiedMethodName :: P (Maybe Name, Ident)
@@ -1350,11 +1371,12 @@ qualifiedMethodName = do
 
 methodInvocationSuffix :: P (Exp Parsed -> MethodInvocation Parsed, Location)
 methodInvocationSuffix = do
+  startLoc <- getLocation
   period
   _ <- neoptList refTypeArgs
   i <- noLoc ident
   (as, loc) <- args
-  return (\p -> PrimaryMethodCall p [] i as, loc)
+  return (\p -> PrimaryMethodCall (startLoc, loc) p [] i as, loc)
 
 methodInvocationExp :: P (Exp Parsed)
 methodInvocationExp =
@@ -1403,14 +1425,16 @@ args = parens (noLoc (seplist exp comma))
 
 arrayAccessNPS :: P (ArrayIndex Parsed, Location)
 arrayAccessNPS = do
+  startLoc <- getLocation
   n <- noLoc name
   (e, loc) <- list1 (brackets (noLoc exp))
-  return (ArrayIndex (ExpName n) e, loc)
+  return (ArrayIndex (startLoc, loc) (ExpName n) e, loc)
 
 arrayAccessSuffix :: P (Exp Parsed -> ArrayIndex Parsed, Location)
 arrayAccessSuffix = do
+  startLoc <- getLocation
   (e, loc) <- list1 (brackets (noLoc exp))
-  return (\ref -> ArrayIndex ref e, loc)
+  return (\ref -> ArrayIndex (startLoc, loc) ref e, loc)
 
 arrayAccess :: P (ArrayIndex Parsed, Location)
 arrayAccess =
@@ -1433,12 +1457,14 @@ arrayRef = ExpName <$> name <|> primaryNoNewArray
 
 arrayCreation :: P (Exp Parsed, Location)
 arrayCreation = do
+  startLoc <- getLocation
   tok KW_New
   t <- nonArrayType
   try
     ( do
         ds <- noLoc $ list1 emptyBrackets
-        mapFst (ArrayCreateInit t (length ds)) <$> arrayInit
+        (ai, loc) <- arrayInit
+        return (ArrayCreateInit (startLoc, loc) t (length ds) ai, loc)
     )
     <|> ( do
             (des, desLoc) <- list1 $ try $ brackets (noLoc exp)
@@ -1448,7 +1474,7 @@ arrayCreation = do
                   if len < 1
                     then desLoc
                     else snd (last ds)
-            return (ArrayCreate t des len, loc)
+            return (ArrayCreate (startLoc, loc) t des len, loc)
         )
 
 literal :: P (Literal, Location)
