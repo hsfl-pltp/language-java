@@ -3,6 +3,7 @@
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -553,11 +554,20 @@ instance EqualityExtension p => Equality (Modifier p) where
     eq opt s1 s2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (Modifier p) where
+instance Located (Modifier p) where
   sourceSpan (Public s) = s
+  sourceSpan (Private s) = s
+  sourceSpan (Protected s) = s
   sourceSpan (Abstract s) = s
+  sourceSpan (Final s) = s
+  sourceSpan (Static s) = s
+  sourceSpan (StrictFP s) = s
+  sourceSpan (Transient s) = s
+  sourceSpan (Volatile s) = s
+  sourceSpan (Native s) = s
   sourceSpan (Annotation a) = sourceSpan a
-  sourceSpan m = error ("No SourceSpan implemented for Modifier: " ++ show m)
+  sourceSpan (Synchronized_ s) = s
+  sourceSpan (Sealed s) = s
 
 -- | Annotations have three different forms: no-parameter, single-parameter or key-value pairs
 data Annotation p
@@ -625,7 +635,7 @@ instance ShowExtension p => Located (ElementValue p) where
 
 -- | A block is a sequence of statements, local class declarations
 --   and local variable declaration statements within braces.
-newtype Block p = Block [BlockStmt p]
+data Block p = Block SourceSpan [BlockStmt p]
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (Block p)
@@ -635,8 +645,11 @@ deriving instance ReadExtension p => Read (Block p)
 deriving instance DataExtension p => Data (Block p)
 
 instance EqualityExtension p => Equality (Block p) where
-  eq opt (Block bss1) (Block bss2) =
-    eq opt bss1 bss2
+  eq opt (Block s1 bss1) (Block s2 bss2) =
+    eq opt s1 s2 && eq opt bss1 bss2
+
+instance Located (Block p) where
+  sourceSpan (Block s _) = s
 
 -- | A block statement is either a normal statement, a local
 --   class declaration or a local variable declaration.
@@ -682,37 +695,37 @@ data Stmt p
   | -- | The enhanced @for@ statement iterates over an array or a value of a class that implements the @iterator@ interface.
     EnhancedFor SourceSpan [Modifier p] Type Ident (Exp p) (Stmt p)
   | -- | An empty statement does nothing.
-    Empty
+    Empty SourceSpan
   | -- | Certain kinds of expressions may be used as statements by following them with semicolons:
     --   assignments, pre- or post-inc- or decrementation, method invocation or class instance
     --   creation expressions.
     ExpStmt SourceSpan (Exp p)
   | -- | An assertion is a statement containing a boolean expression, where an error is reported if the expression
     --   evaluates to false.
-    Assert (Exp p) (Maybe (Exp p))
+    Assert SourceSpan (Exp p) (Maybe (Exp p))
   | -- | The switch statement transfers control to one of several statements depending on the value of an expression.
-    Switch SwitchStyle (Exp p) [SwitchBlock p]
+    Switch SourceSpan SwitchStyle (Exp p) [SwitchBlock p]
   | -- | The @do@ statement executes a statement and an expression repeatedly until the value of the expression is false.
     Do SourceSpan (Stmt p) (Exp p)
   | -- | A @break@ statement transfers control out of an enclosing statement.
     Break SourceSpan (Maybe Ident)
   | -- | A @continue@ statement may occur only in a while, do, or for statement. Control passes to the loop-continuation
     --   point of that statement.
-    Continue (Maybe Ident)
+    Continue SourceSpan (Maybe Ident)
   | -- A @return@ statement returns control to the invoker of a method or constructor.
     Return SourceSpan (Maybe (Exp p))
   | -- | A @synchronized@ statement acquires a mutual-exclusion lock on behalf of the executing thread, executes a block,
     --   then releases the lock. While the executing thread owns the lock, no other thread may acquire the lock.
-    Synchronized (Exp p) (Block p)
+    Synchronized SourceSpan (Exp p) (Block p)
   | -- | A @throw@ statement causes an exception to be thrown.
-    Throw (Exp p)
+    Throw SourceSpan (Exp p)
   | -- | A try statement executes a block. If a value is thrown and the try statement has one or more catch clauses that
     --   can catch it, then control will be transferred to the first such catch clause. If the try statement has a finally
     --   clause, then another block of code is executed, no matter whether the try block completes normally or abruptly,
     --   and no matter whether a catch clause is first given control.
     Try SourceSpan [TryResource p] (Block p) [Catch p] (Maybe {- finally -} (Block p))
   | -- | Statements may have label prefixes.
-    Labeled Ident (Stmt p)
+    Labeled SourceSpan Ident (Stmt p)
   deriving (Generic, Typeable)
 
 deriving instance ShowExtension p => Show (Stmt p)
@@ -734,43 +747,51 @@ instance EqualityExtension p => Equality (Stmt p) where
     eq opt s1 s2 && eq opt mfi1 mfi2 && eq opt me1 me2 && eq opt mes1 mes2 && eq opt stmt1 stmt2
   eq opt (EnhancedFor s1 ms1 t1 i1 e1 stmt1) (EnhancedFor s2 ms2 t2 i2 e2 stmt2) =
     eq opt s1 s2 && eq opt ms1 ms2 && eq opt t1 t2 && eq opt i1 i2 && eq opt e1 e2 && eq opt stmt1 stmt2
-  eq _ Empty Empty = True
+  eq opt (Empty s1) (Empty s2) =
+    eq opt s1 s2
   eq opt (ExpStmt s1 e1) (ExpStmt s2 e2) =
     eq opt s1 s2 && eq opt e1 e2
-  eq opt (Assert e1 me1) (Assert e2 me2) =
-    eq opt e1 e2 && eq opt me1 me2
-  eq opt (Switch ss1 e1 sbs1) (Switch ss2 e2 sbs2) =
-    eq opt ss1 ss2 && eq opt e1 e2 && eq opt sbs1 sbs2
+  eq opt (Assert s1 e1 me1) (Assert s2 e2 me2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt me1 me2
+  eq opt (Switch s1 ss1 e1 sbs1) (Switch s2 ss2 e2 sbs2) =
+    eq opt s1 s2 && eq opt ss1 ss2 && eq opt e1 e2 && eq opt sbs1 sbs2
   eq opt (Do s1 stmt1 e1) (Do s2 stmt2 e2) =
     eq opt s1 s2 && eq opt stmt1 stmt2 && eq opt e1 e2
   eq opt (Break s1 mi1) (Break s2 mi2) =
     eq opt s1 s2 && eq opt mi1 mi2
-  eq opt (Continue mi1) (Continue mi2) =
-    eq opt mi1 mi2
+  eq opt (Continue s1 mi1) (Continue s2 mi2) =
+    eq opt s1 s2 && eq opt mi1 mi2
   eq opt (Return s1 me1) (Return s2 me2) =
     eq opt s1 s2 && eq opt me1 me2
-  eq opt (Synchronized e1 b1) (Synchronized e2 b2) =
-    eq opt e1 e2 && eq opt b1 b2
-  eq opt (Throw e1) (Throw e2) =
-    eq opt e1 e2
+  eq opt (Synchronized s1 e1 b1) (Synchronized s2 e2 b2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt b1 b2
+  eq opt (Throw s1 e1) (Throw s2 e2) =
+    eq opt s1 s2 && eq opt e1 e2
   eq opt (Try s1 trs1 b1 cs1 mb1) (Try s2 trs2 b2 cs2 mb2) =
     eq opt s1 s2 && eq opt trs1 trs2 && eq opt b1 b2 && eq opt cs1 cs2 && eq opt mb1 mb2
-  eq opt (Labeled i1 stmt1) (Labeled i2 stmt2) =
-    eq opt i1 i2 && eq opt stmt1 stmt2
+  eq opt (Labeled s1 i1 stmt1) (Labeled s2 i2 stmt2) =
+    eq opt s1 s2 && eq opt i1 i2 && eq opt stmt1 stmt2
   eq _ _ _ = False
 
-instance ShowExtension p => Located (Stmt p) where
+instance Located (Stmt p) where
+  sourceSpan (StmtBlock b) = sourceSpan b
   sourceSpan (IfThen s _ _) = s
   sourceSpan (IfThenElse s _ _ _) = s
   sourceSpan (While s _ _) = s
   sourceSpan (BasicFor s _ _ _ _) = s
   sourceSpan (EnhancedFor s _ _ _ _ _) = s
+  sourceSpan (Empty s) = s
   sourceSpan (ExpStmt s _) = s
+  sourceSpan (Assert s _ _) = s
+  sourceSpan (Switch s _ _ _) = s
   sourceSpan (Do s _ _) = s
   sourceSpan (Break s _) = s
+  sourceSpan (Continue s _) = s
   sourceSpan (Return s _) = s
+  sourceSpan (Synchronized s _ _) = s
+  sourceSpan (Throw s _) = s
   sourceSpan (Try s _ _ _ _) = s
-  sourceSpan stmt = error ("No SourceSpan implemented for statement: " ++ show stmt)
+  sourceSpan (Labeled s _ _) = s
 
 -- | If a value is thrown and the try statement has one or more catch clauses that can catch it, then control will be
 --   transferred to the first such catch clause.

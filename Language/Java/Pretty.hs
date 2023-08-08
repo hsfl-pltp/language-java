@@ -240,7 +240,7 @@ instance PrettyExtension p => Pretty (ElementValue p) where
 -- Statements
 
 instance PrettyExtension p => Pretty (Block p) where
-  prettyPrec p (Block stmts) = braceBlock $ map (prettyPrec p) stmts
+  prettyPrec p (Block _ stmts) = braceBlock $ map (prettyPrec p) stmts
 
 instance PrettyExtension p => Pretty (BlockStmt p) where
   prettyPrec p (BlockStmt stmt) = prettyPrec p stmt
@@ -283,13 +283,13 @@ instance PrettyExtension p => Pretty (Stmt p) where
             ],
         prettyPrec p stmt
       ]
-  prettyPrec _ Empty = semi
+  prettyPrec _ (Empty _) = semi
   prettyPrec p (ExpStmt _ e) = prettyPrec p e <> semi
-  prettyPrec p (Assert ass mE) =
+  prettyPrec p (Assert _ ass mE) =
     text "assert"
       <+> prettyPrec p ass
       <+> maybe empty ((colon <>) . prettyPrec p) mE <> semi
-  prettyPrec p (Switch _style e sBlocks) =
+  prettyPrec p (Switch _ _style e sBlocks) =
     text "switch"
       <+> parens (prettyPrec p e)
       $$ braceBlock (map (prettyPrec p) sBlocks)
@@ -297,13 +297,13 @@ instance PrettyExtension p => Pretty (Stmt p) where
     text "do" $+$ prettyPrec p stmt <+> text "while" <+> parens (prettyPrec p e) <> semi
   prettyPrec p (Break _ mIdent) =
     text "break" <+> maybePP p mIdent <> semi
-  prettyPrec p (Continue mIdent) =
+  prettyPrec p (Continue _ mIdent) =
     text "continue" <+> maybePP p mIdent <> semi
   prettyPrec p (Return _ mE) =
     text "return" <+> maybePP p mE <> semi
-  prettyPrec p (Synchronized e block) =
+  prettyPrec p (Synchronized _ e block) =
     text "synchronized" <+> parens (prettyPrec p e) $$ prettyPrec p block
-  prettyPrec p (Throw e) =
+  prettyPrec p (Throw _ e) =
     text "throw" <+> prettyPrec p e <> semi
   prettyPrec p (Try _ _resources block catches mFinally) =
     -- FIXME: do not ignore resources
@@ -313,7 +313,7 @@ instance PrettyExtension p => Pretty (Stmt p) where
     where
       ppFinally Nothing = empty
       ppFinally (Just bl) = text "finally" <+> prettyPrec p bl
-  prettyPrec p (Labeled ident stmt) =
+  prettyPrec p (Labeled _ ident stmt) =
     prettyPrec p ident <> colon <+> prettyPrec p stmt
 
 instance PrettyExtension p => Pretty (Catch p) where

@@ -608,14 +608,18 @@ arrayInit = braces $ do
 
 block :: P (Block Parsed, Location)
 block = do
+  startLoc <- getLocation
   state <- getState
   case ps_mode state of
-    ParseFull -> braces $ Block <$> list (noLoc blockStmt)
-    ParseShallow -> shallowP
+    -- ParseFull -> braces $ Block <$> list (noLoc blockStmt)
+    ParseFull -> do
+      (bs, loc) <- braces (list (noLoc blockStmt))
+      return (Block (startLoc, loc) bs, loc)
+    ParseShallow -> shallowP startLoc
   where
-    shallowP = do
+    shallowP start = do
       loc <- parseNestedCurly (-1)
-      return (Block [], loc)
+      return (Block (start, loc) [], loc)
 
 -- | Parses anything between properly balance curly brackets.
 -- level must initially be -1
@@ -697,10 +701,11 @@ stmt = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
       (s, endLoc) <- stmt
       return (f endLoc s, endLoc)
     labeledStmt = try $ do
+      startLoc <- getLocation
       lbl <- noLoc ident
       colon
       (s, endLoc) <- stmt
-      return (Labeled lbl s, endLoc)
+      return (Labeled (startLoc, endLoc) lbl s, endLoc)
 
 stmtNSI :: P (Stmt Parsed, Location)
 stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
@@ -745,34 +750,41 @@ stmtNSI = ifStmt <|> whileStmt <|> forStmt <|> labeledStmt <|> stmtNoTrail
       (s, endLoc) <- stmtNSI
       return (f endLoc s, endLoc)
     labeledStmt = try $ do
+      startLoc <- getLocation
       i <- noLoc ident
       colon
       (s, endLoc) <- stmtNSI
-      return (Labeled i s, endLoc)
+      return (Labeled (startLoc, endLoc) i s, endLoc)
 
 stmtNoTrail :: P (Stmt Parsed, Location)
 stmtNoTrail =
   -- empty statement
-  attrTok SemiColon Empty
+  ( do
+      startLoc <- getLocation
+      (_, loc) <- tokWithEndLoc SemiColon
+      return (Empty (startLoc, loc), loc)
+  )
     <|>
     -- inner block
     mapFst StmtBlock <$> block
     <|>
     -- assertions
-    endSemi
-      ( do
-          tok KW_Assert
-          e <- noLoc exp
-          me2 <- opt $ colon >> noLoc exp
-          return (Assert e me2)
-      )
+    ( do
+        startLoc <- getLocation
+        tok KW_Assert
+        e <- noLoc exp
+        me2 <- opt $ colon >> noLoc exp
+        (_, loc) <- tokWithEndLoc SemiColon
+        return (Assert (startLoc, loc) e me2, loc)
+    )
     <|>
     -- switch stmts
     ( do
+        startLoc <- getLocation
         tok KW_Switch
         e <- noLoc $ parens (noLoc exp)
         ((style, sb), endLoc) <- switchBlock
-        return (Switch style e sb, endLoc)
+        return (Switch (startLoc, endLoc) style e sb, endLoc)
     )
     <|>
     -- do-while loops
@@ -796,12 +808,13 @@ stmtNoTrail =
     )
     <|>
     -- continue
-    endSemi
-      ( do
-          tok KW_Continue
-          mi <- opt (noLoc ident)
-          return $ Continue mi
-      )
+    ( do
+        startLoc <- getLocation
+        tok KW_Continue
+        mi <- opt (noLoc ident)
+        (_, loc) <- tokWithEndLoc SemiColon
+        return (Continue (startLoc, loc) mi, loc)
+    )
     <|>
     -- return
     ( do
@@ -814,19 +827,21 @@ stmtNoTrail =
     <|>
     -- synchronized
     ( do
+        startLoc <- getLocation
         tok KW_Synchronized
         e <- noLoc $ parens (noLoc exp)
         (b, endLoc) <- block
-        return (Synchronized e b, endLoc)
+        return (Synchronized (startLoc, endLoc) e b, endLoc)
     )
     <|>
     -- throw
-    endSemi
-      ( do
-          tok KW_Throw
-          e <- noLoc exp
-          return $ Throw e
-      )
+    ( do
+        startLoc <- getLocation
+        tok KW_Throw
+        e <- noLoc exp
+        (_, loc) <- tokWithEndLoc SemiColon
+        return (Throw (startLoc, loc) e, loc)
+    )
     <|>
     -- try-catch, both with and without a finally clause
     ( do

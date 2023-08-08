@@ -151,7 +151,7 @@ instance AnalyzedTransformer Catch where
       (transformToAnalyzed (IdentCollection.addToFormalParams [FormalParam.ident formalParam] scope) block)
 
 instance AnalyzedTransformer Block where
-  transformToAnalyzed scope (Block blockstmts) = Block (transformBlockStmtsToAnalyzed scope blockstmts)
+  transformToAnalyzed scope (Block srcspan blockstmts) = Block srcspan (transformBlockStmtsToAnalyzed scope blockstmts)
 
 transformBlockStmtsToAnalyzed :: IdentCollection -> [BlockStmt Parsed] -> [BlockStmt Analyzed]
 transformBlockStmtsToAnalyzed _ [] = []
@@ -186,16 +186,16 @@ instance AnalyzedTransformer Stmt where
       idnt
       (transformToAnalyzed scope expr)
       (transformToAnalyzed (IdentCollection.addToLocalVars [idnt] scope) stmt)
-  transformToAnalyzed _ Empty = Empty
+  transformToAnalyzed _ (Empty srcspan) = Empty srcspan
   transformToAnalyzed scope (ExpStmt srcspan expr) = ExpStmt srcspan (transformToAnalyzed scope expr)
-  transformToAnalyzed scope (Assert expr mbExp) = Assert (transformToAnalyzed scope expr) (fmap (transformToAnalyzed scope) mbExp)
-  transformToAnalyzed scope (Switch switchStyle expr switchBlocks) = Switch switchStyle (transformToAnalyzed scope expr) (map (transformToAnalyzed scope) switchBlocks)
+  transformToAnalyzed scope (Assert srcspan expr mbExp) = Assert srcspan (transformToAnalyzed scope expr) (fmap (transformToAnalyzed scope) mbExp)
+  transformToAnalyzed scope (Switch srcspan switchStyle expr switchBlocks) = Switch srcspan switchStyle (transformToAnalyzed scope expr) (map (transformToAnalyzed scope) switchBlocks)
   transformToAnalyzed scope (Do srcspan expr stmt) = Do srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope stmt)
   transformToAnalyzed _ (Break srcspan mbIdent) = Break srcspan mbIdent
-  transformToAnalyzed _ (Continue mbIdent) = Continue mbIdent
+  transformToAnalyzed _ (Continue srcspan mbIdent) = Continue srcspan mbIdent
   transformToAnalyzed scope (Return srcspan mbExp) = Return srcspan (fmap (transformToAnalyzed scope) mbExp)
-  transformToAnalyzed scope (Synchronized expr block) = Synchronized (transformToAnalyzed scope expr) (transformToAnalyzed scope block)
-  transformToAnalyzed scope (Throw expr) = Throw (transformToAnalyzed scope expr)
+  transformToAnalyzed scope (Synchronized srcspan expr block) = Synchronized srcspan (transformToAnalyzed scope expr) (transformToAnalyzed scope block)
+  transformToAnalyzed scope (Throw srcspan expr) = Throw srcspan (transformToAnalyzed scope expr)
   transformToAnalyzed scope (Try srcspan tryResources block catches mbBlock) =
     Try
       srcspan
@@ -203,7 +203,7 @@ instance AnalyzedTransformer Stmt where
       (transformToAnalyzed (IdentCollection.addToLocalVars (mapMaybe TryResource.resourceDeclIdent tryResources) scope) block)
       (map (transformToAnalyzed scope) catches)
       (fmap (transformToAnalyzed scope) mbBlock)
-  transformToAnalyzed scope (Labeled idnt stmt) = Labeled idnt (transformToAnalyzed scope stmt)
+  transformToAnalyzed scope (Labeled srcspan idnt stmt) = Labeled srcspan idnt (transformToAnalyzed scope stmt)
 
 -- boiler plate cases
 
