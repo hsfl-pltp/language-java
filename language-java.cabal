@@ -38,22 +38,25 @@ Library
                         Language.Java.Parser,
                         Language.Java.Pretty,
                         Language.Java.SourceSpan,
-                        Language.Java.Transformer
+                        Language.Java.Transformer,
+                        Language.Java.Syntax.ClassDecl
+                        Language.Java.Syntax.Decl
+                        Language.Java.Syntax.FormalParam
+                        Language.Java.Syntax.MemberDecl
+                        Language.Java.Syntax.ResourceDecl
+                        Language.Java.Syntax.TryResource
+                        Language.Java.Syntax.TypeDecl
+                        Language.Java.Syntax.VarDecl
+                        Language.Java.Syntax.VarDeclId
+                        Language.Java.Syntax.Ident
+                        Language.Java.Syntax.Modifier
   
   Other-modules:	      Language.Java.Syntax.Types,
                         Language.Java.Syntax.Exp,
                         Language.Java.Syntax.Equality
                         Language.Java.Syntax.IdentCollection
                         Language.Java.Syntax.ClassInfo
-                        Language.Java.Syntax.Decl
-                        Language.Java.Syntax.MemberDecl
-                        Language.Java.Syntax.VarDecl
-                        Language.Java.Syntax.VarDeclId
-                        Language.Java.Syntax.TypeDecl
-                        Language.Java.Syntax.ClassDecl
-                        Language.Java.Syntax.FormalParam
-                        Language.Java.Syntax.ResourceDecl
-                        Language.Java.Syntax.TryResource
+
 
 Test-Suite test-java-parse
   type:              exitcode-stdio-1.0
