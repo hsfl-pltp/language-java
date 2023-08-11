@@ -11,12 +11,12 @@ module Language.Java.Syntax.IdentCollection
   )
 where
 
-import Language.Java.Syntax.ClassInfo (ClassInfo)
-import Language.Java.Syntax.Equality
+import Language.Java.Equality
   ( EqOptions (IgnoreSourceSpan),
     Equality (eq),
   )
-import Language.Java.Syntax.Types (Ident)
+import Language.Java.Syntax (Ident)
+import Language.Java.Syntax.ClassInfo (ClassInfo)
 
 -- | data type used to collect the identifiers that are currently in scope
 data IdentCollection = IdentCollection

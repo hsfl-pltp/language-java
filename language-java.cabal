@@ -50,10 +50,9 @@ Library
                         Language.Java.Syntax.VarDeclId
                         Language.Java.Syntax.Ident
                         Language.Java.Syntax.Modifier
+                        Language.Java.Syntax.ClassifiedName
   
-  Other-modules:	      Language.Java.Syntax.Types,
-                        Language.Java.Syntax.Exp,
-                        Language.Java.Syntax.Equality
+  Other-modules:	      Language.Java.Equality
                         Language.Java.Syntax.IdentCollection
                         Language.Java.Syntax.ClassInfo
 

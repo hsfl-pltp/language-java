@@ -1,4 +1,4 @@
-module Language.Java.Syntax.Equality where
+module Language.Java.Equality where
 
 import Data.List.NonEmpty (NonEmpty ((:|)))
 
