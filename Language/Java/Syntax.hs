@@ -3,7 +3,6 @@
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -31,8 +30,6 @@ module Language.Java.Syntax
     ExplConstrInv (..),
     Modifier (..),
     Annotation (..),
-    -- desugarAnnotation,
-    -- desugarAnnotation',
     ElementValue (..),
     Block (..),
     BlockStmt (..),
@@ -57,9 +54,22 @@ module Language.Java.Syntax
     ArrayInit (..),
     MethodInvocation (..),
     MethodRefTarget (..),
-    module Language.Java.Syntax.Exp,
-    module Language.Java.Syntax.Types,
-    module Language.Java.Syntax.Equality,
+    Type (..),
+    RefType (..),
+    ClassType (..),
+    TypeArgument (..),
+    TypeDeclSpecifier (..),
+    Diamond (..),
+    WildcardBound (..),
+    PrimType (..),
+    Literal (..),
+    TypeParam (..),
+    Ident (..),
+    Name (..),
+    ClassifiedName (..),
+    Op (..),
+    AssignOp (..),
+    module Language.Java.Equality,
     Parsed,
     Analyzed,
     XNameClassification,
@@ -69,10 +79,8 @@ where
 import Data.Data
 import Data.List.NonEmpty (NonEmpty)
 import GHC.Generics (Generic)
+import Language.Java.Equality
 import Language.Java.SourceSpan
-import Language.Java.Syntax.Equality
-import Language.Java.Syntax.Exp
-import Language.Java.Syntax.Types
 
 -----------------------------------------------------------------------
 -- AST types
@@ -1307,4 +1315,291 @@ instance Equality MethodRefTarget where
   eq opt (MethodRefIdent i1) (MethodRefIdent i2) =
     eq opt i1 i2
   eq _ MethodRefConstructor MethodRefConstructor = True
+  eq _ _ _ = False
+
+------------------------------------------------
+-- Types
+
+-- | There are two kinds of types in the Java programming language: primitive types and reference types.
+data Type
+  = PrimType PrimType
+  | RefType RefType
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality Type where
+  eq opt (PrimType pt1) (PrimType pt2) =
+    eq opt pt1 pt2
+  eq opt (RefType rt1) (RefType rt2) =
+    eq opt rt1 rt2
+  eq _ _ _ = False
+
+-- | There are three kinds of reference types: class types, interface types, and array types.
+--   Reference types may be parameterized with type arguments.
+--   Type variables cannot be syntactically distinguished from class type identifiers,
+--   and are thus represented uniformly as single ident class types.
+data RefType
+  = ClassRefType ClassType
+  | -- | TypeVariable Ident
+    ArrayType Type
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality RefType where
+  eq opt (ClassRefType ct1) (ClassRefType ct2) =
+    eq opt ct1 ct2
+  eq opt (ArrayType t1) (ArrayType t2) =
+    eq opt t1 t2
+  eq _ _ _ = False
+
+-- | A class or interface type consists of a type declaration specifier,
+--   optionally followed by type arguments (in which case it is a parameterized type).
+newtype ClassType
+  = ClassType (NonEmpty (Ident, [TypeArgument]))
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality ClassType where
+  eq opt (ClassType ctss1) (ClassType ctss2) =
+    eq opt ctss1 ctss2
+
+-- | Type arguments may be either reference types or wildcards.
+data TypeArgument
+  = Wildcard (Maybe WildcardBound)
+  | ActualType RefType
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality TypeArgument where
+  eq opt (Wildcard mwb1) (Wildcard mwb2) =
+    eq opt mwb1 mwb2
+  eq opt (ActualType rt1) (ActualType rt2) =
+    eq opt rt1 rt2
+  eq _ _ _ = False
+
+data TypeDeclSpecifier
+  = TypeDeclSpecifier ClassType
+  | TypeDeclSpecifierWithDiamond ClassType Ident Diamond
+  | TypeDeclSpecifierUnqualifiedWithDiamond Ident Diamond
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality TypeDeclSpecifier where
+  eq opt (TypeDeclSpecifier ct1) (TypeDeclSpecifier ct2) =
+    eq opt ct1 ct2
+  eq opt (TypeDeclSpecifierWithDiamond ct1 i1 d1) (TypeDeclSpecifierWithDiamond ct2 i2 d2) =
+    eq opt ct1 ct2 && eq opt i1 i2 && eq opt d1 d2
+  eq opt (TypeDeclSpecifierUnqualifiedWithDiamond i1 d1) (TypeDeclSpecifierUnqualifiedWithDiamond i2 d2) =
+    eq opt i1 i2 && eq opt d1 d2
+  eq _ _ _ = False
+
+data Diamond = Diamond
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality Diamond where
+  eq _ _ _ = True
+
+-- | Wildcards may be given explicit bounds, either upper (@extends@) or lower (@super@) bounds.
+data WildcardBound
+  = ExtendsBound RefType
+  | SuperBound RefType
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality WildcardBound where
+  eq opt (ExtendsBound rt1) (ExtendsBound rt2) =
+    eq opt rt1 rt2
+  eq opt (SuperBound rt1) (SuperBound rt2) =
+    eq opt rt1 rt2
+  eq _ _ _ = False
+
+-- | A primitive type is predefined by the Java programming language and named by its reserved keyword.
+data PrimType
+  = BooleanT
+  | ByteT
+  | ShortT
+  | IntT
+  | LongT
+  | CharT
+  | FloatT
+  | DoubleT
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality PrimType where
+  eq _ BooleanT BooleanT = True
+  eq _ ByteT ByteT = True
+  eq _ ShortT ShortT = True
+  eq _ IntT IntT = True
+  eq _ LongT LongT = True
+  eq _ CharT CharT = True
+  eq _ FloatT FloatT = True
+  eq _ DoubleT DoubleT = True
+  eq _ _ _ = False
+
+-- | A literal denotes a fixed, unchanging value.
+data Literal
+  = Int SourceSpan Integer
+  | Word SourceSpan Integer
+  | Float SourceSpan Double
+  | Double SourceSpan Double
+  | Boolean SourceSpan Bool
+  | Char SourceSpan Char
+  | String SourceSpan String
+  | Null SourceSpan
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality Literal where
+  eq opt (Int s1 n1) (Int s2 n2) =
+    eq opt s1 s2 && n1 == n2
+  eq opt (Word s1 n1) (Word s2 n2) =
+    eq opt s1 s2 && n1 == n2
+  eq opt (Float s1 x1) (Float s2 x2) =
+    eq opt s1 s2 && x1 == x2
+  eq opt (Double s1 x1) (Double s2 x2) =
+    eq opt s1 s2 && x1 == x2
+  eq opt (Boolean s1 b1) (Boolean s2 b2) =
+    eq opt s1 s2 && b1 == b2
+  eq opt (Char s1 c1) (Char s2 c2) =
+    eq opt s1 s2 && c1 == c2
+  eq opt (String s1 str1) (String s2 str2) =
+    eq opt s1 s2 && str1 == str2
+  eq opt (Null s1) (Null s2) =
+    eq opt s1 s2
+  eq _ _ _ = False
+
+instance Located Literal where
+  sourceSpan (Int s _) = s
+  sourceSpan (Word s _) = s
+  sourceSpan (Float s _) = s
+  sourceSpan (Double s _) = s
+  sourceSpan (Boolean s _) = s
+  sourceSpan (Char s _) = s
+  sourceSpan (String s _) = s
+  sourceSpan (Null s) = s
+
+-- | A class is generic if it declares one or more type variables. These type variables are known
+--   as the type parameters of the class.
+data TypeParam = TypeParam Ident [RefType]
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality TypeParam where
+  eq opt (TypeParam i1 rts1) (TypeParam i2 rts2) =
+    eq opt i1 i2 && eq opt rts1 rts2
+
+-----------------------------------------------------------------------
+-- Names and identifiers
+
+-- | A single identifier.
+data Ident = Ident SourceSpan String
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality Ident where
+  eq opt (Ident s1 str1) (Ident s2 str2) =
+    eq opt s1 s2 && str1 == str2
+
+instance Located Ident where
+  sourceSpan (Ident s _) = s
+
+-- | A name, i.e. a period-separated list of identifiers.
+data Name = Name SourceSpan (NonEmpty Ident)
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality Name where
+  eq opt (Name s1 ids1) (Name s2 ids2) =
+    eq opt s1 s2 && eq opt ids1 ids2
+
+instance Located Name where
+  sourceSpan (Name s _) = s
+
+data ClassifiedName
+  = ExpressionName Name
+  | TypeName Name
+  | Unknown Name
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality ClassifiedName where
+  eq opt (ExpressionName n1) (ExpressionName n2) =
+    eq opt n1 n2
+  eq opt (TypeName n1) (TypeName n2) =
+    eq opt n1 n2
+  eq opt (Unknown n1) (Unknown n2) =
+    eq opt n1 n2
+  eq _ _ _ = False
+
+instance Located ClassifiedName where
+  sourceSpan (ExpressionName n) = sourceSpan n
+  sourceSpan (TypeName n) = sourceSpan n
+  sourceSpan (Unknown n) = sourceSpan n
+
+----------------------------------------
+-- Operators
+
+-- | A binary infix operator.
+data Op
+  = Mult
+  | Div
+  | Rem
+  | Add
+  | Sub
+  | LShift
+  | RShift
+  | RRShift
+  | LThan
+  | GThan
+  | LThanE
+  | GThanE
+  | Equal
+  | NotEq
+  | And
+  | Or
+  | Xor
+  | CAnd
+  | COr
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality Op where
+  eq _ Mult Mult = True
+  eq _ Div Div = True
+  eq _ Rem Rem = True
+  eq _ Add Add = True
+  eq _ Sub Sub = True
+  eq _ LShift LShift = True
+  eq _ RShift RShift = True
+  eq _ RRShift RRShift = True
+  eq _ LThan LThan = True
+  eq _ GThan GThan = True
+  eq _ LThanE LThanE = True
+  eq _ GThanE GThanE = True
+  eq _ Equal Equal = True
+  eq _ NotEq NotEq = True
+  eq _ And And = True
+  eq _ Or Or = True
+  eq _ Xor Xor = True
+  eq _ CAnd CAnd = True
+  eq _ COr COr = True
+  eq _ _ _ = False
+
+-- | An assignment operator.
+data AssignOp
+  = EqualA
+  | MultA
+  | DivA
+  | RemA
+  | AddA
+  | SubA
+  | LShiftA
+  | RShiftA
+  | RRShiftA
+  | AndA
+  | XorA
+  | OrA
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality AssignOp where
+  eq _ EqualA EqualA = True
+  eq _ MultA MultA = True
+  eq _ DivA DivA = True
+  eq _ RemA RemA = True
+  eq _ AddA AddA = True
+  eq _ SubA SubA = True
+  eq _ LShiftA LShiftA = True
+  eq _ RShiftA RShiftA = True
+  eq _ RRShiftA RRShiftA = True
+  eq _ AndA AndA = True
+  eq _ XorA XorA = True
+  eq _ OrA OrA = True
   eq _ _ _ = False

@@ -39,10 +39,9 @@ Library
                         Language.Java.Pretty,
                         Language.Java.SourceSpan,
                         Language.Java.Transformer
+                        Language.Java.Syntax.ClassifiedName
   
-  Other-modules:	      Language.Java.Syntax.Types,
-                        Language.Java.Syntax.Exp,
-                        Language.Java.Syntax.Equality
+  Other-modules:	      Language.Java.Equality
                         Language.Java.Syntax.IdentCollection
                         Language.Java.Syntax.ClassInfo
                         Language.Java.Syntax.Decl
