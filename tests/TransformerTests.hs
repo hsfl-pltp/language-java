@@ -2,9 +2,10 @@ module TransformerTests where
 
 import Data.Generics.Uniplate.Data (universeBi)
 import Data.List (intercalate)
-import Language.Java.Transformer
 import Language.Java.Parser
-import Language.Java.Syntax (ClassifiedName (..), isExpressionName, isTypeName, isUnknownName)
+import Language.Java.Syntax (ClassifiedName (..))
+import qualified Language.Java.Syntax.ClassifiedName as ClassfiedName
+import Language.Java.Transformer
 import System.FilePath ((</>))
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit
@@ -23,9 +24,9 @@ unknownFile = basepath </> "Unknown.java"
 
 allTransformerTests :: [TestTree]
 allTransformerTests =
-  [ createTestTree "ExpressionName" expressionFile (not . isExpressionName),
-    createTestTree "TypeName" typeNameFile (not . isTypeName),
-    createTestTree "Unknown" unknownFile (not . isUnknownName)
+  [ createTestTree "ExpressionName" expressionFile (not . ClassfiedName.isExpressionName),
+    createTestTree "TypeName" typeNameFile (not . ClassfiedName.isTypeName),
+    createTestTree "Unknown" unknownFile (not . ClassfiedName.isUnknownName)
   ]
 
 createTestTree :: String -> FilePath -> (ClassifiedName -> Bool) -> TestTree

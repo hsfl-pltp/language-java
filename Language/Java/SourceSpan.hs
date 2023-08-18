@@ -14,7 +14,7 @@ where
 
 import Data.Data
 import GHC.Generics (Generic)
-import Language.Java.Syntax.Equality (EqOptions (..), Equality (..))
+import Language.Java.Equality (EqOptions (..), Equality (..))
 
 type SourceSpan = (Location, Location)
 
