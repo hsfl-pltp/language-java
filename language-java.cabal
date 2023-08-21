@@ -39,19 +39,23 @@ Library
                         Language.Java.Pretty,
                         Language.Java.SourceSpan,
                         Language.Java.Transformer,
+                        Language.Java.Syntax.BlockStmt
                         Language.Java.Syntax.ClassDecl
+                        Language.Java.Syntax.ClassifiedName
                         Language.Java.Syntax.Decl
+                        Language.Java.Syntax.Exp
                         Language.Java.Syntax.FormalParam
+                        Language.Java.Syntax.Ident
                         Language.Java.Syntax.MemberDecl
+                        Language.Java.Syntax.Modifier
                         Language.Java.Syntax.ResourceDecl
+                        Language.Java.Syntax.Stmt
                         Language.Java.Syntax.TryResource
                         Language.Java.Syntax.TypeDecl
                         Language.Java.Syntax.VarDecl
                         Language.Java.Syntax.VarDeclId
-                        Language.Java.Syntax.Ident
-                        Language.Java.Syntax.Modifier
-                        Language.Java.Syntax.ClassifiedName
-  
+                        Language.Java.Syntax.VarInit
+ 
   Other-modules:	      Language.Java.Equality
                         Language.Java.Syntax.IdentCollection
                         Language.Java.Syntax.ClassInfo
