@@ -55,6 +55,7 @@ Library
                         Language.Java.Syntax.VarDecl
                         Language.Java.Syntax.VarDeclId
                         Language.Java.Syntax.VarInit
+                        Language.Java.Syntax.Literal
  
   Other-modules:	      Language.Java.Equality
                         Language.Java.Syntax.IdentCollection
