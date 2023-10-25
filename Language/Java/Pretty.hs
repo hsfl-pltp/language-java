@@ -32,7 +32,7 @@ class Pretty a where
   prettyPrec :: Int -> a -> Doc
   prettyPrec _ = pretty
 
-class Pretty (XNameClassification x) => PrettyExtension x
+class (Pretty (XNameClassification x), Pretty (XFieldClassification x)) => PrettyExtension x
 
 instance PrettyExtension Parsed
 
@@ -492,12 +492,22 @@ instance PrettyExtension p => Pretty (Lhs p) where
 instance PrettyExtension p => Pretty (ArrayIndex p) where
   prettyPrec p (ArrayIndex _ ref e) = prettyPrec p ref <> hcat (map (brackets . prettyPrec p) (NonEmpty.toList e))
 
-instance PrettyExtension p => Pretty (FieldAccess p) where
+instance Pretty FieldAccess where
   prettyPrec p (PrimaryFieldAccess _ e ident) =
     prettyPrec p e <> char '.' <> prettyPrec p ident
   prettyPrec p (SuperFieldAccess _ ident) =
     text "super." <> prettyPrec p ident
   prettyPrec p (ClassFieldAccess _ name ident) =
+    prettyPrec p name <> text "." <> prettyPrec p ident
+
+instance Pretty ClassifiedFieldAccess where
+  prettyPrec p (ClassifiedFieldAccess _ ident) =
+    prettyPrec p ident
+  prettyPrec p (ClassifiedPrimaryFieldAccess _ e ident) =
+    prettyPrec p e <> char '.' <> prettyPrec p ident
+  prettyPrec p (ClassifiedSuperFieldAccess _ ident) =
+    text "super." <> prettyPrec p ident
+  prettyPrec p (ClassifiedClassFieldAccess _ name ident) =
     prettyPrec p name <> text "." <> prettyPrec p ident
 
 instance PrettyExtension p => Pretty (MethodInvocation p) where

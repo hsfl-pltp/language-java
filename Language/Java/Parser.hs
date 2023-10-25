@@ -1265,7 +1265,7 @@ instanceCreation =
         return $ QualInstanceCreation p tas i as mcb)
 -}
 
-fieldAccessNPS :: P (FieldAccess Parsed, Location)
+fieldAccessNPS :: P (FieldAccess, Location)
 fieldAccessNPS = do
   startLoc <- getLocation
   ( do
@@ -1280,14 +1280,14 @@ fieldAccessNPS = do
             return (ClassFieldAccess (startLoc, loc) n i, loc)
         )
 
-fieldAccessSuffix :: P (Exp Parsed -> FieldAccess Parsed, Location)
+fieldAccessSuffix :: P (Exp Parsed -> FieldAccess, Location)
 fieldAccessSuffix = do
   startLoc <- getLocation
   period
   (i, loc) <- ident
   return (\p -> PrimaryFieldAccess (startLoc, loc) p i, loc)
 
-fieldAccess :: P (FieldAccess Parsed)
+fieldAccess :: P (FieldAccess)
 fieldAccess =
   try (noLoc fieldAccessNPS)
     <|> do
@@ -1753,8 +1753,8 @@ seplist1 p sep =
     try
       ( do
           _ <- sep
-          as <- seplist1 p sep
-          return (a <| fst as, loc)
+          (as, l) <- seplist1 p sep
+          return (a <| as, l)
       )
       <|> return (a :| [], loc)
 

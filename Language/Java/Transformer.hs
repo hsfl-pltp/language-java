@@ -30,8 +30,8 @@ import qualified Language.Java.Syntax.VarDecl as VarDecl
 transformCompilationUnitToAnalyzed :: CompilationUnit Parsed -> CompilationUnit Analyzed
 transformCompilationUnitToAnalyzed = transformToAnalyzed IdentCollection.empty
 
-classifyName :: NonEmpty Ident -> IdentCollection -> Name -> ClassifiedName
-classifyName (idnt :| rest) ic name
+classifyName :: Name -> IdentCollection -> ClassifiedName
+classifyName name@(Name _ (idnt :| rest)) ic
   | IdentCollection.isExpressionIdent idnt ic = ExpressionName name
   | IdentCollection.isImportedClass idnt ic = case rest of
       [] -> TypeName name
@@ -50,7 +50,7 @@ class AnalyzedTransformer a where
 
 instance AnalyzedTransformer MethodInvocation where
   transformToAnalyzed scope (MethodCall srcspan Nothing idnt args) = MethodCall srcspan Nothing idnt (map (transformToAnalyzed scope) args)
-  transformToAnalyzed scope (MethodCall srcspan (Just name@(Name _ idents)) idnt args) = MethodCall srcspan (Just (classifyName idents scope name)) idnt (map (transformToAnalyzed scope) args)
+  transformToAnalyzed scope (MethodCall srcspan (Just name) idnt args) = MethodCall srcspan (Just (classifyName name scope)) idnt (map (transformToAnalyzed scope) args)
   transformToAnalyzed scope (PrimaryMethodCall srcspan expr refTypes idnt args) = PrimaryMethodCall srcspan (transformToAnalyzed scope expr) refTypes idnt (map (transformToAnalyzed scope) args)
   transformToAnalyzed scope (SuperMethodCall srcspan refTypes idnt args) = SuperMethodCall srcspan refTypes idnt (map (transformToAnalyzed scope) args)
   transformToAnalyzed scope (ClassMethodCall srcspan name refTypes idnt args) = ClassMethodCall srcspan name refTypes idnt (map (transformToAnalyzed scope) args)
@@ -282,6 +282,11 @@ instance AnalyzedTransformer BlockStmt where
       type_
       (NonEmpty.map (transformToAnalyzed scope) varDecls)
 
+transformFieldAccess :: IdentCollection -> FieldAccess -> ClassifiedFieldAccess
+transformFieldAccess scope (PrimaryFieldAccess s e i) = ClassifiedPrimaryFieldAccess s (transformToAnalyzed scope e) i
+transformFieldAccess _ (SuperFieldAccess s i) = ClassifiedSuperFieldAccess s i
+transformFieldAccess _ (ClassFieldAccess s n i) = ClassifiedClassFieldAccess s n i
+
 instance AnalyzedTransformer Exp where
   transformToAnalyzed _ (Lit literal) = Lit literal
   transformToAnalyzed _ (ClassLit srcspan mbType) = ClassLit srcspan mbType
@@ -304,7 +309,7 @@ instance AnalyzedTransformer Exp where
       (fmap (transformToAnalyzed scope) mbClassBody)
   transformToAnalyzed scope (ArrayCreate srcspan type_ exps int) = ArrayCreate srcspan type_ (NonEmpty.map (transformToAnalyzed scope) exps) int
   transformToAnalyzed scope (ArrayCreateInit srcspan type_ int arrayInit) = ArrayCreateInit srcspan type_ int (transformToAnalyzed scope arrayInit)
-  transformToAnalyzed scope (FieldAccess fieldAccess) = FieldAccess (transformToAnalyzed scope fieldAccess)
+  transformToAnalyzed scope (FieldAccess fieldAccess) = FieldAccess (transformFieldAccess scope fieldAccess)
   transformToAnalyzed scope (MethodInv methodInv) = MethodInv (transformToAnalyzed scope methodInv)
   transformToAnalyzed scope (ArrayAccess arrayIndex) = ArrayAccess (transformToAnalyzed scope arrayIndex)
   transformToAnalyzed _ (ExpName name) = ExpName name
@@ -340,17 +345,12 @@ instance AnalyzedTransformer ConstructorBody where
 instance AnalyzedTransformer ArrayInit where
   transformToAnalyzed scope (ArrayInit srcspan varInits) = ArrayInit srcspan (map (transformToAnalyzed scope) varInits)
 
-instance AnalyzedTransformer FieldAccess where
-  transformToAnalyzed scope (PrimaryFieldAccess srcspan expr idnt) = PrimaryFieldAccess srcspan (transformToAnalyzed scope expr) idnt
-  transformToAnalyzed _ (SuperFieldAccess srcspan idnt) = SuperFieldAccess srcspan idnt
-  transformToAnalyzed _ (ClassFieldAccess srcspan name idnt) = ClassFieldAccess srcspan name idnt
-
 instance AnalyzedTransformer ArrayIndex where
   transformToAnalyzed scope (ArrayIndex srcspan expr exps) = ArrayIndex srcspan (transformToAnalyzed scope expr) (NonEmpty.map (transformToAnalyzed scope) exps)
 
 instance AnalyzedTransformer Lhs where
   transformToAnalyzed _ (NameLhs name) = NameLhs name
-  transformToAnalyzed scope (FieldLhs fieldAccess) = FieldLhs (transformToAnalyzed scope fieldAccess)
+  transformToAnalyzed scope (FieldLhs fieldAccess) = FieldLhs (transformFieldAccess scope fieldAccess)
   transformToAnalyzed scope (ArrayLhs arrayIndex) = ArrayLhs (transformToAnalyzed scope arrayIndex)
 
 instance AnalyzedTransformer LambdaParams where
@@ -388,7 +388,7 @@ instance AnalyzedTransformer SwitchBlock where
 instance AnalyzedTransformer TryResource where
   transformToAnalyzed scope (TryResourceVarDecl resourceDecl) = TryResourceVarDecl (transformToAnalyzed scope resourceDecl)
   transformToAnalyzed _ (TryResourceVarAccess idnt) = TryResourceVarAccess idnt
-  transformToAnalyzed scope (TryResourceQualAccess fieldAccess) = TryResourceQualAccess (transformToAnalyzed scope fieldAccess)
+  transformToAnalyzed scope (TryResourceQualAccess fieldAccess) = TryResourceQualAccess (transformFieldAccess scope fieldAccess)
 
 instance AnalyzedTransformer ResourceDecl where
   transformToAnalyzed scope (ResourceDecl modifiers type_ varDeclId varInit) = ResourceDecl (map (transformToAnalyzed scope) modifiers) type_ varDeclId (transformToAnalyzed scope varInit)

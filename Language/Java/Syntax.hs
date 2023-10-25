@@ -49,6 +49,7 @@ module Language.Java.Syntax
     Lhs (..),
     ArrayIndex (..),
     FieldAccess (..),
+    ClassifiedFieldAccess (..),
     LambdaParams (..),
     LambdaExpression (..),
     ArrayInit (..),
@@ -72,6 +73,7 @@ module Language.Java.Syntax
     module Language.Java.Equality,
     Parsed,
     Analyzed,
+    XFieldClassification,
     XNameClassification,
   )
 where
@@ -93,29 +95,35 @@ data Analyzed
 
 -- type family classes
 
-class Show (XNameClassification x) => ShowExtension x
+class (Show (XNameClassification x), Show (XFieldClassification x)) => ShowExtension x
 
 instance ShowExtension Parsed
 
 instance ShowExtension Analyzed
 
-class Read (XNameClassification x) => ReadExtension x
+class (Read (XNameClassification x), Read (XFieldClassification x)) => ReadExtension x
 
 instance ReadExtension Parsed
 
 instance ReadExtension Analyzed
 
-class (Data x, Data (XNameClassification x)) => DataExtension x
+class (Data x, Data (XNameClassification x), Data (XFieldClassification x)) => DataExtension x
 
 instance DataExtension Parsed
 
 instance DataExtension Analyzed
 
-class Equality (XNameClassification x) => EqualityExtension x
+class (Equality (XNameClassification x), Equality (XFieldClassification x)) => EqualityExtension x
 
 instance EqualityExtension Parsed
 
 instance EqualityExtension Analyzed
+
+class Located (XFieldClassification x) => LocatedExtension x
+
+instance LocatedExtension Parsed
+
+instance LocatedExtension Analyzed
 
 -----------------------------------------------------------------------
 -- Packages
@@ -430,7 +438,7 @@ instance EqualityExtension p => Equality (VarInit p) where
     eq opt ai1 ai2
   eq _ _ _ = False
 
-instance Located (VarInit p) where
+instance LocatedExtension p => Located (VarInit p) where
   sourceSpan (InitExp e) = sourceSpan e
   sourceSpan (InitArray ai) = sourceSpan ai
 
@@ -634,7 +642,7 @@ instance EqualityExtension p => Equality (ElementValue p) where
     eq opt a1 a2
   eq _ _ _ = False
 
-instance Located (ElementValue p) where
+instance LocatedExtension p => Located (ElementValue p) where
   sourceSpan (EVVal vi) = sourceSpan vi
   sourceSpan (EVAnn ann) = sourceSpan ann
 
@@ -819,7 +827,7 @@ instance EqualityExtension p => Equality (Catch p) where
 data TryResource p
   = TryResourceVarDecl (ResourceDecl p)
   | TryResourceVarAccess Ident
-  | TryResourceQualAccess (FieldAccess p)
+  | TryResourceQualAccess (XFieldClassification p)
   deriving (Typeable, Generic)
 
 deriving instance ShowExtension p => Show (TryResource p)
@@ -956,6 +964,10 @@ type ExceptionType = RefType -- restricted to ClassType or TypeVariable
 -- | Arguments to methods and constructors are expressions.
 type Argument p = Exp p
 
+type family XFieldClassification x where
+  XFieldClassification Analyzed = ClassifiedFieldAccess
+  XFieldClassification Parsed = FieldAccess
+
 -- | A Java expression.
 data Exp p
   = -- | A literal denotes a fixed, unchanging value.
@@ -983,7 +995,7 @@ data Exp p
     --   be given explicit lengths for any of its dimensions.
     ArrayCreateInit SourceSpan Type Int (ArrayInit p)
   | -- | A field access expression.
-    FieldAccess (FieldAccess p)
+    FieldAccess (XFieldClassification p)
   | -- | A method invocation expression.
     MethodInv (MethodInvocation p)
   | -- | An array access expression refers to a variable that is a component of an array.
@@ -1095,7 +1107,7 @@ instance EqualityExtension p => Equality (Exp p) where
     eq opt s1 s2 && eq opt e1 e2 && eq opt sebs1 sebs2
   eq _ _ _ = False
 
-instance Located (Exp p) where
+instance LocatedExtension p => Located (Exp p) where
   sourceSpan (Lit l) = sourceSpan l
   sourceSpan (ClassLit s _) = s
   sourceSpan (This s) = s
@@ -1132,7 +1144,7 @@ data Lhs p
   = -- | Assign to a variable
     NameLhs Name
   | -- | Assign through a field access
-    FieldLhs (FieldAccess p)
+    FieldLhs (XFieldClassification p)
   | -- | Assign to an array
     ArrayLhs (ArrayIndex p)
   deriving (Typeable, Generic)
@@ -1173,22 +1185,16 @@ instance Located (ArrayIndex p) where
 
 -- | A field access expression may access a field of an object or array, a reference to which is the value
 --   of either an expression or the special keyword super.
-data FieldAccess p
+data FieldAccess
   = -- | Accessing a field of an object or array computed from an expression.
-    PrimaryFieldAccess SourceSpan (Exp p) Ident
+    PrimaryFieldAccess SourceSpan (Exp Parsed) Ident
   | -- | Accessing a field of the superclass.
     SuperFieldAccess SourceSpan Ident
   | -- | Accessing a (static) field of a named class.
     ClassFieldAccess SourceSpan Name Ident
-  deriving (Typeable, Generic)
+  deriving (Typeable, Generic, Show, Read, Data)
 
-deriving instance ShowExtension p => Show (FieldAccess p)
-
-deriving instance ReadExtension p => Read (FieldAccess p)
-
-deriving instance DataExtension p => Data (FieldAccess p)
-
-instance EqualityExtension p => Equality (FieldAccess p) where
+instance Equality FieldAccess where
   eq opt (PrimaryFieldAccess s1 e1 i1) (PrimaryFieldAccess s2 e2 i2) =
     eq opt s1 s2 && eq opt e1 e2 && eq opt i1 i2
   eq opt (SuperFieldAccess s1 i1) (SuperFieldAccess s2 i2) =
@@ -1197,10 +1203,34 @@ instance EqualityExtension p => Equality (FieldAccess p) where
     eq opt s1 s2 && eq opt n1 n2 && eq opt i1 i2
   eq _ _ _ = False
 
-instance Located (FieldAccess p) where
+instance Located FieldAccess where
   sourceSpan (PrimaryFieldAccess s _ _) = s
   sourceSpan (SuperFieldAccess s _) = s
   sourceSpan (ClassFieldAccess s _ _) = s
+
+data ClassifiedFieldAccess
+  = ClassifiedFieldAccess SourceSpan Ident
+  | ClassifiedPrimaryFieldAccess SourceSpan (Exp Analyzed) Ident
+  | ClassifiedSuperFieldAccess SourceSpan Ident
+  | ClassifiedClassFieldAccess SourceSpan Name Ident
+  deriving (Typeable, Generic, Show, Read, Data)
+
+instance Equality ClassifiedFieldAccess where
+  eq opt (ClassifiedFieldAccess s1 i1) (ClassifiedFieldAccess s2 i2) =
+    eq opt s1 s2 && eq opt i1 i2
+  eq opt (ClassifiedPrimaryFieldAccess s1 e1 i1) (ClassifiedPrimaryFieldAccess s2 e2 i2) =
+    eq opt s1 s2 && eq opt e1 e2 && eq opt i1 i2
+  eq opt (ClassifiedSuperFieldAccess s1 i1) (ClassifiedSuperFieldAccess s2 i2) =
+    eq opt s1 s2 && eq opt i1 i2
+  eq opt (ClassifiedClassFieldAccess s1 n1 i1) (ClassifiedClassFieldAccess s2 n2 i2) =
+    eq opt s1 s2 && eq opt n1 n2 && eq opt i1 i2
+  eq _ _ _ = False
+
+instance Located ClassifiedFieldAccess where
+  sourceSpan (ClassifiedFieldAccess s _) = s
+  sourceSpan (ClassifiedPrimaryFieldAccess s _ _) = s
+  sourceSpan (ClassifiedSuperFieldAccess s _) = s
+  sourceSpan (ClassifiedClassFieldAccess s _ _) = s
 
 -- ¦ A lambda parameter can be a single parameter, or mulitple formal or mulitple inferred parameters
 data LambdaParams p
