@@ -1753,8 +1753,8 @@ seplist1 p sep =
     try
       ( do
           _ <- sep
-          as <- seplist1 p sep
-          return (a <| fst as, loc)
+          (as, l) <- seplist1 p sep
+          return (a <| as, l)
       )
       <|> return (a :| [], loc)
 
