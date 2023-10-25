@@ -650,8 +650,12 @@ instance Pretty Name where
   prettyPrec p (Name _ is) =
     hcat (punctuate (char '.') $ map (prettyPrec p) (NonEmpty.toList is))
 
+instance Pretty ClassifiedExpressionName where
+  prettyPrec p (Field name) = prettyPrec p name
+  prettyPrec p (Other name) = prettyPrec p name
+
 instance Pretty ClassifiedName where
-  prettyPrec p (ExpressionName name) = prettyPrec p name
+  prettyPrec p (ExpressionName ename) = prettyPrec p ename
   prettyPrec p (TypeName name) = prettyPrec p name
   prettyPrec p (Unknown name) = prettyPrec p name
 

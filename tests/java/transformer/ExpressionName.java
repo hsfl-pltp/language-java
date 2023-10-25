@@ -29,6 +29,7 @@ public class TestA {
     }
 
     public void funcForLoop(){
+        var arrayB = new TestB[1];
         for (TestB varFor = new TestB(); varFor.returnBool(); varFor.funcB() ){
             varFor.funcB();
         }

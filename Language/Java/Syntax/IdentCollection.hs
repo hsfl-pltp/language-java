@@ -5,6 +5,7 @@ module Language.Java.Syntax.IdentCollection
     addToFields,
     addToFormalParams,
     isExpressionIdent,
+    isField,
     empty,
     addToImportedClasses,
     isImportedClass,
@@ -48,6 +49,10 @@ isExpressionIdent idnt ic =
   any (eq IgnoreSourceSpan idnt) (icLocalVars ic)
     || any (eq IgnoreSourceSpan idnt) (icFormalParams ic)
     || any (eq IgnoreSourceSpan idnt) (icFields ic)
+
+isField :: Ident -> IdentCollection -> Bool
+isField idnt ic =
+  any (eq IgnoreSourceSpan idnt) (icFields ic)
 
 isImportedClass :: Ident -> IdentCollection -> Bool
 isImportedClass idnt ic = any (eq IgnoreSourceSpan idnt) (icImportedClasses ic)

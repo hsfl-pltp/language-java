@@ -4,7 +4,7 @@ import Data.Generics.Uniplate.Data (universeBi)
 import Data.List (intercalate)
 import Language.Java.Parser
 import Language.Java.Syntax (ClassifiedName (..))
-import qualified Language.Java.Syntax.ClassifiedName as ClassfiedName
+import qualified Language.Java.Syntax.ClassifiedName as ClassifiedName
 import Language.Java.Transformer
 import System.FilePath ((</>))
 import Test.Tasty (TestTree)
@@ -12,6 +12,9 @@ import Test.Tasty.HUnit
 
 basepath :: FilePath
 basepath = "tests" </> "java" </> "transformer"
+
+fieldFile :: FilePath
+fieldFile = basepath </> "Field.java"
 
 expressionFile :: FilePath
 expressionFile = basepath </> "ExpressionName.java"
@@ -24,9 +27,10 @@ unknownFile = basepath </> "Unknown.java"
 
 allTransformerTests :: [TestTree]
 allTransformerTests =
-  [ createTestTree "ExpressionName" expressionFile (not . ClassfiedName.isExpressionName),
-    createTestTree "TypeName" typeNameFile (not . ClassfiedName.isTypeName),
-    createTestTree "Unknown" unknownFile (not . ClassfiedName.isUnknownName)
+  [ createTestTree "Field" fieldFile (not . ClassifiedName.isField),
+    createTestTree "ExpressionName" expressionFile (not . ClassifiedName.isExpressionName),
+    createTestTree "TypeName" typeNameFile (not . ClassifiedName.isTypeName),
+    createTestTree "Unknown" unknownFile (not . ClassifiedName.isUnknownName)
   ]
 
 createTestTree :: String -> FilePath -> (ClassifiedName -> Bool) -> TestTree
