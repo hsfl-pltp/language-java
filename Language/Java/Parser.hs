@@ -88,16 +88,6 @@ import Text.ParserCombinators.Parsec.Error
 import Prelude hiding (exp, (>>), (>>=))
 import qualified Prelude as P ((>>), (>>=))
 
-#if __GLASGOW_HASKELL__ < 707
-import Control.Applicative ( (<$>), (<$), (<*) )
--- Since I cba to find the instance Monad m => Applicative m declaration.
-(<*>) :: Monad m => m (a -> b) -> m a -> m b
-(<*>) = ap
-infixl 4 <*>
-#else
-import Control.Applicative ( (<$>), (<$), (<*), (<*>) )
-#endif
-
 mapFst :: (a -> b) -> (a, c) -> (b, c)
 mapFst f (x, y) = (f x, y)
 
@@ -439,11 +429,11 @@ interfaceBodyDecl :: P (Maybe (MemberDecl Parsed))
 interfaceBodyDecl =
   semiColon
     >> return Nothing
-      <|> do
-        loc <- getLocation
-        ms <- list modifier
-        imd <- interfaceMemberDecl
-        return $ Just (imd loc ms)
+    <|> do
+      loc <- getLocation
+      ms <- list modifier
+      imd <- interfaceMemberDecl
+      return $ Just (imd loc ms)
 
 interfaceMemberDecl :: P (Mod (MemberDecl Parsed))
 interfaceMemberDecl =
@@ -1567,38 +1557,35 @@ ttype :: P Type
 ttype = try (RefType <$> noLoc refType) <|> PrimType <$> primType
 
 primType :: P PrimType
-primType =
-  tok KW_Boolean
-    >> return BooleanT
-      <|> tok KW_Byte
-    >> return ByteT
-      <|> tok KW_Short
-    >> return ShortT
-      <|> tok KW_Int
-    >> return IntT
-      <|> tok KW_Long
-    >> return LongT
-      <|> tok KW_Char
-    >> return CharT
-      <|> tok KW_Float
-    >> return FloatT
-      <|> tok KW_Double
-    >> return DoubleT
+primType = do
+  startLoc <- getLocation
+  (constr, endLoc) <-
+    attrTok KW_Boolean BooleanT
+      <|> attrTok KW_Byte ByteT
+      <|> attrTok KW_Short ShortT
+      <|> attrTok KW_Int IntT
+      <|> attrTok KW_Long LongT
+      <|> attrTok KW_Char CharT
+      <|> attrTok KW_Float FloatT
+      <|> attrTok KW_Double DoubleT
+  return (constr (startLoc, endLoc))
 
 refType :: P (RefType, Location)
-refType =
+refType = do
+  startLoc <- getLocation
   ( do
       pt <- primType
-      (_ :| bs, loc) <- list1 emptyBrackets
+      (_, loc) :| bs <- list1NoLoc emptyBrackets
       return
-        ( foldl
-            (\f _ -> ArrayType . RefType . f)
-            (ArrayType . PrimType)
-            bs
-            pt,
-          loc
+        ( mapFst
+            (\a -> a pt)
+            ( foldl
+                (f startLoc)
+                (ArrayType (startLoc, loc) . PrimType, loc)
+                bs
+            )
         )
-  )
+    )
     <|> ( do
             (ct, ctLoc) <- classType
             bs <- list emptyBrackets
@@ -1606,13 +1593,15 @@ refType =
               ( mapFst
                   (\a -> a ct)
                   ( foldl
-                      (\(f, _) (_, loc) -> (ArrayType . RefType . f, loc))
+                      (f startLoc)
                       (ClassRefType, ctLoc)
                       bs
                   )
               )
         )
     <?> "refType"
+  where
+    f s (c, _) (_, loc) = (ArrayType (s, loc) . RefType . c, loc)
 
 nonArrayType :: P Type
 nonArrayType =
@@ -1621,8 +1610,9 @@ nonArrayType =
 
 classType :: P (ClassType, Location)
 classType = do
+  startLoc <- getLocation
   (cts, loc) <- seplist1 classTypeSpec period
-  return (ClassType cts, loc)
+  return (ClassType (startLoc, loc) cts, loc)
 
 classTypeSpec :: P ((Ident, [TypeArgument]), Location)
 classTypeSpec = do
@@ -1658,15 +1648,18 @@ typeArgs = angles (seplist1NoLoc typeArg comma)
 typeArg :: P TypeArgument
 typeArg =
   tok Op_Query
-    >> Wildcard <$> opt wildcardBound
-      <|> ActualType <$> noLoc refType
+    >> Wildcard
+    <$> opt wildcardBound
+    <|> ActualType <$> noLoc refType
 
 wildcardBound :: P WildcardBound
 wildcardBound =
   tok KW_Extends
-    >> ExtendsBound <$> noLoc refType
-      <|> tok KW_Super
-    >> SuperBound <$> noLoc refType
+    >> ExtendsBound
+    <$> noLoc refType
+    <|> tok KW_Super
+      >> SuperBound
+      <$> noLoc refType
 
 refTypeArgs :: P (NonEmpty RefType)
 refTypeArgs = noLoc $ angles refTypeList
@@ -1735,6 +1728,10 @@ list1 p = do
   let l = NonEmpty.fromList (map fst ll)
       loc = snd (last ll)
   return (l, loc)
+
+list1NoLoc :: P a -> P (NonEmpty a)
+list1NoLoc p =
+  NonEmpty.fromList <$> many1 p
 
 seplist :: P (a, Location) -> P sep -> P ([a], Location)
 -- seplist = sepBy
