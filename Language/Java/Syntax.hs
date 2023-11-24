@@ -66,6 +66,7 @@ module Language.Java.Syntax
     TypeParam (..),
     Ident (..),
     Name (..),
+    ClassifiedExpressionName (..),
     ClassifiedName (..),
     Op (..),
     AssignOp (..),
@@ -116,6 +117,12 @@ class (Equality (XNameClassification x)) => EqualityExtension x
 instance EqualityExtension Parsed
 
 instance EqualityExtension Analyzed
+
+class Located (XNameClassification x) => LocatedExtension x
+
+instance LocatedExtension Parsed
+
+instance LocatedExtension Analyzed
 
 -----------------------------------------------------------------------
 -- Packages
@@ -430,7 +437,7 @@ instance (EqualityExtension p) => Equality (VarInit p) where
     eq opt ai1 ai2
   eq _ _ _ = False
 
-instance Located (VarInit p) where
+instance LocatedExtension p => Located (VarInit p) where
   sourceSpan (InitExp e) = sourceSpan e
   sourceSpan (InitArray ai) = sourceSpan ai
 
@@ -634,7 +641,7 @@ instance (EqualityExtension p) => Equality (ElementValue p) where
     eq opt a1 a2
   eq _ _ _ = False
 
-instance Located (ElementValue p) where
+instance LocatedExtension p => Located (ElementValue p) where
   sourceSpan (EVVal vi) = sourceSpan vi
   sourceSpan (EVAnn ann) = sourceSpan ann
 
@@ -991,7 +998,7 @@ data Exp p
   | {-    | ArrayAccess Exp Exp -- Should this be made into a datatype, for consistency and use with Lhs? -}
 
     -- | An expression name, e.g. a variable.
-    ExpName Name
+    ExpName (XNameClassification p)
   | -- | Post-incrementation expression, i.e. an expression followed by @++@.
     PostIncrement SourceSpan (Exp p)
   | -- | Post-decrementation expression, i.e. an expression followed by @--@.
@@ -1095,7 +1102,7 @@ instance (EqualityExtension p) => Equality (Exp p) where
     eq opt s1 s2 && eq opt e1 e2 && eq opt sebs1 sebs2
   eq _ _ _ = False
 
-instance Located (Exp p) where
+instance LocatedExtension p => Located (Exp p) where
   sourceSpan (Lit l) = sourceSpan l
   sourceSpan (ClassLit s _) = s
   sourceSpan (This s) = s
@@ -1526,8 +1533,24 @@ instance Equality Name where
 instance Located Name where
   sourceSpan (Name s _) = s
 
+data ClassifiedExpressionName
+  = Field Name
+  | Other Name
+  deriving (Show, Read, Typeable, Generic, Data)
+
+instance Equality ClassifiedExpressionName where
+  eq opt (Field n1) (Field n2) =
+    eq opt n1 n2
+  eq opt (Other n1) (Other n2) =
+    eq opt n1 n2
+  eq _ _ _ = False
+
+instance Located ClassifiedExpressionName where
+  sourceSpan (Field n) = sourceSpan n
+  sourceSpan (Other n) = sourceSpan n
+
 data ClassifiedName
-  = ExpressionName Name
+  = ExpressionName ClassifiedExpressionName
   | TypeName Name
   | Unknown Name
   deriving (Show, Read, Typeable, Generic, Data)
