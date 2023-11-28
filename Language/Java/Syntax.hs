@@ -3,6 +3,7 @@
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -118,7 +119,7 @@ instance EqualityExtension Parsed
 
 instance EqualityExtension Analyzed
 
-class Located (XNameClassification x) => LocatedExtension x
+class (Located (XNameClassification x)) => LocatedExtension x
 
 instance LocatedExtension Parsed
 
@@ -437,7 +438,7 @@ instance (EqualityExtension p) => Equality (VarInit p) where
     eq opt ai1 ai2
   eq _ _ _ = False
 
-instance LocatedExtension p => Located (VarInit p) where
+instance (LocatedExtension p) => Located (VarInit p) where
   sourceSpan (InitExp e) = sourceSpan e
   sourceSpan (InitArray ai) = sourceSpan ai
 
@@ -641,7 +642,7 @@ instance (EqualityExtension p) => Equality (ElementValue p) where
     eq opt a1 a2
   eq _ _ _ = False
 
-instance LocatedExtension p => Located (ElementValue p) where
+instance (LocatedExtension p) => Located (ElementValue p) where
   sourceSpan (EVVal vi) = sourceSpan vi
   sourceSpan (EVAnn ann) = sourceSpan ann
 
@@ -1102,7 +1103,7 @@ instance (EqualityExtension p) => Equality (Exp p) where
     eq opt s1 s2 && eq opt e1 e2 && eq opt sebs1 sebs2
   eq _ _ _ = False
 
-instance LocatedExtension p => Located (Exp p) where
+instance (LocatedExtension p) => Located (Exp p) where
   sourceSpan (Lit l) = sourceSpan l
   sourceSpan (ClassLit s _) = s
   sourceSpan (This s) = s
@@ -1534,19 +1535,20 @@ instance Located Name where
   sourceSpan (Name s _) = s
 
 data ClassifiedExpressionName
-  = Field Name
+  = -- a.b.c - LocalFieldAccess a [b,c]
+    LocalFieldAccess SourceSpan Ident [Ident]
   | Other Name
   deriving (Show, Read, Typeable, Generic, Data)
 
 instance Equality ClassifiedExpressionName where
-  eq opt (Field n1) (Field n2) =
-    eq opt n1 n2
+  eq opt (LocalFieldAccess s1 i1 is1) (LocalFieldAccess s2 i2 is2) =
+    eq opt s1 s2 && eq opt i1 i2 && eq opt is1 is2
   eq opt (Other n1) (Other n2) =
     eq opt n1 n2
   eq _ _ _ = False
 
 instance Located ClassifiedExpressionName where
-  sourceSpan (Field n) = sourceSpan n
+  sourceSpan (LocalFieldAccess s _ _) = s
   sourceSpan (Other n) = sourceSpan n
 
 data ClassifiedName

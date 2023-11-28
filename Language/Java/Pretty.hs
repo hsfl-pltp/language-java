@@ -654,7 +654,7 @@ instance Pretty Name where
     hcat (punctuate (char '.') $ map (prettyPrec p) (NonEmpty.toList is))
 
 instance Pretty ClassifiedExpressionName where
-  prettyPrec p (Field name) = prettyPrec p name
+  prettyPrec p (LocalFieldAccess _ i is) = hcat (punctuate (char '.') $ map (prettyPrec p) (i : is))
   prettyPrec p (Other name) = prettyPrec p name
 
 instance Pretty ClassifiedName where

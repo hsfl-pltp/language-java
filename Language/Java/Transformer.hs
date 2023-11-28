@@ -32,8 +32,8 @@ transformCompilationUnitToAnalyzed :: CompilationUnit Parsed -> CompilationUnit 
 transformCompilationUnitToAnalyzed = transformToAnalyzed IdentCollection.empty
 
 classifyName :: Name -> IdentCollection -> ClassifiedName
-classifyName name@(Name _ (idnt :| rest)) ic
-  | IdentCollection.isField idnt ic = ExpressionName (Field name)
+classifyName name@(Name s (idnt :| rest)) ic
+  | IdentCollection.isField idnt ic = ExpressionName (LocalFieldAccess s idnt rest)
   | IdentCollection.isExpressionIdent idnt ic = ExpressionName (Other name)
   | IdentCollection.isImportedClass idnt ic = case rest of
       [] -> TypeName name
@@ -43,7 +43,7 @@ classifyName name@(Name _ (idnt :| rest)) ic
 classifyIdentFromTree :: [Ident] -> Name -> ClassInfo -> ClassifiedName
 classifyIdentFromTree [] name _ = TypeName name
 classifyIdentFromTree (idnt : rest) name classInfo
-  | ClassInfo.hasField idnt classInfo = ExpressionName (Field name)
+  | ClassInfo.hasField idnt classInfo = ExpressionName (Other name)
   | otherwise =
       maybe (Unknown name) (classifyIdentFromTree rest name) (find (ClassInfo.hasIdent idnt) (ciInnerClasses classInfo))
 

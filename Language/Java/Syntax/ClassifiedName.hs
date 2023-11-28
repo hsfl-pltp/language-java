@@ -1,9 +1,9 @@
 module Language.Java.Syntax.ClassifiedName where
 
-import Language.Java.Syntax (ClassifiedExpressionName (Field), ClassifiedName (..))
+import Language.Java.Syntax (ClassifiedExpressionName (LocalFieldAccess), ClassifiedName (..))
 
 isField :: ClassifiedName -> Bool
-isField (ExpressionName (Field _)) = True
+isField (ExpressionName (LocalFieldAccess {})) = True
 isField _ = False
 
 isExpressionName :: ClassifiedName -> Bool
